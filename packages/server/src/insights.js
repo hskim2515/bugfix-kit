@@ -14,6 +14,19 @@ export class Insights {
   constructor(cfg, store, runner, log = console) {
     this.cfg = cfg; this.store = store; this.runner = runner; this.log = log;
     this.timers = new Map();
+    this.locks = new Map();
+  }
+
+  /** 프로젝트별 잠금 - 같은 프로젝트의 fn 은 하나씩 차례로 */
+  async withLock(project, fn) {
+    const prev = this.locks.get(project) || Promise.resolve();
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const cur = prev.then(() => gate);
+    this.locks.set(project, cur);
+    await prev;
+    try { return await fn(); }
+    finally { release(); if (this.locks.get(project) === cur) this.locks.delete(project); }
   }
 
   file(project) { return path.join(this.cfg.server.dataDir, project, 'insights.json'); }

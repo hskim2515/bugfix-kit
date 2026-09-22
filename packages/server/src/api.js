@@ -86,13 +86,19 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
   app.post('/api/admin/insights/:project/report', admin, wrap(async (req) => {
     if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
     const p = proj(req);
-    const st = await insights.state(p.name);
-    const item = st.items?.find((x) => x.id === Number(req.body?.id));
-    if (!item) throw new HttpError(404, '없는 제안');
-    const id = await insights.toReport(p, item, { fix: !!req.body?.fix, reporter: req.body?.reporter || 'insights' });
-    // 만든 제안은 목록에서 '리포트 #n' 으로 표시되게
-    await insights.save(p.name, { items: st.items.map((x) => (x.id === item.id ? { ...x, reportId: id } : x)) });
-    return { bugReportId: id };
+    const fix = !!req.body?.fix;
+    if (fix && !notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
+    // 읽기~reportId 저장을 잠금 안에서 - 중복 클릭·동시 요청이 리포트를 두 번 만들지 않게
+    return insights.withLock(p.name, async () => {
+      const st = await insights.state(p.name);
+      const item = st.items?.find((x) => x.id === Number(req.body?.id));
+      if (!item) throw new HttpError(404, '없는 제안');
+      if (item.reportId) throw new HttpError(409, `이미 리포트 #${item.reportId} 로 만들었습니다`);
+      const id = await insights.toReport(p, item, { fix, reporter: req.body?.reporter || 'insights' });
+      // 만든 제안은 목록에서 '리포트 #n' 으로 표시되게
+      await insights.save(p.name, { items: st.items.map((x) => (x.id === item.id ? { ...x, reportId: id } : x)) });
+      return { bugReportId: id };
+    });
   }));
 
   const pr = express.Router({ mergeParams: true });
