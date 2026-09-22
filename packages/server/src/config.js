@@ -43,7 +43,9 @@ export function loadConfig(file) {
     if (!notBlank(p.repo) || !notBlank(p.githubRepo)) throw new Error(`projects.${name}: repo, githubRepo 는 필수`);
     const envKey = process.env[`BUGFIX_KEY_${name.toUpperCase().replace(/-/g, '_')}`];
     // 프로젝트 비밀값은 서버의 파일 하나(envFile, KEY=VALUE)에 - 저장소에는 안 들어가고, front-check 의 FC_USER/FC_PASS 등이 여기서 나온다
-    const fileEnv = readEnvFile(p.envFile ? path.resolve(baseDir, expandHome(p.envFile)) : path.join(expandHome('~/.config/bugfix-kit/projects'), `${name}.env`));
+    // 운영자 비밀값: ~/.config/bugfix-kit/default.env (모든 프로젝트 공통) ← projects/<이름>.env (프로젝트별, 우선)
+    const fileEnv = { ...readEnvFile(expandHome('~/.config/bugfix-kit/default.env')),
+      ...readEnvFile(p.envFile ? path.resolve(baseDir, expandHome(p.envFile)) : path.join(expandHome('~/.config/bugfix-kit/projects'), `${name}.env`)) };
     projects[name] = {
       name,
       baseBranch: 'main',

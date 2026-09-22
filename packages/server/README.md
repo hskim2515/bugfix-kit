@@ -65,10 +65,16 @@ curl -s localhost:8790/api/health
 | Claude Code 로그인 | 서버 실행 계정의 `claude login` (`~/.claude`) | 서버 하나에 한 번. 모든 프로젝트가 공유 |
 | GitHub 토큰 | `~/.config/bugfix-kit/github-token` (공용) · 프로젝트별로 다르면 `~/.config/bugfix-kit/projects/<이름>.env` 의 `GITHUB_TOKEN` | 전용 봇 계정의 classic PAT(repo) 권장 |
 | 프로젝트 API 키 | `bugfix-kit.yml` 의 `apiKey` 또는 `<이름>.env` 의 `BUGFIX_API_KEY` | 프론트에도 들어가는 공개 키(남용 방지 수준) |
-| front-check 테스트 계정 | `<이름>.env` 의 `FC_USER`/`FC_PASS` (서버) **또는** 저장소의 `front-check.account` (개발용 계정이면) | env 가 저장소 파일보다 우선 |
+| front-check 테스트 계정 | `<이름>.env` 의 `FC_USER`/`FC_PASS` (운영자의 것 - 서버에만) | 저장소에는 두지 않는다. 모든 프로젝트가 같은 계정이면 `default.env` 에 한 번 |
 | 프로젝트 규약·검증 명령 | `bugfix-kit.yml` 프로젝트 블록 + 저장소의 `CLAUDE.md`·`.claude/skills`·`front-check.config.mjs` | 비밀 아님, 저장소에 |
 
-`~/.config/bugfix-kit/projects/<이름>.env` 는 KEY=VALUE 한 줄씩(chmod 600). 파일만 바꾸면 재시작 없이 다음 작업부터 반영된다.
+```
+~/.config/bugfix-kit/
+  github-token            GitHub PAT 한 줄 (공용)
+  default.env             모든 프로젝트 공통 KEY=VALUE (예: 같은 테스트 계정, GITHUB_TOKEN)
+  projects/<이름>.env     프로젝트별 KEY=VALUE - default.env 보다 우선 (BUGFIX_API_KEY · GITHUB_TOKEN · FC_USER · FC_PASS)
+```
+전부 chmod 600. 파일만 바꾸면 재시작 없이 다음 작업부터 반영된다. 저장소(프로젝트)에는 비밀값을 두지 않는다 - 선택자·절차·검증 명령만.
 
 ## 개인정보·토큰
 

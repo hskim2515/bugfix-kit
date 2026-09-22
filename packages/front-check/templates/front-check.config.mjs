@@ -16,10 +16,9 @@ export default {
     done: '#app .main',                    // 로그인된 화면에만 있는 요소
     form: {                                // 있으면 login 명령·만료 갱신에 쓴다 (없으면 창을 띄워 사람이 로그인)
       url: '/login', user: '#username', pass: '#password', submit: 'button[type=submit]',
-      // 계정: 프로젝트 안 파일(설정 파일 기준 상대 경로) - 개발용 테스트 계정이면 저장소에 넣어도 됨(.gitignore 에서 빼기).
-      //       또는 credentials: { user: '…', password: '…' } 로 여기 직접. 환경변수 FC_USER/FC_PASS 가 있으면 그게 우선
+      // 계정은 여기(저장소)에 두지 않는다. 서버(bugfix-server)는 ~/.config/bugfix-kit/projects/<이름>.env 의 FC_USER/FC_PASS 로 넘겨 주고,
+      // 개발 PC 에서는 FC_USER/FC_PASS 환경변수 또는 gitignore 된 ./front-check.account (init 이 만들어 줌) 를 쓴다
       account: './front-check.account',
-      // credentials: { user: 'tester', password: '…' },
     },
   },
 

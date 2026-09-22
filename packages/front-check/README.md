@@ -62,9 +62,9 @@ export default {
 앱마다 인증이 다르므로(폼·SSO·MFA·토큰) **로그인된 브라우저 상태 파일(storageState = 쿠키+localStorage)** 을 공통으로 쓴다.
 
 ```bash
-# 가장 쉬운 길: 프로젝트 안 계정 파일(front-check.account, init 이 만들어 줌)에 user=/password= 를 적으면 끝.
-#   상태 파일은 자동으로 만들고 만료 때 갱신한다. 개발 서버용 테스트 계정이면 저장소에 넣어도 무방(.gitignore 에서 빼기),
-#   아니면 gitignore 그대로 두고 서버·PC 에 각각 둔다. 설정 파일에 credentials: { user, password } 로 직접 적어도 된다
+# 계정은 운영자의 것 - 저장소에 두지 않는다. bugfix-server 가 돌릴 때는 서버의 ~/.config/bugfix-kit/projects/<이름>.env 의
+#   FC_USER/FC_PASS 가 들어오고, 개발 PC 에서는 환경변수 또는 gitignore 된 ./front-check.account 를 쓴다.
+#   상태 파일(세션)은 자동으로 만들고 만료 때 갱신한다
 
 # 계정 파일을 둘 수 없는 앱(SSO·MFA): 한 번 사람이 로그인해 상태 파일을 만든다
 npx front-check login              # 창이 뜨면 로그인 → 상태 파일 저장 (개발 PC 에서 만들어 서버로 복사 가능)
