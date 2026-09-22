@@ -574,7 +574,7 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
     const paths = project.protectedPaths || [];
     if (!paths.length) return;
     const status = (await ex.execOut(wt, 1, ['git', 'status', '--porcelain'])).trim();
-    const files = status.split(/\r?\n/).filter(Boolean).map((l) => ({ code: l.slice(0, 2), file: l.slice(3).trim().split(' -> ').pop() }));
+    const files = parsePorcelain(status);
     const hit = files.filter((f) => paths.some((p) => f.file === p || f.file.startsWith(p.endsWith('/') ? p : p + '/')));
     if (!hit.length) return;
     for (const f of hit) {
@@ -587,7 +587,7 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
   // ── 검증·모듈 ─────────────────────────────────────────────────────────
   /** git status --porcelain 출력에서 바뀐 파일이 속한 모듈 */
   changedModules(project, porcelain) {
-    const files = porcelain.split(/\r?\n/).map((l) => l.slice(3).trim().split(' -> ').pop()).filter(Boolean);
+    const files = parsePorcelain(porcelain).map((f) => f.file);
     return project.modules.filter((m) => files.some((f) => f.startsWith(m.match)));
   }
 
@@ -729,4 +729,16 @@ async function readIfExists(p) {
 function uniqBy(arr, key) {
   const seen = new Set();
   return arr.filter((x) => { const k = key(x); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+/**
+ * `git status --porcelain` 줄 → { code, file }. 호출하는 쪽이 출력을 trim() 해 첫 줄의 앞 공백(" M path")이 사라져도
+ * 경로 첫 글자를 잘라먹지 않도록 상태 코드를 정규식으로 뗀다. 이름 바뀜(R)은 새 이름만.
+ */
+export function parsePorcelain(text) {
+  return String(text || '').split(/\r?\n/).map((l) => l.replace(/\s+$/, '')).filter(Boolean).map((l) => {
+    const m = l.match(/^\s*([MADRCU?!]{1,2})\s+(.*)$/);
+    if (!m) return null;
+    return { code: m[1].padStart(2, ' '), file: m[2].trim().split(' -> ').pop().replace(/^"|"$/g, '') };
+  }).filter(Boolean);
 }

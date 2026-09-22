@@ -119,7 +119,7 @@ export class Knowledge {
         if (rc !== 0) { full = true; await L('이전 기준 커밋을 찾지 못해 전체 구축으로 전환'); }
         else {
           changed = (await ex.exec(wt, 1, ['git', 'diff', '--name-only', prev.head, 'HEAD'])).trim();
-          if (!changed) { await this.save(name, { status: 'DONE', head, pendingUpdate: null }); await L('✓ 바뀐 파일 없음 - 그래프 그대로'); return; }
+          if (!changed) { await this.save(name, { status: 'DONE', head }); await L('✓ 바뀐 파일 없음 - 그래프 그대로'); return; }
           await fs.writeFile(path.join(dir, 'knowledge-prev.json'), JSON.stringify({ nodes: prev.nodes, edges: prev.edges }), 'utf8');
           await fs.writeFile(path.join(dir, 'changed-files.txt'), changed + '\n', 'utf8');
           await L(`바뀐 파일 ${changed.split(/\r?\n/).length}개 (${prev.head.slice(0, 8)}..${head.slice(0, 8)})`);
@@ -148,7 +148,8 @@ export class Knowledge {
 
       const graph = normalize(JSON.parse(await fs.readFile(resultFile, 'utf8')));
       if (!graph.nodes.length) throw new Error('결과에 노드가 없습니다');
-      await this.save(name, { status: 'DONE', nodes: graph.nodes, edges: graph.edges, head, builtAt: full ? nowIso() : (prev.builtAt || nowIso()), pendingUpdate: null });
+      // 구축 중에 병합이 있었으면(afterMerge 가 pendingUpdate 를 남김) 그대로 두어 다음 tick 이 갱신을 잇는다
+      await this.save(name, { status: 'DONE', nodes: graph.nodes, edges: graph.edges, head, builtAt: full ? nowIso() : (prev.builtAt || nowIso()) });
       this.cache.delete(name);
       await L(`✓ 노드 ${graph.nodes.length} · 관계 ${graph.edges.length}`);
     } finally {
@@ -302,7 +303,10 @@ export function hintsFromReport(r) {
 
 function tokens(s) {
   if (!s) return [];
-  return String(s).toLowerCase().split(/[^\p{L}\p{N}_/.-]+/u).map((w) => w.replace(/^[./-]+|[./-]+$/g, '')).filter((w) => w.length >= 2 && !STOP.has(w));
+  return String(s).toLowerCase().split(/[^\p{L}\p{N}_/.-]+/u)
+    .map((w) => w.replace(/^[./-]+|[./-]+$/g, ''))
+    .map((w) => (/^[가-힣]{3,}$/.test(w) ? w.replace(/(에서는|으로는|에서|으로|에게|까지|부터|처럼|이나|나|가|를|을|이|은|는|의|에|로|도|와|과|만)$/, '') : w))
+    .filter((w) => w.length >= 2 && !STOP.has(w));
 }
 const STOP = new Set(['the', 'and', 'that', 'this', 'with', 'from', 'null', 'undefined', 'error', 'true', 'false', 'http', 'https', 'www', '있음', '없음', '문제', '오류', '화면', '클릭', '버튼', '하면', '됩니다', '않음', '안됨', '에서', '으로', '합니다', '입니다', '경우', '이후', '다시', '계속', '때문', '같음', '있습니다', '없습니다']);
 
@@ -327,7 +331,7 @@ export function renderRelevant(g, hints, { max = 14 } = {}) {
   const picked = new Map(scored.map((x) => [x.n.id, x.n]));
   const adj = new Map();
   for (const e of g.edges) { (adj.get(e.from) || adj.set(e.from, []).get(e.from)).push(e); (adj.get(e.to) || adj.set(e.to, []).get(e.to)).push(e); }
-  for (const id of [...picked.keys()]) for (const e of adj.get(id) || []) { const o = e.from === id ? e.to : e.from; if (byId.has(o) && picked.size < max * 4) picked.set(o, byId.get(o)); }
+  for (const id of scored.slice(0, 6).map((x) => x.n.id)) for (const e of adj.get(id) || []) { const o = e.from === id ? e.to : e.from; if (byId.has(o) && picked.size < max * 3) picked.set(o, byId.get(o)); }
   const lines = [];
   const show = (n) => `${n.label}${n.route ? ` (${n.route})` : ''}${n.path ? ` \`${n.path}\`` : ''}${n.desc ? ` - ${n.desc}` : ''}`;
   const groups = [['menu', '메뉴·화면'], ['screen', null], ['feature', '기능'], ['component', '구현 파일'], ['store', null], ['util', null], ['api', 'API'], ['service', '백엔드'], ['table', null], ['module', null]];
@@ -348,17 +352,24 @@ export function renderRelevant(g, hints, { max = 14 } = {}) {
 /** 메뉴 → 기능 → 파일 트리 (제안 분석·콘솔용) */
 export function renderTree(g, { maxLines = 400 } = {}) {
   const byId = new Map(g.nodes.map((n) => [n.id, n]));
-  const kids = new Map();
-  for (const e of g.edges) if (e.rel === 'contains' || e.rel === 'uses' || e.rel === 'calls') (kids.get(e.from) || kids.set(e.from, []).get(e.from)).push(e.to);
+  const kids = new Map();      // contains 만 구조(트리)로, 나머지 관계는 한 줄 메모로
+  const rels = new Map();
+  for (const e of g.edges) {
+    if (e.rel === 'contains') (kids.get(e.from) || kids.set(e.from, []).get(e.from)).push(e.to);
+    else (rels.get(e.from) || rels.set(e.from, []).get(e.from)).push(e);
+  }
   const hasParent = new Set(g.edges.filter((e) => e.rel === 'contains').map((e) => e.to));
-  const roots = g.nodes.filter((n) => (n.type === 'menu' || n.type === 'screen') && !hasParent.has(n.id));
+  const order = { module: 0, screen: 1, menu: 2 };
+  let roots = g.nodes.filter((n) => n.type in order && !hasParent.has(n.id) && kids.has(n.id)).sort((a, b) => order[a.type] - order[b.type]);
+  if (!roots.length) roots = g.nodes.filter((n) => (n.type === 'menu' || n.type === 'screen') && !hasParent.has(n.id));
   const lines = [];
   const seen = new Set();
   const walk = (id, depth) => {
-    if (lines.length >= maxLines || depth > 3) return;
+    if (lines.length >= maxLines || depth > 5) return;
     const n = byId.get(id); if (!n) return;
     const dup = seen.has(id); seen.add(id);
-    lines.push(`${'  '.repeat(depth)}- ${n.type === 'menu' || n.type === 'screen' ? '**' + n.label + '**' : n.label}${n.route ? ` (${n.route})` : ''}${n.path ? ` \`${n.path}\`` : ''}${dup ? ' ↑' : ''}`);
+    const note = (rels.get(id) || []).slice(0, 4).map((e) => `${e.rel} ${byId.get(e.to)?.label || e.to}`).join(', ');
+    lines.push(`${'  '.repeat(depth)}- ${['module', 'menu', 'screen'].includes(n.type) ? '**' + n.label + '**' : n.label}${n.route ? ` (${n.route})` : ''}${n.path ? ` \`${n.path}\`` : ''}${note && n.type !== 'module' ? ` → ${note}` : ''}${dup ? ' ↑' : ''}`);
     if (dup) return;
     for (const k of kids.get(id) || []) walk(k, depth + 1);
   };

@@ -137,3 +137,10 @@ test('Insights.resetInterrupted: 재시작 시 QUEUED/RUNNING 분석을 FAILED �
   assert.equal((await ins.state('c')).status, 'NONE');
   await fs.rm(dataDir, { recursive: true, force: true });
 });
+
+test('parsePorcelain: trim 으로 앞 공백이 사라진 첫 줄도 경로를 온전히', async () => {
+  const { parsePorcelain } = await import('../src/runner.js');
+  const out = parsePorcelain('M lhdt-user-front/src/a.vue\n M lhdt-user-front/src/b.vue\n?? new.txt\nR  old.js -> new.js\n');
+  assert.deepEqual(out.map((f) => f.file), ['lhdt-user-front/src/a.vue', 'lhdt-user-front/src/b.vue', 'new.txt', 'new.js']);
+  assert.equal(out[2].code, '??');
+});

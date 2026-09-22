@@ -420,11 +420,14 @@
   // 메뉴/화면 → contains/uses/calls 로 내려가는 트리. 검색어가 있으면 맞는 노드와 그 조상만
   function renderTree(g, q) {
     const byId = new Map(g.nodes.map((n) => [n.id, n]));
-    const kids = new Map();
-    for (const e of g.edges) if (['contains', 'uses', 'calls', 'reads', 'writes'].includes(e.rel)) (kids.get(e.from) || kids.set(e.from, []).get(e.from)).push(e.to);
+    const kids = new Map(), rels = new Map();   // contains 는 트리, 나머지 관계는 한 줄 메모
+    for (const e of g.edges) { if (e.rel === 'contains') (kids.get(e.from) || kids.set(e.from, []).get(e.from)).push(e.to); else (rels.get(e.from) || rels.set(e.from, []).get(e.from)).push(e); }
     const hasParent = new Set(g.edges.filter((e) => e.rel === 'contains').map((e) => e.to));
-    const roots = g.nodes.filter((n) => (n.type === 'menu' || n.type === 'screen') && !hasParent.has(n.id));
-    const rest = g.nodes.filter((n) => !roots.includes(n) && !hasParent.has(n.id) && (n.type === 'feature' || n.type === 'api'));
+    const order = { module: 0, screen: 1, menu: 2 };
+    let roots = g.nodes.filter((n) => n.type in order && !hasParent.has(n.id) && kids.has(n.id)).sort((a, b) => order[a.type] - order[b.type]);
+    if (!roots.length) roots = g.nodes.filter((n) => (n.type === 'menu' || n.type === 'screen') && !hasParent.has(n.id));
+    const inTree = new Set(); const mark = (id, d) => { if (d > 6 || inTree.has(id)) return; inTree.add(id); for (const k of kids.get(id) || []) mark(k, d + 1); }; roots.forEach((r) => mark(r.id, 0));
+    const rest = g.nodes.filter((n) => !inTree.has(n.id) && ['feature', 'api', 'component', 'service'].includes(n.type));
     const qq = q.trim().toLowerCase();
     const hit = (n) => qq && `${n.label} ${n.path || ''} ${n.route || ''} ${n.desc || ''}`.toLowerCase().includes(qq);
     const seenPath = new Set();
@@ -435,7 +438,8 @@
       const anyChild = children.some((c) => c.match);
       const self = hit(n);
       if (qq && !self && !anyChild) return { html: '', match: false };
-      const label = `<span class="kn"><span class="kt">${esc(n.type)}</span>${esc(n.label)}${n.route ? `<span class="kd">${esc(n.route)}</span>` : ''}${n.path ? `<span class="kp">${esc(n.path)}</span>` : ''}${n.desc ? `<span class="kd">- ${esc(n.desc)}</span>` : ''}</span>`;
+      const note = (rels.get(id) || []).slice(0, 5).map((e) => `${e.rel} ${byId.get(e.to)?.label || e.to}`).join(' · ');
+      const label = `<span class="kn"><span class="kt">${esc(n.type)}</span>${esc(n.label)}${n.route ? `<span class="kd">${esc(n.route)}</span>` : ''}${n.path ? `<span class="kp">${esc(n.path)}</span>` : ''}${n.desc ? `<span class="kd">- ${esc(n.desc)}</span>` : ''}${note ? `<span class="kd">→ ${esc(note)}</span>` : ''}</span>`;
       const inner = children.map((c) => c.html).join('');
       const open = qq || depth < 1;
       const html = inner ? `<li class="${self ? 'hit' : ''}"><details ${open ? 'open' : ''}><summary>${label}</summary><ul>${inner}</ul></details></li>` : `<li class="${self ? 'hit' : ''}">${label}</li>`;
