@@ -35,6 +35,16 @@ export class Insights {
     this.log.info(`[insights ${project}] ${line}`);
   }
 
+  /** 서버가 재시작되면 돌던 분석은 사라진다 - QUEUED/RUNNING 으로 남아 409 가 되지 않게 FAILED 로 정리한다. */
+  async resetInterrupted() {
+    for (const p of Object.values(this.cfg.projects)) {
+      const cur = await this.state(p.name);
+      if (!['QUEUED', 'RUNNING'].includes(cur.status)) continue;
+      await this.logLine(p.name, '✗ 서버 재시작으로 중단');
+      await this.save(p.name, { status: 'FAILED' });
+    }
+  }
+
   /** 큐에 넣는다(수정 작업과 같은 큐 - Claude 하나씩). focus: 사용자가 준 관심사(선택) */
   async enqueue(project, { focus = '' } = {}) {
     const cur = await this.state(project.name);

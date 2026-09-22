@@ -28,6 +28,7 @@ const runner = new Runner(cfg, store, log);
 const insights = new Insights(cfg, store, runner, log);
 
 await store.resetInterrupted(log);
+await insights.resetInterrupted();
 const app = createApi(cfg, store, runner, log, insights);
 insights.startSchedules();
 app.listen(port, cfg.server.host, () => {
