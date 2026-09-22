@@ -15,7 +15,12 @@ export function attachCollectors(page, cfg) {
     consoleMsgs.push({ type, text: text.slice(0, 1000), at: loc?.url ? `${loc.url.split('/').pop()}:${loc.lineNumber}` : '' });
   });
   page.on('pageerror', (e) => pageErrors.push({ message: String(e.message || e).slice(0, 1000), stack: String(e.stack || '').split('\n').slice(0, 4).join('\n') }));
-  page.on('requestfailed', (r) => { if (!match(cfg.ignoreRequests, r.url())) failedRequests.push({ url: r.url().slice(0, 300), method: r.method(), status: 'ERR', error: r.failure()?.errorText || '' }); });
+  page.on('requestfailed', (r) => {
+    const err = r.failure()?.errorText || '';
+    // 페이지 이동·닫힘으로 끊긴 요청(ERR_ABORTED)은 앱 오류가 아니다 - 기본으로 뺀다 (cfg.countAborted 로 켤 수 있음)
+    if (/ERR_ABORTED/.test(err) && !cfg.countAborted) return;
+    if (!match(cfg.ignoreRequests, r.url())) failedRequests.push({ url: r.url().slice(0, 300), method: r.method(), status: 'ERR', error: err });
+  });
   page.on('response', (r) => { if (r.status() >= 400 && !match(cfg.ignoreRequests, r.url())) failedRequests.push({ url: r.url().slice(0, 300), method: r.request().method(), status: r.status() }); });
 
   return {

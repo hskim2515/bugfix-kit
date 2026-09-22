@@ -23,7 +23,7 @@
     "./package.json": "./package.json",
     "./front-check": "./packages/front-check/src/index.js"
   },
-  "version": "0.1.8",
+  "version": "0.1.9",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs"
   },
