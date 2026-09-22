@@ -18,15 +18,24 @@ export function startServer({ dir, port = 4173, proxy = {}, spa = true, host = '
     const url = new URL(req.url, `http://${host}:${port}`);
     const hit = prefixes.find(([p]) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'));
     if (hit) return forward(req, res, hit[0], hit[1]);
-    let file = path.join(root, decodeURIComponent(url.pathname));
+    let pathname;
+    try { pathname = decodeURIComponent(url.pathname); } catch { res.writeHead(400); return res.end('bad request'); }
+    let file = path.join(root, pathname);
     if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
     if (!fs.existsSync(file)) {
       if (spa && !path.extname(url.pathname)) file = path.join(root, 'index.html');
       else { res.writeHead(404); return res.end('not found'); }
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
-    fs.createReadStream(file).pipe(res);
+    const stream = fs.createReadStream(file);
+    stream.on('open', () => {
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      stream.pipe(res);
+    });
+    stream.on('error', () => {
+      if (res.headersSent) return res.destroy();
+      res.writeHead(500); res.end('read error');
+    });
   });
 
   function forward(req, res, prefix, target) {

@@ -22,9 +22,10 @@ export async function runSteps(page, steps, { baseUrl, outDir, timeoutMs = 30000
   let shot = 0;
   const loc = (target) => {
     if (typeof target === 'string') return page.locator(target).first();
+    // selector 가 있으면 text 는 대상 찾기가 아닌 내용 검사용이다
+    if (target.selector) return page.locator(target.selector).first();
     if (target.role) return page.getByRole(target.role, { name: target.name, exact: target.exact }).first();
     if (target.text) return page.getByText(target.text, { exact: target.exact ?? false }).first();
-    if (target.selector) return page.locator(target.selector).first();
     throw new Error(`대상을 알 수 없습니다: ${JSON.stringify(target)}`);
   };
 
@@ -52,7 +53,7 @@ export async function runSteps(page, steps, { baseUrl, outDir, timeoutMs = 30000
         else await page.mouse.wheel(step.scroll.x || 0, step.scroll.y || 0);
       } else if (step.expect !== undefined) {
         const e = typeof step.expect === 'string' ? { selector: step.expect } : step.expect;
-        const l = loc(e);
+        const l = e.selector ? page.locator(e.selector).first() : loc(e);
         // 개수는 first() 를 떼고 센다
         const all = e.selector || typeof e === 'string' ? page.locator(e.selector || e) : e.role ? page.getByRole(e.role, { name: e.name, exact: e.exact }) : page.getByText(e.text, { exact: e.exact ?? false });
         const count = await all.count().catch(() => 0);
