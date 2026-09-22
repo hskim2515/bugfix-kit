@@ -30,6 +30,18 @@
   .shots figcaption { font-size: 11px; color: var(--dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .shotbig { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: zoom-out; }
   .shotbig img { max-width: 94vw; max-height: 86vh; border: 1px solid var(--line); border-radius: 6px; }
+  .kg { position: relative; padding: 0; overflow: hidden; height: 74vh; min-height: 480px; }
+  #kGraph { width: 100%; height: 100%; }
+  .kg-side { position: absolute; left: 12px; top: 12px; z-index: 2; background: rgba(15,18,26,0.82); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; max-height: calc(100% - 24px); overflow: auto; }
+  .kg-side label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; } .kg-side input { margin: 0; }
+  .kg-side .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .kg-side .hint { color: var(--dim); margin-top: 4px; border-top: 1px solid var(--line); padding-top: 6px; }
+  .kg-info { position: absolute; right: 12px; top: 12px; z-index: 2; width: 340px; max-height: calc(100% - 24px); overflow: auto; background: rgba(15,18,26,0.92); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+  .kg-info h4 { margin: 0 0 6px; font-size: 13px; } .kg-info .kp { font: 11px ui-monospace, Menlo, monospace; color: var(--dim); word-break: break-all; }
+  .kg-info ul { margin: 6px 0 0; padding-left: 16px; } .kg-info li { margin: 2px 0; cursor: pointer; } .kg-info li:hover { text-decoration: underline; }
+  .kg-info .x { float: right; cursor: pointer; color: var(--dim); }
+  .kg-tip { background: rgba(15,18,26,0.95); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12px; max-width: 360px; }
+  .kg-tip .kp { font: 11px ui-monospace, Menlo, monospace; color: var(--dim); display: block; }
   .ktree ul { list-style: none; margin: 0; padding-left: 18px; } .ktree > ul { padding-left: 0; }
   .ktree li { margin: 3px 0; } .ktree .kn { cursor: default; } .ktree .kt { font-size: 10px; color: var(--dim); margin-right: 6px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
   .ktree .kp { font: 11px ui-monospace, Menlo, monospace; color: var(--dim); margin-left: 6px; } .ktree .kd { color: var(--dim); font-size: 11px; margin-left: 6px; }
@@ -162,13 +174,19 @@
     <!-- 지식 그래프 -->
     <div data-tab="knowledge" hidden>
       <div class="toolbar">
+        <span class="seg" id="kViewSeg"><button data-kv="3d" class="on">3D</button><button data-kv="tree">트리</button></span>
         <span class="dim" id="kState"></span>
         <button class="btn" id="kUpdate" title="마지막 구축 이후 바뀐 파일만 반영">갱신</button>
         <button class="btn" id="kFull" title="처음부터 다시 만든다 (5~15분, Claude 비용 발생)">전체 구축</button>
         <input type="search" id="kQ" placeholder="메뉴·기능·파일 검색" style="min-width:280px">
       </div>
       <details class="card" id="kLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="kLog"></pre></details>
-      <div class="card" id="kTree"><div class="dim">프로젝트가 연결되면 자동으로 구축됩니다. 병합될 때마다, 그리고 예약 시각(knowledge.schedule)에 갱신됩니다.</div></div>
+      <div class="card kg" id="kGraphWrap">
+        <div class="kg-side" id="kLegend"></div>
+        <div id="kGraph"></div>
+        <div class="kg-info" id="kInfo" hidden></div>
+      </div>
+      <div class="card" id="kTree" hidden><div class="dim">프로젝트가 연결되면 자동으로 구축됩니다. 병합될 때마다, 그리고 예약 시각(knowledge.schedule)에 갱신됩니다.</div></div>
     </div>
 
     <!-- 프로젝트 -->
@@ -395,7 +413,113 @@
   }
 
   // ── 지식 그래프 ──
-  let kTimer = null, kq = '';
+  let kTimer = null, kq = '', kView = '3d', kGraphKey = '', kMerged = null;
+  const K_COLORS = { module: '#ffd166', screen: '#06d6a0', menu: '#118ab2', feature: '#8ecae6', component: '#c77dff', store: '#f4a261', util: '#94a3b8', api: '#ef476f', service: '#f78c6b', table: '#ffb703' };
+  const K_LABEL = { module: '모듈', screen: '화면', menu: '메뉴', feature: '기능', component: '컴포넌트', store: '스토어', util: '유틸', api: 'API', service: '서비스', table: '테이블' };
+  const K_LINK = { contains: 'rgba(255,255,255,0.45)', uses: 'rgba(160,170,190,0.35)', calls: 'rgba(239,71,111,0.6)', reads: 'rgba(255,183,3,0.5)', writes: 'rgba(247,140,107,0.7)', navigates: 'rgba(6,214,160,0.6)' };
+  let kg3d = null, kgLibs = null, kHidden = new Set(), kSel = null, kNbr = new Map();
+  async function kgLoadLibs() {
+    if (kgLibs) return kgLibs;
+    const [fg, st] = await Promise.all([import('https://cdn.jsdelivr.net/npm/3d-force-graph@1.73.4/+esm'), import('https://cdn.jsdelivr.net/npm/three-spritetext@1.8.2/+esm')]);
+    kgLibs = { ForceGraph3D: fg.default, SpriteText: st.default };
+    return kgLibs;
+  }
+  // 프로젝트가 여럿이면 id 에 프로젝트 이름을 붙여 합친다
+  function kgMerge(graphs) {
+    const nodes = [], links = [];
+    for (const { name, g } of graphs) {
+      const pre = graphs.length > 1 ? `${name}/` : '';
+      for (const n of g.nodes) nodes.push({ ...n, id: pre + n.id, project: name });
+      for (const e of g.edges) links.push({ source: pre + e.from, target: pre + e.to, rel: e.rel });
+    }
+    const deg = new Map();
+    for (const l of links) { deg.set(l.source, (deg.get(l.source) || 0) + 1); deg.set(l.target, (deg.get(l.target) || 0) + 1); }
+    for (const n of nodes) n.deg = deg.get(n.id) || 0;
+    kNbr = new Map();
+    for (const l of links) { (kNbr.get(l.source) || kNbr.set(l.source, new Set()).get(l.source)).add(l.target); (kNbr.get(l.target) || kNbr.set(l.target, new Set()).get(l.target)).add(l.source); }
+    return { nodes, links };
+  }
+  function kgMatch(n) { const qq = kq.trim().toLowerCase(); return !!qq && `${n.label} ${n.path || ''} ${n.route || ''} ${n.desc || ''}`.toLowerCase().includes(qq); }
+  function kgVisible(n) { return !kHidden.has(n.type); }
+  function kgDim(n) {
+    const qq = kq.trim();
+    if (kSel) return n.id !== kSel && !kNbr.get(kSel)?.has(n.id);
+    return !!qq && !kgMatch(n);
+  }
+  async function kgRender(force = false) {
+    if (!kMerged) return;
+    const el = $('#kGraph');
+    const { ForceGraph3D, SpriteText } = await kgLoadLibs();
+    if (!kg3d) {
+      kg3d = ForceGraph3D()(el)
+        .backgroundColor('rgba(0,0,0,0)')
+        .showNavInfo(false)
+        .nodeId('id')
+        .nodeVal((n) => 1 + Math.min(n.deg, 30) * 0.35)
+        .nodeColor((n) => kgDim(n) ? 'rgba(90,95,110,0.35)' : (kgMatch(n) ? '#fff700' : (K_COLORS[n.type] || '#ccc')))
+        .nodeOpacity(0.95)
+        .nodeLabel((n) => `<div class="kg-tip"><b>${esc(n.label)}</b> <span class="dim">${esc(K_LABEL[n.type] || n.type)}</span>${n.route ? `<span class="kp">${esc(n.route)}</span>` : ''}${n.path ? `<span class="kp">${esc(n.path)}</span>` : ''}${n.desc ? `<div>${esc(n.desc)}</div>` : ''}</div>`)
+        .nodeThreeObjectExtend(true)
+        .nodeThreeObject((n) => {
+          // 모듈·화면·메뉴는 이름을 항상 띄운다. 나머지는 선택·검색에 걸린 것만
+          const show = ['module', 'screen', 'menu'].includes(n.type) || kgMatch(n) || n.id === kSel || (kSel && kNbr.get(kSel)?.has(n.id));
+          if (!show || kgDim(n)) return false;
+          const t = new SpriteText(n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label);
+          t.color = n.type === 'module' ? '#ffd166' : '#e8eefc'; t.textHeight = n.type === 'module' ? 6 : (n.type === 'screen' || n.type === 'menu' ? 4 : 3);
+          t.backgroundColor = 'rgba(10,12,18,0.55)'; t.padding = 1; t.borderRadius = 2;
+          t.position.y = 6 + Math.min(n.deg, 30) * 0.2;
+          return t;
+        })
+        .linkColor((l) => (kSel && l.source.id !== kSel && l.target.id !== kSel) ? 'rgba(80,85,100,0.12)' : (K_LINK[l.rel] || 'rgba(160,170,190,0.35)'))
+        .linkWidth((l) => l.rel === 'contains' ? 0.6 : 0.3)
+        .linkDirectionalArrowLength(2.2).linkDirectionalArrowRelPos(1)
+        .linkDirectionalParticles((l) => (kSel && (l.source.id === kSel || l.target.id === kSel)) ? 2 : 0).linkDirectionalParticleWidth(1.2)
+        .linkLabel((l) => `${esc(l.source.label)} ─${esc(l.rel)}→ ${esc(l.target.label)}`)
+        .nodeVisibility(kgVisible)
+        .linkVisibility((l) => kgVisible(l.source) && kgVisible(l.target))
+        .onNodeClick((n) => { kgSelect(n.id === kSel ? null : n.id); kgFly(n); })
+        .onBackgroundClick(() => kgSelect(null))
+        .warmupTicks(60).cooldownTicks(200);
+      kg3d.d3Force('charge').strength(-90);
+      kg3d.d3Force('link').distance((l) => l.rel === 'contains' ? 18 : 30);
+      window.addEventListener('resize', () => kg3d && kg3d.width(el.clientWidth).height(el.clientHeight));
+    }
+    kg3d.width(el.clientWidth).height(el.clientHeight);
+    if (force) kg3d.graphData(kMerged);
+    else kgRefresh();
+  }
+  function kgRefresh() { if (!kg3d) return; kg3d.nodeColor(kg3d.nodeColor()).nodeThreeObject(kg3d.nodeThreeObject()).linkColor(kg3d.linkColor()).linkDirectionalParticles(kg3d.linkDirectionalParticles()).nodeVisibility(kg3d.nodeVisibility()).linkVisibility(kg3d.linkVisibility()); }
+  function kgFly(n) {
+    if (!kg3d || n.x == null) return;
+    const d = 70, r = Math.hypot(n.x, n.y, n.z) || 1, k = 1 + d / r;
+    kg3d.cameraPosition({ x: n.x * k, y: n.y * k, z: n.z * k }, n, 900);
+  }
+  function kgSelect(id) {
+    kSel = id;
+    const box = $('#kInfo');
+    if (!id) { box.hidden = true; kgRefresh(); return; }
+    const n = kMerged.nodes.find((x) => x.id === id);
+    const out = kMerged.links.filter((l) => (l.source.id || l.source) === id).map((l) => ({ rel: l.rel, o: l.target.id || l.target }));
+    const inn = kMerged.links.filter((l) => (l.target.id || l.target) === id).map((l) => ({ rel: l.rel, o: l.source.id || l.source }));
+    const lab = (oid) => { const m = kMerged.nodes.find((x) => x.id === oid); return m ? `<span class="sw" style="background:${K_COLORS[m.type] || '#ccc'};margin-right:5px"></span>${esc(m.label)}` : esc(oid); };
+    box.innerHTML = `<span class="x" data-kclose>✕</span><h4><span class="sw" style="background:${K_COLORS[n.type] || '#ccc'};margin-right:6px"></span>${esc(n.label)} <span class="dim">${esc(K_LABEL[n.type] || n.type)}</span></h4>${n.route ? `<div class="kp">${esc(n.route)}</div>` : ''}${n.path ? `<div class="kp">${esc(n.path)}</div>` : ''}${n.desc ? `<div style="margin-top:4px">${esc(n.desc)}</div>` : ''}
+      ${out.length ? `<div class="dim" style="margin-top:8px">이 노드가 →</div><ul>${out.map((r) => `<li data-kgo="${esc(r.o)}"><span class="dim">${esc(r.rel)}</span> ${lab(r.o)}</li>`).join('')}</ul>` : ''}
+      ${inn.length ? `<div class="dim" style="margin-top:8px">→ 이 노드로</div><ul>${inn.map((r) => `<li data-kgo="${esc(r.o)}">${lab(r.o)} <span class="dim">${esc(r.rel)}</span></li>`).join('')}</ul>` : ''}`;
+    box.hidden = false;
+    kgRefresh();
+  }
+  function kgLegend(nodes) {
+    const cnt = {}; for (const n of nodes) cnt[n.type] = (cnt[n.type] || 0) + 1;
+    $('#kLegend').innerHTML = Object.keys(K_LABEL).filter((t) => cnt[t]).map((t) => `<label><input type="checkbox" data-ktype="${t}" ${kHidden.has(t) ? '' : 'checked'}><span class="sw" style="background:${K_COLORS[t]}"></span>${K_LABEL[t]} <span class="dim">${cnt[t]}</span></label>`).join('')
+      + `<div class="hint">드래그 회전 · 휠 확대 · 노드 클릭 = 이웃 강조 · 빈 곳 클릭 = 해제<br>선: <span style="color:${K_LINK.contains}">포함</span> · <span style="color:#ef476f">호출</span> · <span style="color:#ffb703">읽기</span>/<span style="color:#f78c6b">쓰기</span> · <span style="color:#06d6a0">이동</span></div>`;
+  }
+  function kgSearch() {
+    if (!kg3d || !kMerged) return;
+    kSel = null; $('#kInfo').hidden = true;
+    kgRefresh();
+    const first = kq.trim() ? kMerged.nodes.find((n) => kgMatch(n) && kgVisible(n)) : null;
+    if (first) kgFly(first);
+  }
   async function loadKnowledge() {
     if (!data) return;
     const multi = data.projects.length > 1;
@@ -408,13 +532,19 @@
     $('#kState').textContent = all.map(({ name, s }) => `${multi ? name + ': ' : ''}${isBusy(s) ? (s.status === 'QUEUED' ? '대기 중…' : '구축 중…') : s.nodes ? `노드 ${s.nodes} · 관계 ${s.edges} · ${s.builtAt ? '구축 ' + ago(s.builtAt) : ''}${s.updatedAt ? ' · 갱신 ' + ago(s.updatedAt) : ''}${s.pendingUpdate ? ' · 갱신 대기' : ''}` : (s.status === 'FAILED' ? '구축 실패 - 로그 확인' : '아직 없음')}`).join(' · ');
     $('#kLog').textContent = all.filter(({ s }) => s.log).map(({ name, s }) => (multi ? `── ${name} ──\n` : '') + s.log).join('\n');
     $('#kLogWrap').open = busy; if (busy) $('#kLog').scrollTop = $('#kLog').scrollHeight;
-    const parts = [];
-    for (const { name, s } of all) {
-      if (!s.nodes) continue;
-      const g = await api('GET', `/admin/knowledge/${name}/graph`);
-      parts.push(`${multi ? `<h3 style="margin:0 0 6px">${esc(name)}</h3>` : ''}${renderTree(g, kq)}`);
+    // 그래프는 head 가 바뀌었을 때만 다시 받는다(4초 폴링 중 재배치 방지)
+    const key = all.map(({ name, s }) => `${name}@${s.head}:${s.nodes}`).join('|');
+    if (key !== kGraphKey) {
+      kGraphKey = key;
+      const graphs = [];
+      for (const { name, s } of all) { if (!s.nodes) continue; graphs.push({ name, g: await api('GET', `/admin/knowledge/${name}/graph`) }); }
+      kMerged = graphs.length ? kgMerge(graphs) : null;
+      if (graphs.length) $('#kTree').innerHTML = `<div class="ktree">${graphs.map(({ name, g }) => `${multi ? `<h3 style="margin:0 0 6px">${esc(name)}</h3>` : ''}${renderTree(g, kq)}`).join('')}</div>`;
+      if (kMerged) { kgLegend(kMerged.nodes); if (kView === '3d') kgRender(true).catch((e) => { $('#kGraph').innerHTML = `<div class="dim" style="padding:16px">3D 그래프 라이브러리를 불러오지 못했습니다(인터넷 연결 필요): ${esc(e.message)}</div>`; }); }
+    } else if (kView === 'tree' && kMerged) {
+      $('#kTree').innerHTML = `<div class="ktree">${(await Promise.all(all.filter(({ s }) => s.nodes).map(async ({ name }) => ({ name, g: await api('GET', `/admin/knowledge/${name}/graph`) })))).map(({ name, g }) => `${multi ? `<h3 style="margin:0 0 6px">${esc(name)}</h3>` : ''}${renderTree(g, kq)}`).join('')}</div>`;
     }
-    if (parts.length) $('#kTree').innerHTML = `<div class="ktree">${parts.join('')}</div>`;
+    $('#kGraphWrap').hidden = kView !== '3d'; $('#kTree').hidden = kView !== 'tree';
     clearInterval(kTimer); if (busy) kTimer = setInterval(loadKnowledge, 4000);
   }
   // 메뉴/화면 → contains/uses/calls 로 내려가는 트리. 검색어가 있으면 맞는 노드와 그 조상만
@@ -589,7 +719,13 @@
     if (errs.length) alert(errs.join('\n'));
   };
   $('#q').addEventListener('input', (e) => { q = e.target.value; renderReports(); });
-  $('#kQ').addEventListener('input', (e) => { kq = e.target.value; loadKnowledge(); });
+  $('#kQ').addEventListener('input', (e) => { kq = e.target.value; if (kView === '3d') kgSearch(); else loadKnowledge(); });
+  document.addEventListener('click', (e) => {
+    const kv = e.target.closest('#kViewSeg button'); if (kv) { kView = kv.dataset.kv; document.querySelectorAll('#kViewSeg button').forEach((b) => b.classList.toggle('on', b === kv)); $('#kGraphWrap').hidden = kView !== '3d'; $('#kTree').hidden = kView !== 'tree'; if (kView === '3d' && kMerged) kgRender(!kg3d).catch(() => {}); else if (kView === 'tree') loadKnowledge(); return; }
+    const kc = e.target.closest('[data-kclose]'); if (kc) { kgSelect(null); return; }
+    const ko = e.target.closest('[data-kgo]'); if (ko) { const n = kMerged?.nodes.find((x) => x.id === ko.dataset.kgo); if (n) { kgSelect(n.id); kgFly(n); } return; }
+  });
+  document.addEventListener('change', (e) => { const kt = e.target.closest('[data-ktype]'); if (kt) { if (kt.checked) kHidden.delete(kt.dataset.ktype); else kHidden.add(kt.dataset.ktype); kgRefresh(); } });
   const kRun = (mode) => async () => { const names = data.projects.map((p) => p.name); if (mode === 'full' && !confirm(`${names.join(', ')} 의 지식 그래프를 처음부터 다시 만들까요? (5~15분, Claude 비용 발생)`)) return; const errs = []; for (const name of names) { try { await api('POST', `/admin/knowledge/${name}`, { mode }); } catch (x) { errs.push(`${name}: ${x.message}`); } } await loadKnowledge(); if (errs.length) alert(errs.join('\n')); };
   $('#kUpdate').onclick = kRun('update'); $('#kFull').onclick = kRun('full');
   $('#refresh').addEventListener('click', () => { load(); if (settings) loadSettings(); });
