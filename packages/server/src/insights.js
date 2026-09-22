@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { runClaudeStream, claudeSummary, sessionIdOf } from './claude.js';
 import { firstLine, hhmmss, nowIso } from './util.js';
+import { Shots } from './shots.js';
+import os from 'node:os';
 
 const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(git blame:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)','Bash(wc:*)', 'Write(.bugfix/insights.json)'];
 
@@ -107,7 +109,10 @@ export class Insights {
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, 'reports.md'), `# 최근 리포트 ${reports.length}건\n\n${lines.join('\n') || '(없음)'}\n`, 'utf8');
       await fs.writeFile(path.join(dir, 'recent-commits.txt'), await ex.execOut(wt, 1, ['git', 'log', '-30', '--stat', '--format=%h %ad %an %s', '--date=short']), 'utf8');
-      await L(`재료 준비: 리포트 ${reports.length}건 · 최근 커밋 30개`);
+      const kg = await this.knowledge?.writeOverview(project, dir).catch(() => false);
+      await L(`재료 준비: 리포트 ${reports.length}건 · 최근 커밋 30개${kg ? ' · 지식 그래프' : ''}`);
+      // 재료 3: 배포된 개발 화면을 헤드리스로 열어 본 결과(콘솔 오류·실패 요청·절차 실패·스크린샷). 스크린샷은 서버에 보관해 콘솔에서 본다
+      const fcNote = await this.headless(project, ex, wt, dir, L);
 
       // 도구는 읽기 전용 목록이지만 결과 파일(.bugfix/insights.json) 은 써야 하므로 acceptEdits 가 필요하다(allowedTools 의 Write(경로) 규칙만으로는 -p 모드에서 거부됨).
       // 이 작업 사본은 분석 뒤 버려지고 커밋·푸시도 없으므로 코드가 바뀌어도 어디에도 반영되지 않는다.
@@ -117,7 +122,7 @@ export class Insights {
       let out;
       try {
         out = await runClaudeStream(ex, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
-          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', String(Math.max(40, this.cfg.server.maxTurns)), '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus, fcNote), '--max-turns', String(Math.max(40, this.cfg.server.maxTurns)), '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
           (line) => { pending.push(this.logLine(name, `  ${line}`).catch((e) => this.log.warn(`[insights ${name}] 로그 기록 실패: ${e.message}`))); });
       } finally {
         await Promise.all(pending);
@@ -144,7 +149,7 @@ export class Insights {
         const j = JSON.parse(raw);
         items = (Array.isArray(j) ? j : j.items || []).map((x, i) => ({
           id: i + 1, title: String(x.title || '').slice(0, 160), severity: ['HIGH', 'MEDIUM', 'LOW'].includes(String(x.severity).toUpperCase()) ? String(x.severity).toUpperCase() : 'MEDIUM',
-          kind: String(x.kind || 'bug'), files: [].concat(x.files || []).slice(0, 8).map(String), evidence: String(x.evidence || '').slice(0, 600), proposal: String(x.proposal || '').slice(0, 800), confidence: Number(x.confidence) || 0,
+          kind: String(x.kind || 'bug'), files: [].concat(x.files || []).slice(0, 8).map(String), shots: [].concat(x.shots || []).slice(0, 4).map((n) => path.basename(String(n))), evidence: String(x.evidence || '').slice(0, 600), proposal: String(x.proposal || '').slice(0, 800), confidence: Number(x.confidence) || 0,
         })).filter((x) => x.title).slice(0, 20);
       } catch (e) { await L(`결과 파일을 읽지 못했습니다: ${firstLine(e.message, 120)}`); }
       await this.save(name, { status: 'DONE', items, ranAt: nowIso(), head: (await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim() });
@@ -154,13 +159,56 @@ export class Insights {
     }
   }
 
-  prompt(project, focus) {
+  /**
+   * 프로젝트에 front-check 설정이 있고 앱 주소(cors[0])가 있으면, 배포된 개발 화면을 모든 시나리오로 열어 본다(빌드 없이 실사이트).
+   * 결과는 .bugfix/front-check.md(요약) + 스크린샷 파일(Claude 가 Read 로 볼 수 있다), 그리고 insights.json 의 shots 에 보관 목록.
+   * 테스트 계정(FC_USER/FC_PASS)은 프로젝트 env 로 실행 환경에 들어간다.
+   */
+  async headless(project, ex, wt, dir, L) {
+    const fc = project.frontCheck;
+    const url = (project.cors || [])[0];
+    if (!fc?.cwd && !fc?.config) return '';
+    if (!url) { await L('화면 확인 건너뜀: 프로젝트 cors 에 앱 주소가 없음'); return ''; }
+    const cfgFile = path.join(wt, fc.config || path.join(fc.cwd || '.', 'front-check.config.mjs'));
+    if (!(await fs.access(cfgFile).then(() => true, () => false))) { await L(`화면 확인 건너뜀: ${path.relative(wt, cfgFile)} 없음`); return ''; }
+    const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
+    const outDir = path.join(wt, '.bugfix', 'front-check');
+    await L('화면 확인(front-check, 모든 시나리오)…');
+    let r = null;
+    try {
+      const out = await ex.sh(wt, fc.timeoutMinutes || 10, `node ${JSON.stringify(bin)} check --config ${JSON.stringify(cfgFile)} --url ${JSON.stringify(url)} --no-serve --scenario all --out ${JSON.stringify(outDir)} --json`);
+      const i = out.indexOf('{'); r = i >= 0 ? JSON.parse(out.slice(i)) : null;
+    } catch (e) {
+      const m = String(e.message || '').match(/\{[\s\S]*\}\s*$/);
+      if (m) { try { r = JSON.parse(m[0]); } catch { /* */ } }
+      if (!r) { await L(`화면 확인 실패(계속 진행): ${firstLine(e.message, 200)}`); return ''; }
+    }
+    const c = r.collected || {};
+    const line = `${r.ok ? '✓' : '✗'} 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`;
+    await L(`화면 확인 ${line}`);
+    const shots = new Shots(this.cfg.server.dataDir);
+    const saved = await shots.save(project.name, 'insights', 'run', outDir, r.screenshots, { label: `${r.scenario || ''} ${line}`.trim(), keep: 2 }).catch(() => []);
+    await this.save(project.name, { shots: saved, shotsAt: nowIso(), frontCheck: line });
+    if (saved.length) await L(`스크린샷 ${saved.length}장 보관`);
+    const md = [`# 헤드리스 화면 확인 (${url}, 시나리오: ${r.scenario || '-'})`, line, '',
+      ...(r.console || []).filter((m) => m.type === 'error').slice(0, 15).map((m) => `- 콘솔 오류: ${firstLine(m.text, 200)}`),
+      ...(r.pageErrors || []).slice(0, 10).map((m) => `- 페이지 예외: ${firstLine(typeof m === 'string' ? m : m.message || JSON.stringify(m), 200)}`),
+      ...(r.failedRequests || []).slice(0, 15).map((q) => `- 실패 요청: ${q.method || ''} ${q.url || ''} → ${q.status ?? q.error ?? ''}`),
+      ...(r.failures || []).slice(0, 10).map((f) => `- 절차 실패: ${firstLine(f, 200)}`),
+      '', `스크린샷(Read 로 볼 수 있음): ${(r.screenshots || []).map((n) => `.bugfix/front-check/${n}`).join(', ') || '없음'}`].join('\n');
+    await fs.writeFile(path.join(dir, 'front-check.md'), md + '\n', 'utf8');
+    return line;
+  }
+
+  prompt(project, focus, fcNote = '') {
     const mods = project.modules.map((m) => `  - \`${m.dir}\`: ${m.verify.map((v) => `\`${v}\``).join(' → ') || '검증 없음'}`).join('\n');
     return `${project.description || `\`${project.githubRepo}\``} 저장소입니다. 사용자가 신고하기 전에 **고칠 점을 먼저 찾는** 일입니다. 코드는 고치지 마세요 - 찾아서 목록으로만.
 
 재료:
   - \`.bugfix/reports.md\`: 최근 버그 리포트(문제 · 수정 결과 · 아직 실행 안 한 추천 개선). 반복되는 문제, 실패로 끝난 리포트, 남은 추천을 눈여겨보세요.
   - \`.bugfix/recent-commits.txt\`: 최근 커밋 30개와 바뀐 파일. 최근에 많이 바뀐 곳이 위험합니다.
+  - \`.bugfix/knowledge.md\` (있으면): 메뉴 → 기능 → 파일 지식 그래프. 어느 기능이 어떤 파일인지 여기서 먼저 찾으세요.${fcNote ? `
+  - \`.bugfix/front-check.md\`: 배포된 개발 화면을 헤드리스로 열어 본 결과(${fcNote}). 콘솔 오류·실패 요청·절차 실패는 실제 사용자가 겪는 문제이므로 우선 후보이고, 스크린샷을 Read 로 열어 화면이 깨졌는지도 보세요.` : ''}
   - 코드 자체. 모듈:
 ${mods || '  - (모듈 규칙 없음)'}
 ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
@@ -179,6 +227,7 @@ ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
     "files": ["경로:줄"], "evidence": "무엇을 봤는지(코드 인용 포함, 3줄 이내)",
     "proposal": "어떻게 고칠지 - 이 문장을 그대로 AI 에게 수정 요청으로 보낼 수 있게 구체적으로", "confidence": 0.0~1.0 }
 ]
+항목이 화면 확인 스크린샷에서 보이는 문제면 "shots": ["main.png"] 처럼 파일 이름을 넣으세요.
 파일 쓰기는 \`.bugfix/insights.json\` 만 허용됩니다. 다른 파일은 절대 고치지 마세요.`;
   }
 

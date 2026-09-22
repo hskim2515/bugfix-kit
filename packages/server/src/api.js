@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FileStore } from './store.js';
+import { Shots } from './shots.js';
 import { HttpError, notBlank } from './util.js';
 import { adminRouter } from './admin.js';
 
@@ -24,7 +25,7 @@ const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 's
  *
  * 인증: 프로젝트에 apiKey 가 있으면 `X-Bugfix-Key` 헤더가 같아야 한다. 보고자는 `X-Bugfix-User` 헤더(앱이 로그인 사용자를 넣는다) 또는 body.reporter.
  */
-export function createApi(cfg, store, runner, log = console, insights = null) {
+export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '60mb' }));
@@ -83,6 +84,11 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
   const proj = (req) => { const p = cfg.projects[req.params.project]; if (!p) throw new HttpError(404, `모르는 프로젝트: ${req.params.project}`); return p; };
   app.get('/api/admin/insights/:project', admin, wrap(async (req) => insights ? insights.state(proj(req).name) : { status: 'NONE', items: [] }));
   app.post('/api/admin/insights/:project', admin, wrap(async (req) => { if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다'); await insights.enqueue(proj(req), { focus: String(req.body?.focus || '').slice(0, 500) }); return insights.state(proj(req).name); }));
+  // ── 지식 그래프(Knowledge): 메뉴·기능 → 파일·API 온톨로지 ──
+  app.get('/api/admin/knowledge/:project', admin, wrap(async (req) => knowledge ? knowledge.summary(proj(req).name) : { status: 'NONE' }));
+  app.get('/api/admin/knowledge/:project/graph', admin, wrap(async (req) => { const s = knowledge ? await knowledge.state(proj(req).name) : {}; return { nodes: s.nodes || [], edges: s.edges || [], head: s.head || null }; }));
+  app.post('/api/admin/knowledge/:project', admin, wrap(async (req) => { if (!knowledge) throw new HttpError(503, '지식 그래프 기능이 꺼져 있습니다'); await knowledge.enqueue(proj(req), { mode: req.body?.mode === 'full' ? 'full' : 'update', reason: '콘솔' }); return knowledge.summary(proj(req).name); }));
+
   app.post('/api/admin/insights/:project/report', admin, wrap(async (req) => {
     if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
     const p = proj(req);
@@ -133,6 +139,15 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
   }));
 
   pr.get('/reports', wrap((req) => store.list(req.project.name)));
+
+  // front-check 스크린샷 (fixShots / 제안 분석의 shots 에 적힌 file). 보관 디렉터리 밖은 404
+  const shots = new Shots(cfg.server.dataDir);
+  pr.get('/shots/*', (req, res, next) => {
+    const abs = shots.resolve(req.project.name, req.params[0]);
+    if (!abs) return next(new HttpError(404, '없는 스크린샷'));
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.sendFile(abs, (e) => { if (e) next(new HttpError(404, '없는 스크린샷')); });
+  });
 
   const load = async (req) => {
     const id = Number(req.params.id);

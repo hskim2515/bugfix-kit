@@ -95,3 +95,7 @@ projects:
   #   baseBranch: develop
   #   modules:
   #     - { name: web, match: web/, dir: web, nodeModulesCache: true, verify: [npm run lint, npm run build] }
+
+# 예약(선택, 서버 시각 HH:MM). 프로젝트별로는 projects.<이름>.insights.schedule / knowledge.schedule
+#   insightsSchedule: "05:00"     # 제안 분석(리포트·커밋·코드·헤드리스 화면)
+#   knowledgeSchedule: "04:00"    # 지식 그래프 갱신 - 병합될 때마다도 자동 갱신되고, 처음 연결되면 자동 구축

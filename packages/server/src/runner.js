@@ -6,6 +6,7 @@ import { makeExec } from './exec.js';
 import { GitHub } from './github.js';
 import { runClaudeStream, sessionIdOf, resultTextOf, claudeSummary } from './claude.js';
 import { writeReportFiles } from './reportFiles.js';
+import { Shots, mergeShots } from './shots.js';
 import { firstLine, hhmmss, notBlank, nowIso, orDash, parseResult, sleep, stamp } from './util.js';
 
 const DEFAULT_TOOLS = [
@@ -69,8 +70,11 @@ export class Runner {
   }
   /** fixStatus 등 부분 갱신 (null 값은 건너뜀) */
   async updateFix(project, id, patch) {
-    const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-    return this.store.update(project.name, id, (c) => ({ ...c, ...clean, fixUpdatedAt: nowIso() }));
+    return this.store.update(project.name, id, (c) => {
+      const p = typeof patch === 'function' ? patch(c) : patch;
+      const clean = Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined));
+      return { ...c, ...clean, fixUpdatedAt: nowIso() };
+    });
   }
   async appendChat(project, id, role, text) {
     await this.store.update(project.name, id, (c) => {
@@ -142,7 +146,8 @@ export class Runner {
 
     try {
       await writeReportFiles(path.join(wt, '.bugfix'), r);
-      await L('리포트 자료 준비 (.bugfix/)');
+      const kg = await this.knowledge?.writeFor(project, path.join(wt, '.bugfix'), r).catch(() => false);
+      await L(`리포트 자료 준비 (.bugfix/)${kg ? ' + 지식 그래프 관련 부분' : ''}`);
       await this.prepareNodeModules(project, ex, wt, L);
 
       await L(`Claude Code 실행 중… (최대 ${this.cfg.server.timeoutMinutes}분)`);
@@ -228,6 +233,7 @@ export class Runner {
     await this.freshWorktree(ex, repo, jobs, wt, startRef);
     if (prOpen) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, startRef]);
     await writeReportFiles(path.join(wt, '.bugfix'), r);
+    await this.knowledge?.writeFor(project, path.join(wt, '.bugfix'), r).catch(() => false);
     await this.prepareNodeModules(project, ex, wt, L, true);
 
     try {
@@ -350,6 +356,8 @@ export class Runner {
       }
       await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' });
       await L(`✓ 병합 완료 ${base} @ ${sha.slice(0, 8)}`);
+      // 코드가 바뀌었으니 지식 그래프도 따라 갱신 (같은 큐 뒤에 붙는다)
+      this.knowledge?.afterMerge(project, `#${id} 병합`).catch(() => {});
       await gh.deleteBranch(branch);
       // 배포(GitHub Actions)는 큐를 막지 않고 따로 지켜본다 - 사용자에게 "끝까지" 는 배포까지다
       this.watchDeploy(project, gh, id, sha).catch((e) => this.log.warn(`[bugfix ${project.name}#${id}] 배포 추적 실패: ${e.message}`));
@@ -519,6 +527,7 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
   - summary.md: 문제 · 재현 절차 · 기대 결과
   - screenshot.png: 신고 당시 화면 (있으면 반드시 열어 보세요)
   - context.json: 앱 상태(화면·메뉴·켜진 데이터 등)
+  - knowledge.md (있으면): 프로젝트 지식 그래프 중 이 신고와 관련된 메뉴·기능·파일·API - 원인 파일을 찾을 때 먼저 보세요
   - frontend-logs.json / backend-logs.json / network-logs.json / mutation-log.json: 신고 직전 로그
     (이미 오류 위주로 추려 둔 것입니다. 앞쪽이 오류, 뒤쪽이 최근 순입니다)
 
@@ -608,29 +617,42 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
     if (fc.when?.length && !mods.some((m) => fc.when.includes(m.name))) return null;
     const L = (s) => this.logLine(project, id, s);
     await L('화면 확인(front-check)…');
+    const summarize = (r) => { const c = r.collected || {}; return `${r.ok ? '✓' : '✗'} 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`; };
     try {
       const out = await ex.sh(path.join(wt, fc.cwd || '.'), fc.timeoutMinutes || 10, fc.command);
       const i = out.indexOf('{');
       const r = i >= 0 ? JSON.parse(out.slice(i)) : null;
       if (!r) throw new Error('front-check 출력에 JSON 이 없습니다');
-      const c = r.collected || {};
-      const line = `${r.ok ? '✓' : '✗'} 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`;
+      const line = summarize(r);
       await L(`화면 확인 ${line}`);
       const details = [
         ...(r.console || []).filter((m) => m.type === 'error').slice(0, 3).map((m) => `- 콘솔: ${firstLine(m.text, 140)}`),
         ...(r.failures || []).slice(0, 3).map((f) => `- 절차: ${firstLine(f, 140)}`),
       ];
-      if (r.screenshots?.length) details.push(`- 스크린샷 ${r.screenshots.length}장 (${r.outDir || fc.cwd || '.'})`);
+      const shots = await this.keepShots(project, id, r, path.join(wt, fc.cwd || '.'), line);
+      if (shots.length) details.push(`- 스크린샷 ${shots.length}장: ${shots.map((s) => s.name).join(', ')} (리포트 화면에서 보기)`);
       return [line, ...details].join('\n');
     } catch (e) {
       // exit 1(기준 초과)도 명령 실패로 오므로 출력에서 JSON 을 건져 본다
       const m = String(e.message || '').match(/\{[\s\S]*\}\s*$/);
-      if (m) { try { const r = JSON.parse(m[0]); const c = r.collected || {}; const line = `✗ 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`; await L(`화면 확인 ${line}`); return line; } catch { /* 아래 */ } }
+      if (m) { try { const r = JSON.parse(m[0]); const line = summarize(r); await L(`화면 확인 ${line}`); await this.keepShots(project, id, r, path.join(wt, fc.cwd || '.'), line); return line; } catch { /* 아래 */ } }
       // 원인이 보이도록 명령 출력의 마지막 줄들도 남긴다
       const tailLines = String(e.message || '').split(/\r?\n/).filter((l) => l.trim() && !/^\s+at /.test(l)).slice(-4).join('\n');
       await L(`화면 확인 실패(계속 진행):\n${tailLines.slice(0, 600)}`);
       return `(실행 실패) ${firstLine(e.message, 200)}`;
     }
+  }
+
+  /** front-check 결과의 스크린샷을 서버 데이터로 옮기고 리포트(fixShots)에 기록한다 - 작업 사본은 곧 지워진다 */
+  async keepShots(project, id, r, cwd, label) {
+    if (!r?.screenshots?.length) return [];
+    try {
+      const outDir = path.resolve(cwd, r.outDir || 'front-check-out');
+      const shots = new Shots(this.cfg.server.dataDir);
+      const saved = await shots.save(project.name, 'fix', id, outDir, r.screenshots, { label });
+      if (saved.length) await this.updateFix(project, id, (cur) => ({ fixShots: mergeShots(cur.fixShots, saved) }));
+      return saved;
+    } catch (e) { this.log.warn(`[bugfix ${project.name}#${id}] 스크린샷 보관 실패: ${e.message}`); return []; }
   }
 
   async prepareNodeModules(project, ex, wt, L, quiet = false) {

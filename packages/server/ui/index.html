@@ -24,6 +24,18 @@
   .card .big { font-size: 22px; font-weight: 600; }
   .card .row { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
   .running { background: linear-gradient(180deg, #1f2a44, #1a2030); border-color: rgba(110,160,255,0.35); grid-column: 1 / -1; }
+  .shots { display: flex; gap: 10px; overflow-x: auto; padding: 6px 0 2px; }
+  .shots figure { margin: 0; flex: 0 0 auto; width: 220px; cursor: zoom-in; }
+  .shots img { width: 220px; height: 124px; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 6px; background: #000; display: block; }
+  .shots figcaption { font-size: 11px; color: var(--dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .shotbig { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: zoom-out; }
+  .shotbig img { max-width: 94vw; max-height: 86vh; border: 1px solid var(--line); border-radius: 6px; }
+  .ktree ul { list-style: none; margin: 0; padding-left: 18px; } .ktree > ul { padding-left: 0; }
+  .ktree li { margin: 3px 0; } .ktree .kn { cursor: default; } .ktree .kt { font-size: 10px; color: var(--dim); margin-right: 6px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  .ktree .kp { font: 11px ui-monospace, Menlo, monospace; color: var(--dim); margin-left: 6px; } .ktree .kd { color: var(--dim); font-size: 11px; margin-left: 6px; }
+  .ktree .hit > .kn { background: rgba(255,220,120,0.18); border-radius: 4px; padding: 0 3px; }
+  .ktree details > summary { cursor: pointer; list-style: none; } .ktree details > summary::-webkit-details-marker { display: none; }
+  .ktree details > summary::before { content: '▸ '; color: var(--dim); } .ktree details[open] > summary::before { content: '▾ '; }
   pre.log { margin: 8px 0 0; max-height: 220px; overflow: auto; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #cfd8e6; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; }
   pre.log.tall { max-height: 60vh; }
   .toolbar { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; flex-wrap: wrap; }
@@ -94,6 +106,7 @@
   <nav class="tabs" id="tabs">
     <button data-t="reports" class="on">리포트</button>
     <button data-t="insights">제안</button>
+    <button data-t="knowledge">지식</button>
     <button data-t="projects">프로젝트</button>
     <button data-t="secrets">키·계정</button>
     <button data-t="server">서버</button>
@@ -141,8 +154,21 @@
         <span class="dim" id="iState"></span>
       </div>
       <details class="card" id="iLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="iLog"></pre></details>
+      <div class="card" id="iShotsWrap" hidden><div class="dim" id="iShotsHead"></div><div class="shots" id="iShots"></div></div>
       <table><thead><tr><th style="width:70px">심각도</th><th class="pcol">프로젝트</th><th>제안</th><th style="width:220px">파일</th><th style="width:60px">확신</th><th style="width:200px"></th></tr></thead><tbody id="iRows"></tbody></table>
       <div class="empty" id="iEmpty">분석 실행을 누르면 AI 가 최근 리포트·커밋·코드를 읽고 고칠 점을 찾습니다 (5분 안팎, Claude 비용 발생)</div>
+    </div>
+
+    <!-- 지식 그래프 -->
+    <div data-tab="knowledge" hidden>
+      <div class="toolbar">
+        <span class="dim" id="kState"></span>
+        <button class="btn" id="kUpdate" title="마지막 구축 이후 바뀐 파일만 반영">갱신</button>
+        <button class="btn" id="kFull" title="처음부터 다시 만든다 (5~15분, Claude 비용 발생)">전체 구축</button>
+        <input type="search" id="kQ" placeholder="메뉴·기능·파일 검색" style="min-width:280px">
+      </div>
+      <details class="card" id="kLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="kLog"></pre></details>
+      <div class="card" id="kTree"><div class="dim">프로젝트가 연결되면 자동으로 구축됩니다. 병합될 때마다, 그리고 예약 시각(knowledge.schedule)에 갱신됩니다.</div></div>
     </div>
 
     <!-- 프로젝트 -->
@@ -336,16 +362,88 @@
     $('#iState').textContent = states.map(({ name, st }) => `${multi ? name + ': ' : ''}${isBusy(st) ? (st.status === 'QUEUED' ? '대기 중…' : '분석 중…') : st.ranAt ? `마지막 분석 ${ago(st.ranAt)}` : '분석 전'}`).join(' · ');
     $('#iLog').textContent = states.filter(({ st }) => st.log).map(({ name, st }) => (multi ? `── ${name} ──\n` : '') + st.log).join('\n');
     $('#iLogWrap').open = busy; if (busy) $('#iLog').scrollTop = $('#iLog').scrollHeight;
+    const withShots = states.filter(({ st }) => st.shots?.length);
+    $('#iShotsWrap').hidden = !withShots.length;
+    if (withShots.length) {
+      $('#iShotsHead').textContent = withShots.map(({ name, st }) => `${multi ? name + ': ' : ''}화면 확인 ${st.frontCheck || ''} · ${ago(st.shotsAt)}`).join(' · ');
+      const el = $('#iShots'); if (el.dataset.key !== withShots.map(({ st }) => st.shotsAt).join()) { el.dataset.key = withShots.map(({ st }) => st.shotsAt).join(); el.innerHTML = ''; for (const { name, st } of withShots) { const d = document.createElement('div'); d.className = 'shots'; el.appendChild(d); renderShots(d, name, st.shots); } }
+    }
     const items = states.flatMap(({ name, st }) => (st.items || []).map((it) => ({ ...it, project: name })));
     const order = { HIGH: 0, MEDIUM: 1, LOW: 2 };
     items.sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
     $('#iEmpty').hidden = items.length > 0 || busy;
     $('#iRows').innerHTML = items.map((it) => `<tr data-ip="${esc(it.project)}"><td>${sevPill(it.severity)}<div class="dim">${esc(it.kind)}</div></td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(it.project)}</td>
       <td><div>${esc(it.title)}</div><div class="dim" style="white-space:pre-wrap;margin-top:4px">${esc(it.evidence)}</div><div style="margin-top:4px;color:#b9c3d0">→ ${esc(it.proposal)}</div></td>
-      <td class="dim" style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all">${it.files.map(esc).join('<br>')}</td>
+      <td class="dim" style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all">${it.files.map(esc).join('<br>')}${it.shots?.length ? `<div>📷 ${it.shots.map(esc).join(', ')}</div>` : ''}</td>
       <td class="dim">${Math.round((it.confidence || 0) * 100)}%</td>
       <td>${it.reportId ? `<span class="dim">리포트 #${it.reportId}</span> <button class="btn" data-open="${it.reportId}">열기</button>` : `<button class="btn" data-ireport="${it.id}">리포트로</button> <button class="btn primary" data-ifix="${it.id}">바로 수정</button>`}</td></tr>`).join('');
     clearInterval(iTimer); if (busy) iTimer = setInterval(loadInsights, 4000);
+  }
+
+  // ── 스크린샷 (img 는 헤더를 못 보내므로 운영자 키로 받아 object URL) ──
+  const shotCache = new Map();
+  async function shotUrl(project, file) {
+    const k = `${project}/${file}`;
+    if (shotCache.has(k)) return shotCache.get(k);
+    const r = await fetch(`${API}/p/${encodeURIComponent(project)}/shots/${file.split('/').map(encodeURIComponent).join('/')}`, { headers: H() });
+    if (!r.ok) throw new Error(`스크린샷 ${r.status}`);
+    const u = URL.createObjectURL(await r.blob()); shotCache.set(k, u); return u;
+  }
+  async function renderShots(el, project, shots) {
+    el.innerHTML = shots.map((s) => `<figure data-shot="${esc(s.file)}" data-sp="${esc(project)}"><div style="width:220px;height:124px;background:#000;border-radius:6px"></div><figcaption title="${esc(s.label || '')}">${esc(s.name)} <span class="dim">${ago(s.at)}</span></figcaption></figure>`).join('');
+    for (const f of el.querySelectorAll('figure')) { try { const u = await shotUrl(project, f.dataset.shot); f.firstElementChild.outerHTML = `<img src="${u}" alt="${esc(f.dataset.shot)}">`; } catch { /* 없어진 파일 */ } }
+  }
+
+  // ── 지식 그래프 ──
+  let kTimer = null, kq = '';
+  async function loadKnowledge() {
+    if (!data) return;
+    const multi = data.projects.length > 1;
+    let all;
+    try { all = await Promise.all(data.projects.map(async (p) => ({ name: p.name, s: await api('GET', `/admin/knowledge/${p.name}`) }))); }
+    catch (e) { $('#kState').textContent = e.message; return; }
+    const isBusy = (s) => ['QUEUED', 'RUNNING'].includes(s.status);
+    const busy = all.some(({ s }) => isBusy(s));
+    $('#kUpdate').disabled = busy; $('#kFull').disabled = busy;
+    $('#kState').textContent = all.map(({ name, s }) => `${multi ? name + ': ' : ''}${isBusy(s) ? (s.status === 'QUEUED' ? '대기 중…' : '구축 중…') : s.nodes ? `노드 ${s.nodes} · 관계 ${s.edges} · ${s.builtAt ? '구축 ' + ago(s.builtAt) : ''}${s.updatedAt ? ' · 갱신 ' + ago(s.updatedAt) : ''}${s.pendingUpdate ? ' · 갱신 대기' : ''}` : (s.status === 'FAILED' ? '구축 실패 - 로그 확인' : '아직 없음')}`).join(' · ');
+    $('#kLog').textContent = all.filter(({ s }) => s.log).map(({ name, s }) => (multi ? `── ${name} ──\n` : '') + s.log).join('\n');
+    $('#kLogWrap').open = busy; if (busy) $('#kLog').scrollTop = $('#kLog').scrollHeight;
+    const parts = [];
+    for (const { name, s } of all) {
+      if (!s.nodes) continue;
+      const g = await api('GET', `/admin/knowledge/${name}/graph`);
+      parts.push(`${multi ? `<h3 style="margin:0 0 6px">${esc(name)}</h3>` : ''}${renderTree(g, kq)}`);
+    }
+    if (parts.length) $('#kTree').innerHTML = `<div class="ktree">${parts.join('')}</div>`;
+    clearInterval(kTimer); if (busy) kTimer = setInterval(loadKnowledge, 4000);
+  }
+  // 메뉴/화면 → contains/uses/calls 로 내려가는 트리. 검색어가 있으면 맞는 노드와 그 조상만
+  function renderTree(g, q) {
+    const byId = new Map(g.nodes.map((n) => [n.id, n]));
+    const kids = new Map();
+    for (const e of g.edges) if (['contains', 'uses', 'calls', 'reads', 'writes'].includes(e.rel)) (kids.get(e.from) || kids.set(e.from, []).get(e.from)).push(e.to);
+    const hasParent = new Set(g.edges.filter((e) => e.rel === 'contains').map((e) => e.to));
+    const roots = g.nodes.filter((n) => (n.type === 'menu' || n.type === 'screen') && !hasParent.has(n.id));
+    const rest = g.nodes.filter((n) => !roots.includes(n) && !hasParent.has(n.id) && (n.type === 'feature' || n.type === 'api'));
+    const qq = q.trim().toLowerCase();
+    const hit = (n) => qq && `${n.label} ${n.path || ''} ${n.route || ''} ${n.desc || ''}`.toLowerCase().includes(qq);
+    const seenPath = new Set();
+    const node = (id, depth, trail) => {
+      const n = byId.get(id); if (!n || depth > 4 || trail.has(id)) return { html: '', match: false };
+      const t = new Set(trail); t.add(id);
+      const children = (kids.get(id) || []).map((k) => node(k, depth + 1, t));
+      const anyChild = children.some((c) => c.match);
+      const self = hit(n);
+      if (qq && !self && !anyChild) return { html: '', match: false };
+      const label = `<span class="kn"><span class="kt">${esc(n.type)}</span>${esc(n.label)}${n.route ? `<span class="kd">${esc(n.route)}</span>` : ''}${n.path ? `<span class="kp">${esc(n.path)}</span>` : ''}${n.desc ? `<span class="kd">- ${esc(n.desc)}</span>` : ''}</span>`;
+      const inner = children.map((c) => c.html).join('');
+      const open = qq || depth < 1;
+      const html = inner ? `<li class="${self ? 'hit' : ''}"><details ${open ? 'open' : ''}><summary>${label}</summary><ul>${inner}</ul></details></li>` : `<li class="${self ? 'hit' : ''}">${label}</li>`;
+      return { html, match: self || anyChild };
+    };
+    const top = roots.map((r) => node(r.id, 0, new Set()).html).join('');
+    const extra = rest.map((r) => node(r.id, 0, new Set()).html).join('');
+    return `<ul>${top}</ul>${extra ? `<div class="dim" style="margin:10px 0 4px">메뉴에 매이지 않은 기능·API</div><ul>${extra}</ul>` : ''}${!top && !extra ? '<div class="dim">검색 결과 없음</div>' : ''}`;
   }
 
   // ── 설정 공통 ──
@@ -451,7 +549,9 @@
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
-    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); return; }
+    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); return; }
+    const sh = e.target.closest('.shots figure'); if (sh) { const img = sh.querySelector('img'); if (img) { const big = document.createElement('div'); big.className = 'shotbig'; big.innerHTML = `<img src="${img.src}"><div class="dim">${esc(sh.dataset.shot)} (눌러서 닫기)</div>`; big.onclick = () => big.remove(); document.body.appendChild(big); } return; }
+    const sb = e.target.closest('.shotbig'); if (sb) { sb.remove(); return; }
     const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
     const op = e.target.closest('[data-open]'); if (op && kit) { kit.setProject(op.closest('tr')?.dataset.ip); kit.openViewer(Number(op.dataset.open)); return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
@@ -485,6 +585,9 @@
     if (errs.length) alert(errs.join('\n'));
   };
   $('#q').addEventListener('input', (e) => { q = e.target.value; renderReports(); });
+  $('#kQ').addEventListener('input', (e) => { kq = e.target.value; loadKnowledge(); });
+  const kRun = (mode) => async () => { const names = data.projects.map((p) => p.name); if (mode === 'full' && !confirm(`${names.join(', ')} 의 지식 그래프를 처음부터 다시 만들까요? (5~15분, Claude 비용 발생)`)) return; const errs = []; for (const name of names) { try { await api('POST', `/admin/knowledge/${name}`, { mode }); } catch (x) { errs.push(`${name}: ${x.message}`); } } await loadKnowledge(); if (errs.length) alert(errs.join('\n')); };
+  $('#kUpdate').onclick = kRun('update'); $('#kFull').onclick = kRun('full');
   $('#refresh').addEventListener('click', () => { load(); if (settings) loadSettings(); });
   $('#logout').addEventListener('click', () => { localStorage.removeItem(KEY); key = ''; showLogin(); });
   $('#enter').addEventListener('click', () => { key = $('#key').value.trim(); localStorage.setItem(KEY, key); load(); });

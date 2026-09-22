@@ -6,7 +6,8 @@ import { expandHome, notBlank } from './util.js';
 /**
  * 설정 파일(bugfix-kit.yml) 을 읽고 기본값·환경변수를 합친다.
  *
- * server:   port · dataDir(리포트 저장) · workDir(저장소 사본·작업) · claudeBin · pathExtra · javaHome · model · maxTurns · timeoutMinutes · runAsUser
+ * server:   port · dataDir(리포트 저장) · workDir(저장소 사본·작업) · claudeBin · pathExtra · javaHome · model · maxTurns · timeoutMinutes · runAsUser · insightsSchedule · knowledgeSchedule(HH:MM)
+ *           프로젝트별: insights.schedule · knowledge.schedule · knowledge.enabled(false 면 자동 구축 안 함) · frontCheck.config(기본 {cwd}/front-check.config.mjs)
  * github:   tokenFile (또는 환경변수 BUGFIX_GITHUB_TOKEN)
  * projects: 이름 → { apiKey, repo, githubRepo, baseBranch, autoMerge, cors, description, conventions, modules[], allowedTools[], env{} }
  *   module: { name, match(변경 파일 경로 접두어), dir(명령 실행 위치), verify[](셸 명령), nodeModulesCache(bool), prebuild[]{ when, cwd, run } }

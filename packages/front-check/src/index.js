@@ -29,12 +29,15 @@ export async function check(opt = {}) {
   if (opt.steps) steps = typeof opt.steps === 'string' ? JSON.parse(opt.steps) : opt.steps;
   else if (opt.scenario) {
     steps = [];
-    for (const name of [].concat(opt.scenario)) {
+    const wanted = [].concat(opt.scenario);
+    const names = wanted.includes('all') ? Object.keys(cfg.scenarios || {}) : wanted;
+    if (!names.length) throw new Error('시나리오가 없습니다 (설정의 scenarios 가 비어 있음)');
+    for (const name of names) {
       const sc = cfg.scenarios[name];
       if (!sc) throw new Error(`시나리오가 없습니다: ${name} (있는 것: ${Object.keys(cfg.scenarios).join(', ') || '없음'})`);
       steps.push(...(Array.isArray(sc) ? sc : sc.steps));
     }
-    scenarioName = [].concat(opt.scenario).join('+');
+    scenarioName = names.join('+');
   } else if (opt.context) {
     const ctx = JSON.parse(fs.readFileSync(opt.context, 'utf8'));
     if (typeof cfg.fromContext !== 'function') throw new Error('설정에 fromContext(ctx) 가 없어 --context 를 절차로 바꿀 수 없습니다');

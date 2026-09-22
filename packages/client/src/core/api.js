@@ -6,7 +6,7 @@ export function createApi({ endpoint, project, apiKey, user, adminKey }) {
   const base = endpoint ? `${String(endpoint).replace(/\/+$/, '')}/p/${project}` : '';
   const enabled = !!base;
 
-  async function call(method, path, body, { query } = {}) {
+  async function call(method, path, body, { query, blob } = {}) {
     if (!enabled) throw new Error('버그 리포트 서버가 설정되지 않았습니다(endpoint).');
     const headers = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -16,6 +16,7 @@ export function createApi({ endpoint, project, apiKey, user, adminKey }) {
     if (u) headers['X-Bugfix-User'] = String(u);
     const qs = query ? '?' + new URLSearchParams(query).toString() : '';
     const res = await fetch(base + path + qs, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    if (blob) { if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }); return URL.createObjectURL(await res.blob()); }
     if (res.status === 204) return null;
     const text = await res.text();
     let json = null;
@@ -41,5 +42,7 @@ export function createApi({ endpoint, project, apiKey, user, adminKey }) {
     requestFix: (id) => call('POST', `/reports/${id}/request-fix`),
     fixChat: (id, message, mode) => call('POST', `/reports/${id}/fix-chat`, { message, mode }),
     fixSync: (id) => call('POST', `/reports/${id}/fix-sync`),
+    /** 스크린샷 → object URL (img src 로 쓰고, 다 쓰면 URL.revokeObjectURL) */
+    shot: (file) => call('GET', `/shots/${String(file).split('/').map(encodeURIComponent).join('/')}`, undefined, { blob: true }),
   };
 }

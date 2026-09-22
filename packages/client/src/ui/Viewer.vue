@@ -60,7 +60,13 @@
                 <img :src="detail.screenshot" class="brv-screenshot" alt="screenshot" />
               </div>
 
-              <!-- 기본 정보 -->
+              <!-- 스크린샷 크게 보기 -->
+      <div v-if="bigShot" class="brv-shots__big" @click="bigShot = null">
+        <img :src="shotUrls[bigShot.file]" :alt="bigShot.name">
+        <div class="brv-shots__bigcap">{{ bigShot.name }} · {{ bigShot.label }} <span class="brv-suggest__hint">(눌러서 닫기)</span></div>
+      </div>
+
+      <!-- 기본 정보 -->
               <div class="brv-section">
                 <div class="brv-label">기본 정보</div>
                 <div class="brv-row">
@@ -114,6 +120,18 @@
                     <span v-if="detail.fixBranch" class="brv-ai__branch brv-selectable">{{ detail.fixBranch }}</span>
                   </div>
                   <div v-if="detail.fixSummary" class="brv-ai__summary brv-selectable">{{ detail.fixSummary }}</div>
+
+                  <!-- 수정 뒤 헤드리스 화면 확인(front-check) 스크린샷 - 서버에 보관된 것 -->
+                  <div v-if="fixShots.length" class="brv-shots">
+                    <div class="brv-shots__title">화면 확인 <span class="brv-suggest__hint">{{ fixShots[fixShots.length - 1].label }}</span></div>
+                    <div class="brv-shots__strip">
+                      <figure v-for="s in fixShots" :key="s.file" class="brv-shots__item" @click="openShot(s)">
+                        <img v-if="shotUrls[s.file]" :src="shotUrls[s.file]" :alt="s.name">
+                        <div v-else class="brv-shots__ph">…</div>
+                        <figcaption>{{ s.name.replace(/\.png$/i, '') }}</figcaption>
+                      </figure>
+                    </div>
+                  </div>
 
                   <details v-if="detail.fixLog" class="brv-fix-log" :open="fixInProgress || deployPending">
                     <summary>진행 로그 <span class="brv-ai__count">{{ logLineCount }}줄</span></summary>
@@ -368,6 +386,8 @@ export default {
       now: Date.now(),
       notice: null,
       canFix: true,            // 프로젝트 설정(fixFrom) - 앱 사용자에게 수정 요청을 열어 두었는가
+      shotUrls: {},            // fixShots file → object URL
+      bigShot: null,           // 크게 보는 스크린샷
       project: null,
       info: {},
       logTab: 'front',
@@ -383,6 +403,7 @@ export default {
     // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)은 목록을 한데 모아 보여 주고 프로젝트를 골라 열므로 전환 탭이 없다
     // 도구 문제 리포트는 이 프로젝트 코드와 무관하므로 수정 UI 를 두지 않는다
     fixable() { return this.canFix && !this.detail?.tool; },
+    fixShots() { try { return this.detail?.fixShots ? JSON.parse(this.detail.fixShots) : []; } catch { return []; } },
     viewProjects() { return this.kit?.options?.adminKey ? [] : this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
     prNumber() { return this.detail?.fixPrNumber || (this.detail?.fixPrUrl || '').split('/').pop(); },
     logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
@@ -458,6 +479,7 @@ export default {
     },
   },
   watch: {
+    fixShots: { immediate: true, handler(list) { this.loadShots(list); } },
     'detail.fixLog'() {
       this.$nextTick(() => { const el = this.$refs.fixLogPre; if (el) el.scrollTop = el.scrollHeight; });
     },
@@ -477,6 +499,13 @@ export default {
       await this.fetchList();
       if (id) await this.openDetail(Number(id));     // 대시보드 등에서 특정 리포트로 바로
     },
+    async loadShots(list) {
+      for (const s of list || []) {
+        if (this.shotUrls[s.file] || !this.kit?.api?.shot) continue;
+        try { this.shotUrls[s.file] = await this.kit.api.shot(s.file); } catch { /* 없어진 파일 */ }
+      }
+    },
+    openShot(s) { this.bigShot = s; },
     async loadInfo() {
       try { const i = await this.kit.api.info(); this.canFix = i?.canFix !== false; } catch { this.canFix = true; }
     },
@@ -693,6 +722,16 @@ export default {
 .brv-fix-btn--lg { padding: 9px 18px; font-size: 13px; }
 .brv-ai__hint { font-size: 11px; color: #8898aa; line-height: 1.5; margin-top: 6px; }
 .brv-ai__meta { display: flex; gap: 10px; align-items: center; font-size: 12px; margin-bottom: 6px; }
+.brv-shots { margin: 8px 0 6px; }
+.brv-shots__title { font-size: 11px; color: #aab; margin-bottom: 4px; }
+.brv-shots__strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.brv-shots__item { margin: 0; flex: 0 0 auto; width: 150px; cursor: zoom-in; }
+.brv-shots__item img, .brv-shots__ph { width: 150px; height: 88px; object-fit: cover; object-position: top; border: 1px solid rgba(255,255,255,0.18); border-radius: 4px; background: #111; display: block; }
+.brv-shots__ph { color: #666; text-align: center; line-height: 88px; }
+.brv-shots__item figcaption { font-size: 10px; color: #99a; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brv-shots__big { position: fixed; inset: 0; z-index: 100000; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: zoom-out; gap: 8px; }
+.brv-shots__big img { max-width: 94vw; max-height: 86vh; border: 1px solid rgba(255,255,255,0.25); border-radius: 4px; }
+.brv-shots__bigcap { color: #ddd; font-size: 12px; }
 .brv-ai__pr { font-weight: 600; }
 .brv-ai__branch { color: #8898aa; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
 .brv-ai__summary { font-size: 12px; line-height: 1.55; padding: 8px 10px; background: rgba(255,255,255,0.05); border-radius: 6px; margin-bottom: 8px; }
