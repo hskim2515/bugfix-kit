@@ -125,6 +125,9 @@ export class Knowledge {
           await L(`바뀐 파일 ${changed.split(/\r?\n/).length}개 (${prev.head.slice(0, 8)}..${head.slice(0, 8)})`);
         }
       }
+      // 검증 규칙(modules)은 프론트·백엔드 두어 개뿐이라 그것만 보면 다른 패키지(관리자 프론트·타일러 등)가 빠진다 - 최상위 디렉터리를 전부 알려 준다
+      const skipDirs = new Set(['node_modules', 'dist', 'build', 'target', 'gradle', 'buildSrc', 'docs', 'doc', 'html', 'security', '.github', '.claude', '.vscode']);
+      const packages = (await ex.execOut(wt, 1, ['git', 'ls-tree', '--name-only', '-d', 'HEAD'])).split(/\r?\n/).map((d) => d.trim()).filter((d) => d && !d.startsWith('.') && !skipDirs.has(d));
       const resultFile = path.join(dir, 'knowledge.json');
       const turns = full ? Math.max(60, this.cfg.server.maxTurns) : Math.max(30, this.cfg.server.maxTurns);
       await L(`Claude ${full ? '구축' : '갱신'} 중… (읽기 전용, 최대 ${turns}턴)`);
@@ -132,7 +135,7 @@ export class Knowledge {
       const pending = [];
       const onLine = (line) => { pending.push(this.logLine(name, `  ${line}`).catch(() => {})); };
       let out;
-      try { out = await runClaudeStream(ex, wt, Math.max(10, this.cfg.server.timeoutMinutes), args(this.prompt(project, full, changed), turns), onLine); }
+      try { out = await runClaudeStream(ex, wt, Math.max(10, this.cfg.server.timeoutMinutes), args(this.prompt(project, full, changed, packages), turns), onLine); }
       finally { await Promise.all(pending); }
       await L(`Claude 종료 (${claudeSummary(out)})`);
       const sid = sessionIdOf(out);
@@ -157,8 +160,9 @@ export class Knowledge {
     }
   }
 
-  prompt(project, full, changed) {
-    const mods = project.modules.map((m) => `  - \`${m.dir}\` (${m.name})`).join('\n') || '  - (모듈 규칙 없음 - 저장소 구조를 보고 판단)';
+  prompt(project, full, changed, packages = []) {
+    const verified = new Set(project.modules.map((m) => m.dir.replace(/\/$/, '')));
+    const mods = (packages.length ? packages : project.modules.map((m) => m.dir)).map((d) => `  - \`${d}\`${verified.has(d.replace(/\/$/, '')) ? ' (검증 규칙 있음)' : ''}`).join('\n') || '  - (저장소 구조를 보고 판단)';
     const schema = `\`.bugfix/knowledge.json\` 형식:
 {
   "nodes": [ { "id": "menu:지구선택", "type": "menu|screen|feature|component|store|util|api|service|table|module", "label": "사람이 읽는 이름", "path": "저장소 상대 경로(파일이면)", "route": "/경로(화면이면)", "desc": "한 줄 설명" } ],
@@ -166,12 +170,12 @@ export class Knowledge {
 }
 규칙: id 는 "type:짧은이름" 으로 고유하게. 메뉴/화면(menu·screen)은 사용자가 보는 이름으로, 기능(feature)은 메뉴 안의 동작 단위로.
 파일 단위 노드(component·store·util·service)는 path 를 꼭 적고, api 노드는 label 에 "METHOD /경로". 엣지는 menu contains feature, feature uses component/store, component calls api, api uses service, service reads/writes table 처럼.
-노드는 최대 400개, 엣지는 최대 900개. 사소한 공용 유틸·스타일·테스트는 빼고, 메뉴·기능이 빠짐없이 들어가는 것이 우선입니다.`;
+노드는 최대 550개, 엣지는 최대 1300개(패키지가 많으면 패키지마다 최소한 module → 주요 service/component/api 까지는 넣고, 세부는 사용자 화면이 있는 패키지에 배분). 사소한 공용 유틸·스타일·테스트는 빼고, 메뉴·기능이 빠짐없이 들어가는 것이 우선입니다.`;
     if (full) {
       return `${project.description || `\`${project.githubRepo}\``} 저장소입니다. 이 프로젝트의 **지식 그래프(온톨로지)** 를 만들어 주세요. 코드는 고치지 마세요.
 목적: 나중에 버그 신고가 들어오면 "어느 메뉴/기능 → 어떤 파일·API·백엔드" 인지 바로 찾고, 질문에 답할 때 참고합니다.
 
-모듈:
+저장소 최상위 패키지(**모두** 그래프에 넣으세요 - 각 패키지가 module 노드 하나, 검증 규칙이 없는 패키지도 빠뜨리지 마세요. 관리자 프론트·타일러·동기화·보안 라이브러리처럼 사용자 화면이 없는 패키지는 module contains service/util/api 로 잇습니다):
 ${mods}
 
 진행: 라우터·메뉴 정의(라우트 파일, 사이드메뉴/헤더 컴포넌트, 메뉴 상수)에서 메뉴·화면 트리를 먼저 뽑고, 화면마다 쓰는 컴포넌트·스토어·API 호출을 Grep 으로 잇고,
