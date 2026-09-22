@@ -59,6 +59,7 @@ export function loadConfig(file) {
       modules: [],
       allowedTools: [],
       fixFrom: 'app',            // 'app' = 앱 사용자도 수정 요청 가능, 'admin' = 관리 콘솔에서만 (라이브러리·공용 코드)
+      protectedPaths: [],        // AI 가 바꾸면 되돌리는 경로(접두어 또는 정확한 파일) - 예: 버그 신고 연결 파일, CI 설정
       ...p,
       env: { ...fileEnv, ...(p.env || {}) },
       apiKey: notBlank(envKey) ? envKey : (p.apiKey || fileEnv.BUGFIX_API_KEY || ''),

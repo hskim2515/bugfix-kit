@@ -12,8 +12,8 @@
             저장된 버그 리포트
             <span v-if="hotkey" class="brv-shortcut">{{ hotkey }}</span>
           </span>
-          <span v-if="projects.length > 1" class="brv-projects">
-            <button v-for="p in projects" :key="p.key" :class="{ 'brv-projects__on': project === p.key }" @click="switchProject(p.key)">{{ p.label }}</button>
+          <span v-if="viewProjects.length > 1" class="brv-projects">
+            <button v-for="p in viewProjects" :key="p.key" :class="{ 'brv-projects__on': project === p.key }" @click="switchProject(p.key)">{{ p.label }}</button>
           </span>
           <button class="brv-close" @click="close">✕</button>
         </div>
@@ -367,6 +367,7 @@ export default {
       notice: null,
       canFix: true,            // 프로젝트 설정(fixFrom) - 앱 사용자에게 수정 요청을 열어 두었는가
       project: null,
+      info: {},
       logTab: 'front',
       expanded: new Set(),
       showFE: { error: true, warn: true, log: false },
@@ -377,6 +378,8 @@ export default {
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.viewer || ''; },
     projects() { return this.kit?.projects || []; },
+    // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)에서는 전부
+    viewProjects() { return this.kit?.options?.adminKey ? this.projects : this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
     prNumber() { return this.detail?.fixPrNumber || (this.detail?.fixPrUrl || '').split('/').pop(); },
     logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
@@ -462,6 +465,9 @@ export default {
       this.selected = null;
       this.detail = null;
       this.expanded = new Set();
+      if (this.kit?.projectInfo) this.info = { ...(await this.kit.projectInfo()) };
+      // 앱 사용자에게 안 보이는(운영자 전용) 프로젝트가 현재 대상이면 첫 앱 프로젝트로
+      if (!this.kit?.options?.adminKey && this.info[this.kit?.project]?.canFix === false) { const first = this.projects.find((p) => this.info[p.key]?.canFix !== false); if (first) this.kit.setProject(first.key); }
       this.project = this.kit?.project || null;
       await this.loadInfo();
       await this.fetchList();
