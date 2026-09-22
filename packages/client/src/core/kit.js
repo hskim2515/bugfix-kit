@@ -38,13 +38,13 @@ export function createBugfix(options = {}) {
     options: opt,
     projects,
     project: projects[0].key,
-    api: createApi({ ...opt, project: projects[0].key, apiKey: projects[0].apiKey ?? opt.apiKey }),
+    api: createApi({ ...opt, project: projects[0].key, apiKey: projects[0].apiKey ?? opt.apiKey, adminKey: opt.adminKey }),
     /** 신고·조회 대상 프로젝트 바꾸기 (모달·뷰어의 선택 상자가 부른다) */
     setProject(key) {
       const p = projects.find((x) => x.key === key);
       if (!p) return;
       kit.project = p.key;
-      kit.api = createApi({ ...opt, project: p.key, apiKey: p.apiKey ?? opt.apiKey });
+      kit.api = createApi({ ...opt, project: p.key, apiKey: p.apiKey ?? opt.apiKey, adminKey: opt.adminKey });
     },
     getLogs, getNetwork, getMutations, getRoutes, getEvents,
     captureScreen: (extra = {}) => captureScreen({ ...(opt.capture || {}), ...extra, ignore: [...(opt.capture?.ignore || []), ...(extra.ignore || [])] }),

@@ -2,7 +2,7 @@
  * bugfix-server 클라이언트. 응답 `{ content }` 를 벗겨서 돌려주고, 오류는 서버의 `{ message }` 로 Error 를 만든다.
  * endpoint 가 비어 있으면 enabled=false - 신고 UI 는 복사·다운로드만 제공한다.
  */
-export function createApi({ endpoint, project, apiKey, user }) {
+export function createApi({ endpoint, project, apiKey, user, adminKey }) {
   const base = endpoint ? `${String(endpoint).replace(/\/+$/, '')}/p/${project}` : '';
   const enabled = !!base;
 
@@ -11,6 +11,7 @@ export function createApi({ endpoint, project, apiKey, user }) {
     const headers = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (apiKey) headers['X-Bugfix-Key'] = apiKey;
+    if (adminKey) headers['X-Bugfix-Admin'] = adminKey;
     const u = typeof user === 'function' ? user() : user;
     if (u) headers['X-Bugfix-User'] = String(u);
     const qs = query ? '?' + new URLSearchParams(query).toString() : '';
@@ -30,6 +31,7 @@ export function createApi({ endpoint, project, apiKey, user }) {
   return {
     enabled,
     base,
+    info: () => call('GET', '/info'),
     save: (payload) => call('POST', '/reports', payload),
     list: () => call('GET', '/reports'),
     get: (id) => call('GET', `/reports/${id}`),

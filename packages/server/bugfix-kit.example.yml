@@ -76,6 +76,7 @@ projects:
     githubRepo: hskim2515/bugfix-kit
     baseBranch: main
     autoMerge: false          # 라이브러리는 PR 만 올리고 사람이 병합
+    fixFrom: admin            # 앱 사용자는 신고만, 수정 요청·PR 은 관리 콘솔에서만
     description: "bugfix-kit 모노레포(Node 18 ESM): packages/server(리포트 API·자동 수정 파이프라인) · packages/client(브라우저 SDK, Vue 3 → Web Component) · packages/front-check(Playwright CLI)"
     modules:
       - { name: server, match: packages/server/, dir: packages/server, verify: [npm test] }

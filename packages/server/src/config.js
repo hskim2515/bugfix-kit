@@ -58,6 +58,7 @@ export function loadConfig(file) {
       conventions: '',
       modules: [],
       allowedTools: [],
+      fixFrom: 'app',            // 'app' = 앱 사용자도 수정 요청 가능, 'admin' = 관리 콘솔에서만 (라이브러리·공용 코드)
       ...p,
       env: { ...fileEnv, ...(p.env || {}) },
       apiKey: notBlank(envKey) ? envKey : (p.apiKey || fileEnv.BUGFIX_API_KEY || ''),
