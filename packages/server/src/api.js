@@ -92,7 +92,7 @@ export function createApi(cfg, store, runner, log = console) {
 
   pr.post('/reports/:id/request-fix', wrap(async (req) => {
     const p = req.project;
-    if (!notBlank(cfg.githubToken())) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
+    if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
     const r = await load(req);
     if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '이미 수정이 진행 중입니다.');
     await store.update(p.name, r.bugReportId, (c) => ({

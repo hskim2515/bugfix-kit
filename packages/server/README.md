@@ -58,6 +58,18 @@ curl -s localhost:8790/api/health
 - `conventions`: 프롬프트에 그대로 들어가는 프로젝트 규약.
 - 비밀값은 환경변수 우선: `BUGFIX_GITHUB_TOKEN`, `BUGFIX_KEY_<PROJECT>`.
 
+## 비밀값 두는 곳 (권장 배치)
+
+| 종류 | 어디에 | 비고 |
+|---|---|---|
+| Claude Code 로그인 | 서버 실행 계정의 `claude login` (`~/.claude`) | 서버 하나에 한 번. 모든 프로젝트가 공유 |
+| GitHub 토큰 | `~/.config/bugfix-kit/github-token` (공용) · 프로젝트별로 다르면 `~/.config/bugfix-kit/projects/<이름>.env` 의 `GITHUB_TOKEN` | 전용 봇 계정의 classic PAT(repo) 권장 |
+| 프로젝트 API 키 | `bugfix-kit.yml` 의 `apiKey` 또는 `<이름>.env` 의 `BUGFIX_API_KEY` | 프론트에도 들어가는 공개 키(남용 방지 수준) |
+| front-check 테스트 계정 | `<이름>.env` 의 `FC_USER`/`FC_PASS` (서버) **또는** 저장소의 `front-check.account` (개발용 계정이면) | env 가 저장소 파일보다 우선 |
+| 프로젝트 규약·검증 명령 | `bugfix-kit.yml` 프로젝트 블록 + 저장소의 `CLAUDE.md`·`.claude/skills`·`front-check.config.mjs` | 비밀 아님, 저장소에 |
+
+`~/.config/bugfix-kit/projects/<이름>.env` 는 KEY=VALUE 한 줄씩(chmod 600). 파일만 바꾸면 재시작 없이 다음 작업부터 반영된다.
+
 ## 개인정보·토큰
 
 - 보고자·문제 원문은 PR/커밋에 넣지 않는다(리포트 번호만). `.bugfix/` 는 `.git/info/exclude` 로 커밋에서 빠진다.

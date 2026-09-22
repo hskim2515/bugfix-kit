@@ -42,6 +42,8 @@ export function loadConfig(file) {
     if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name)) throw new Error(`프로젝트 이름은 영문·숫자·-_ 만: ${name}`);
     if (!notBlank(p.repo) || !notBlank(p.githubRepo)) throw new Error(`projects.${name}: repo, githubRepo 는 필수`);
     const envKey = process.env[`BUGFIX_KEY_${name.toUpperCase().replace(/-/g, '_')}`];
+    // 프로젝트 비밀값은 서버의 파일 하나(envFile, KEY=VALUE)에 - 저장소에는 안 들어가고, front-check 의 FC_USER/FC_PASS 등이 여기서 나온다
+    const fileEnv = readEnvFile(p.envFile ? path.resolve(baseDir, expandHome(p.envFile)) : path.join(expandHome('~/.config/bugfix-kit/projects'), `${name}.env`));
     projects[name] = {
       name,
       baseBranch: 'main',
@@ -51,9 +53,12 @@ export function loadConfig(file) {
       conventions: '',
       modules: [],
       allowedTools: [],
-      env: {},
       ...p,
-      apiKey: notBlank(envKey) ? envKey : (p.apiKey || ''),
+      env: { ...fileEnv, ...(p.env || {}) },
+      apiKey: notBlank(envKey) ? envKey : (p.apiKey || fileEnv.BUGFIX_API_KEY || ''),
+      // 프로젝트별 GitHub 토큰(선택) - 없으면 서버 공용 토큰
+      githubTokenFile: p.githubTokenFile || (fileEnv.GITHUB_TOKEN ? null : undefined),
+      githubTokenValue: fileEnv.GITHUB_TOKEN || null,
     };
     projects[name].modules = (projects[name].modules || []).map((m, i) => {
       if (!notBlank(m.match)) throw new Error(`projects.${name}.modules[${i}]: match 는 필수`);
@@ -67,8 +72,10 @@ export function loadConfig(file) {
     github,
     projects,
     file: abs,
-    /** 토큰: 환경변수 → 파일(매번 읽어 재시작 없이 교체 가능). 없으면 null */
-    githubToken() {
+    /** 토큰: (프로젝트 것) → 환경변수 → 파일(매번 읽어 재시작 없이 교체 가능). 없으면 null */
+    githubToken(project) {
+      if (project?.githubTokenValue) return project.githubTokenValue;
+      if (project?.githubTokenFile) { try { return fs.readFileSync(expandHome(project.githubTokenFile), 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return null; } }
       if (notBlank(process.env.BUGFIX_GITHUB_TOKEN)) return process.env.BUGFIX_GITHUB_TOKEN.trim();
       try {
         const f = expandHome(github.tokenFile);
@@ -79,4 +86,18 @@ export function loadConfig(file) {
       }
     },
   };
+}
+
+/** KEY=VALUE 파일(# 주석, 따옴표 허용). 없으면 {} */
+export function readEnvFile(file) {
+  const out = {};
+  try {
+    for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+      if (m) out[m[1]] = m[2].replace(/^(["'])(.*)\1$/, '$2');
+    }
+  } catch { /* 파일 없음 */ }
+  return out;
 }

@@ -18,8 +18,12 @@ server:
 github:
   tokenFile: ~/.config/bugfix-kit/github-token   # 한 줄, chmod 600
 
+# 프로젝트별 비밀값은 서버의 ~/.config/bugfix-kit/projects/<이름>.env (KEY=VALUE, chmod 600) 에 둔다 - 저장소에는 안 들어간다.
+#   BUGFIX_API_KEY=…      (apiKey 대신)   GITHUB_TOKEN=…  (이 프로젝트만 다른 토큰을 쓸 때)
+#   FC_USER=… FC_PASS=…   (front-check 로그인 테스트 계정 - 저장소의 front-check.account 보다 우선)
 projects:
   lhdt:
+    # envFile: ~/.config/bugfix-kit/projects/lhdt.env   (기본값이라 생략 가능)
     repo: https://github.com/Gaia3D/lhdt.git
     githubRepo: Gaia3D/lhdt
     baseBranch: develop-new

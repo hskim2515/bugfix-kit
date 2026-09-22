@@ -52,7 +52,7 @@ export class Runner {
     if (!this.execs.has(project.name)) this.execs.set(project.name, makeExec(this.cfg.server, project, this.log));
     return this.execs.get(project.name);
   }
-  gh(project) { return new GitHub(project.githubRepo, () => this.cfg.githubToken(), this.log); }
+  gh(project) { return new GitHub(project.githubRepo, () => this.cfg.githubToken(project), this.log); }
   paths(project, id) {
     const root = path.join(this.cfg.server.workDir, project.name);
     // 리포트마다 고정 경로 - Claude 세션은 작업 디렉터리에 묶이므로(--resume) 후속 대화 때 같은 경로를 써야 한다
