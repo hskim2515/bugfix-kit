@@ -67,10 +67,11 @@ function rerunInDocker(cfg) {
   if (acct && fs.existsSync(acct)) mountRo(acct);
   const stateFile = cfg.login?.type === 'state' ? expandHome(cfg.login.file || path.join(cfg.dir || cwd, '.front-check-state.json')) : null;
   if (stateFile) { const d = path.dirname(stateFile); fs.mkdirSync(d, { recursive: true }); if (!seen.has(d) && ![...seen].some((s) => d.startsWith(s + path.sep))) { seen.add(d); mounts.push('-v', `${d}:${d}`); } }
-  const env = ['-e', `FC_USER=${process.env.FC_USER || ''}`, '-e', `FC_PASS=${process.env.FC_PASS || ''}`, '-e', `HOME=${os.homedir()}`];
+  // 계정은 값 없이 이름만 넘겨 docker 가 호출 프로세스 환경에서 상속하게 한다 - 명령줄(ps, /proc/<pid>/cmdline)에 비밀번호가 드러나지 않도록
+  const env = ['-e', 'FC_USER', '-e', 'FC_PASS', '-e', `HOME=${os.homedir()}`];
   const args = ['run', '--rm', '--network', 'host', '--ipc=host', '-w', cwd, ...mounts, ...env, cfg.docker.image,
     'node', bin, ...process.argv.slice(2), '--no-docker'];
-  const r = spawnSync('docker', args, { stdio: 'inherit' });
+  const r = spawnSync('docker', args, { stdio: 'inherit', env: process.env });
   return r.status ?? 1;
 }
 
