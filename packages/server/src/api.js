@@ -44,7 +44,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
-  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending }));
+  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy }));
 
   // ── 운영자 대시보드: /api/ui/ (nginx 가 /bugfix/ → /api/ 이면 https://…/bugfix/ui/) ──
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -89,14 +89,15 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     const fix = !!req.body?.fix;
     if (fix && !notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
     // 읽기~reportId 저장을 잠금 안에서 - 중복 클릭·동시 요청이 리포트를 두 번 만들지 않게
-    return insights.withLock(p.name, async () => {
+    // save() 가 p.name 키로 따로 잠그므로(재진입 불가) 여기서는 다른 키로 잠근다
+    return insights.withLock(`report:${p.name}`, async () => {
       const st = await insights.state(p.name);
       const item = st.items?.find((x) => x.id === Number(req.body?.id));
       if (!item) throw new HttpError(404, '없는 제안');
       if (item.reportId) throw new HttpError(409, `이미 리포트 #${item.reportId} 로 만들었습니다`);
       const id = await insights.toReport(p, item, { fix, reporter: req.body?.reporter || 'insights' });
       // 만든 제안은 목록에서 '리포트 #n' 으로 표시되게
-      await insights.save(p.name, { items: st.items.map((x) => (x.id === item.id ? { ...x, reportId: id } : x)) });
+      await insights.save(p.name, (cur) => ({ items: (cur.items || []).map((x) => (x.id === item.id ? { ...x, reportId: id } : x)) }));
       return { bugReportId: id };
     });
   }));
@@ -107,10 +108,16 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     if (!project) return next(new HttpError(404, `모르는 프로젝트: ${req.params.project}`));
     const origin = req.headers.origin;
     if (origin && project.cors?.length && !project.cors.includes(origin)) return next(new HttpError(403, `허용되지 않은 origin: ${origin}`));
-    if (notBlank(project.apiKey) && req.get('X-Bugfix-Key') !== project.apiKey) return next(new HttpError(401, 'API 키가 맞지 않습니다(X-Bugfix-Key)'));
+    req.isAdmin = notBlank(cfg.server.adminKey) && req.get('X-Bugfix-Admin') === cfg.server.adminKey;
+    if (!req.isAdmin && notBlank(project.apiKey) && req.get('X-Bugfix-Key') !== project.apiKey) return next(new HttpError(401, 'API 키가 맞지 않습니다(X-Bugfix-Key)'));
     req.project = project;
     next();
   }, pr);
+  // 수정 요청·후속 요청은 프로젝트 설정(fixFrom)에 따라 관리 콘솔에서만 허용할 수 있다
+  const fixGuard = (req, res, next) => (req.project.fixFrom === 'admin' && !req.isAdmin ? next(new HttpError(403, '이 프로젝트의 수정 요청은 관리 콘솔에서만 할 수 있습니다. 신고는 접수됐습니다.')) : next());
+
+  /** 앱 SDK 가 화면을 맞추는 데 필요한 공개 정보 */
+  pr.get('/info', wrap((req) => ({ name: req.project.name, fixFrom: req.project.fixFrom, canFix: req.project.fixFrom !== 'admin' || !!req.isAdmin, autoMerge: !!req.project.autoMerge })));
 
   pr.post('/reports', wrap(async (req) => {
     const b = req.body || {};
@@ -149,7 +156,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     res.status(204).end();
   }));
 
-  pr.post('/reports/:id/request-fix', wrap(async (req) => {
+  pr.post('/reports/:id/request-fix', fixGuard, wrap(async (req) => {
     const p = req.project;
     if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
     const r = await load(req);
@@ -164,7 +171,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     return FileStore.fixState(await store.get(p.name, r.bugReportId));
   }));
 
-  pr.post('/reports/:id/fix-chat', wrap(async (req) => {
+  pr.post('/reports/:id/fix-chat', fixGuard, wrap(async (req) => {
     const p = req.project;
     const { message, mode } = req.body || {};
     if (!notBlank(message)) throw new HttpError(400, '메시지가 비어 있습니다.');
@@ -174,6 +181,13 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     await runner.appendChat(p, r.bugReportId, 'user', message.trim());
     await runner.enqueueFollowUp(p, r.bugReportId, message.trim(), mode === 'change' ? 'change' : 'ask');
     return FileStore.fixState(await store.get(p.name, r.bugReportId));
+  }));
+
+  /** 열린 PR 을 정식 경로로 병합 (관리 콘솔·자동 병합 프로젝트용) */
+  pr.post('/reports/:id/merge', fixGuard, wrap(async (req) => {
+    const r = await load(req);
+    await runner.enqueueMerge(req.project, r.bugReportId);
+    return FileStore.fixState(await store.get(req.project.name, r.bugReportId));
   }));
 
   pr.post('/reports/:id/fix-sync', wrap(async (req) => {
