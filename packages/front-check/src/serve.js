@@ -19,7 +19,8 @@ export function startServer({ dir, port = 4173, proxy = {}, spa = true, host = '
     const hit = prefixes.find(([p]) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'));
     if (hit) return forward(req, res, hit[0], hit[1]);
     let file = path.join(root, decodeURIComponent(url.pathname));
-    if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
+    const rel = path.relative(root, file);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) { res.writeHead(403); return res.end(); }
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
     if (!fs.existsSync(file)) {
       if (spa && !path.extname(url.pathname)) file = path.join(root, 'index.html');
