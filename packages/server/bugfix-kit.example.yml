@@ -55,6 +55,11 @@ projects:
         verify:
           - ./gradlew :lhdt-rest:compileJava -q
     # 검증 뒤 실제 화면 확인 (front-check). when 의 모듈이 바뀌었을 때만. 결과는 진행 로그·PR 본문에
+    # AI 가 건드리면 되돌리는 경로 - 버그 신고 연결 파일·CI 설정 등
+    protectedPaths:
+      - lhdt-user-front/src/utils/bugfixKit.js
+      - lhdt-user-front/front-check.config.mjs
+      - .github/workflows/
     frontCheck:
       cwd: lhdt-user-front
       command: npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json
