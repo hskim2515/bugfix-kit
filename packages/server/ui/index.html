@@ -157,6 +157,7 @@
           <label>GitHub owner/repo</label><input id="p_githubRepo" placeholder="org/myapp">
           <label>기준 브랜치</label><input id="p_baseBranch" placeholder="develop">
           <label>자동 병합 <small>끄면 PR 만</small></label><div class="inline"><input type="checkbox" id="p_autoMerge"></div>
+          <label>수정 요청 <small>누가 할 수 있나</small></label><div class="inline"><select id="p_fixFrom"><option value="app">앱 사용자 + 관리 콘솔</option><option value="admin">관리 콘솔에서만 (앱은 신고만)</option></select></div>
           <label>앱 주소 <small>쉼표 구분</small></label><input id="p_cors" placeholder="https://dev.myapp.com, http://localhost:3000">
           <label>API 키 <small>프론트에 넣는 공개 키</small></label><input id="p_apiKey" placeholder="(선택)">
           <label>설명 <small>스택·구조 한 줄</small></label><input id="p_description" placeholder="MyApp (Vue 3 프론트 web/, Spring Boot 백엔드 api/)">
@@ -166,6 +167,7 @@
           <label></label><div><button class="btn" id="addMod">+ 모듈</button></div>
           <label>화면 확인 <small>front-check</small></label>
           <div class="inline"><input id="p_fc_cwd" placeholder="cwd (예: web)" style="width:140px"><input id="p_fc_cmd" placeholder="npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json" style="flex:1;min-width:320px"><input id="p_fc_when" placeholder="when: front" style="width:120px"></div>
+          <label>보호 경로 <small>AI 가 바꾸면 되돌림. 줄마다 하나</small></label><textarea id="p_protectedPaths" style="min-height:44px" placeholder="web/src/utils/bugfixKit.js&#10;.github/workflows/"></textarea>
           <label>허용 도구 <small>줄마다 하나</small></label><textarea id="p_allowedTools" style="min-height:50px"></textarea>
           <label>환경변수 <small>KEY=VALUE</small></label><textarea id="p_env" style="min-height:44px" placeholder="NODE_OPTIONS=--openssl-legacy-provider"></textarea>
         </div>
@@ -267,7 +269,7 @@
   }
   function ensureKit() {
     if (kit) return;
-    kit = BugfixKit.createBugfix({ endpoint: API, user: 'admin', hotkeys: false, interceptors: { console: false }, projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })) }).mount();
+    kit = BugfixKit.createBugfix({ endpoint: API, user: 'admin', adminKey: key, hotkeys: false, interceptors: { console: false }, projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })) }).mount();
   }
   // 시작 체크리스트 - 설정 상태와 빠른 점검으로 "남은 일" 을 보여 준다
   let quick = null;
@@ -363,19 +365,20 @@
     v('#p_name', p?.name); $('#p_name').disabled = !!p;
     v('#p_repo', p?.repo); v('#p_githubRepo', p?.githubRepo); v('#p_baseBranch', p?.baseBranch || 'main');
     $('#p_autoMerge').checked = p ? p.autoMerge !== false : true;
+    $('#p_fixFrom').value = p?.fixFrom === 'admin' ? 'admin' : 'app';
     v('#p_cors', (p?.cors || []).join(', ')); v('#p_apiKey', ''); $('#p_apiKey').placeholder = p?.apiKeySet ? `${p.apiKeySet} - 바꾸려면 입력` : '(선택)';
     v('#p_description', p?.description); v('#p_conventions', p?.conventions);
     const mods = $('#mods'); mods.innerHTML = ''; for (const m of (p?.modules || [])) mods.appendChild(modRow(m));
     v('#p_fc_cwd', p?.frontCheck?.cwd); v('#p_fc_cmd', p?.frontCheck?.command); v('#p_fc_when', (p?.frontCheck?.when || []).join(', '));
-    v('#p_allowedTools', (p?.allowedTools || []).join('\n')); v('#p_env', Object.entries(p?.env || {}).map(([k, x]) => `${k}=${x}`).join('\n'));
+    v('#p_allowedTools', (p?.allowedTools || []).join('\n')); v('#p_protectedPaths', (p?.protectedPaths || []).join('\n')); v('#p_env', Object.entries(p?.env || {}).map(([k, x]) => `${k}=${x}`).join('\n'));
     $('#delProject').disabled = !p; $('#pmsg').textContent = '';
   }
   function readProject() {
     const modules = [...$('#mods').querySelectorAll('.mod')].map((d) => ({ name: d.querySelector('[data-k=name]').value.trim(), match: d.querySelector('[data-k=match]').value.trim(), dir: d.querySelector('[data-k=dir]').value.trim() || undefined, verify: csv(d.querySelector('[data-k=verify]').value), nodeModulesCache: d.querySelector('[data-k=nm]').checked || undefined })).filter((m) => m.match);
     const env = Object.fromEntries(lines($('#p_env').value).map((l) => l.split('=')).filter((a) => a.length >= 2).map(([k, ...r]) => [k.trim(), r.join('=').trim()]));
     const fc = $('#p_fc_cmd').value.trim() ? { cwd: $('#p_fc_cwd').value.trim() || '.', command: $('#p_fc_cmd').value.trim(), when: csv($('#p_fc_when').value) } : null;
-    return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', autoMerge: $('#p_autoMerge').checked,
-      cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), env };
+    return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', autoMerge: $('#p_autoMerge').checked, fixFrom: $('#p_fixFrom').value,
+      cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), protectedPaths: lines($('#p_protectedPaths').value), env };
   }
 
   // ── 키·계정 ──

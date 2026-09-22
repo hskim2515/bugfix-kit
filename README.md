@@ -76,7 +76,7 @@ nginx: `location ^~ /bugfix/ { proxy_pass http://127.0.0.1:8790/api/; client_max
 ### ③ 앱에 두 줄
 
 ```bash
-npm i -D github:hskim2515/bugfix-kit#v0.1.21 && npx front-check init
+npm i -D github:hskim2515/bugfix-kit#v0.1.29 && npx front-check init
 ```
 ```js
 // Vue
@@ -108,12 +108,12 @@ flowchart LR
 | 질문 | 답 |
 |---|---|
 | 백엔드도 고치나요? | 네, 같은 저장소면 프론트·백엔드 다. 백엔드 검증은 컴파일·테스트까지 |
-| 신고 창 자체가 이상하면? | 신고 창에서 대상을 **버그 신고 도구**로 바꾸면 bugfix-kit 저장소로 PR |
+| 신고 창 자체가 이상하면? | 신고 창에서 대상을 **버그 신고 도구**로 바꿔 신고만. 수정·PR 은 운영자가 관리 콘솔에서 (`fixFrom: admin`) |
 | 운영 서버에 영향은? | 없음. 개발 저장소·브랜치만 건드리고, front-check 는 운영 주소 요청을 차단 가능 |
 | 개인정보는? | 신고자·문제 원문은 PR 에 안 들어감. 인증값 마스킹, AI 에겐 추린 로그만 |
-| 서버를 재시작하면? | 돌던 작업만 끊김. 앱 서버 재배포와는 무관 |
+| 서버를 재시작하면? | 끊긴 작업은 재시작 뒤 자동으로 다시 큐에 들어감(PR 을 올린 뒤면 그대로). 앱 서버 재배포와는 무관 |
 | 프론트/백엔드 저장소가 다르면? | 프로젝트 두 개로 등록하고 신고할 때 대상 선택 |
 
-문제가 생기면 콘솔 **점검** 탭과 **로그** 탭. 서버 갱신: `cd ~/bugfix-kit && git checkout -- package-lock.json && git pull && npm install && systemctl --user restart bugfix-server`
+문제가 생기면 콘솔 **점검** 탭과 **로그** 탭. 서버 갱신: `~/bugfix-kit/packages/server/deploy/update.sh` (돌던 작업이 끝나길 기다렸다가 재시작. 끊긴 작업은 재시작 뒤 자동으로 다시 큐에)
 
 자세한 옵션: [server](packages/server) · [client](packages/client) · [front-check](packages/front-check)

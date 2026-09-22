@@ -83,9 +83,10 @@ test('FileStore: 저장·조회·목록·갱신·재시작 정리', async () => 
   await Promise.all([st.update('p', 1, (c) => ({ ...c, x: 1 })), st.update('p', 1, (c) => ({ ...c, y: 2 }))]);
   const r1 = await st.get('p', 1);
   assert.equal(r1.x, 1); assert.equal(r1.y, 2);
-  await st.resetInterrupted({ warn() {} });
-  assert.equal((await st.get('p', 1)).fixStatus, 'PR_OPENED');
-  assert.equal((await st.get('p', 2)).fixStatus, 'FAILED');
+  const redo = await st.resetInterrupted({ warn() {} });
+  assert.equal((await st.get('p', 1)).fixStatus, 'PR_OPENED');       // PR 있음 → 열린 채
+  assert.equal((await st.get('p', 2)).fixStatus, 'QUEUED');          // PR 없음 → 다시 큐
+  assert.deepEqual(redo, [{ project: 'p', id: 2, kind: 'fix' }]);
   assert.equal(FileStore.fixState(await st.get('p', 1)).screenshot, undefined);
   assert.equal(await st.delete('p', 2), true);
   assert.equal(await st.get('p', 2), null);
@@ -119,4 +120,20 @@ test('Insights 예약: 매 tick 현재 설정을 읽고, 시각이 지났고 오
   await ins.tickSchedules(new Date(2026, 8, 23, 3, 0));
   assert.deepEqual(ran, ['a@dev', 'b@main', 'a@dev']);
   assert.equal((await ins.state('a')).lastScheduledDate, '2026-09-23');
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('Insights.resetInterrupted: 재시작 시 QUEUED/RUNNING 분석을 FAILED 로 정리', async () => {
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bfk-ins-'));
+  const cfg = { server: { dataDir }, projects: { a: { name: 'a' }, b: { name: 'b' }, c: { name: 'c' } } };
+  const ins = new Insights(cfg, null, null, { info() {}, warn() {} });
+  await ins.save('a', { status: 'RUNNING', log: '' });
+  await ins.save('b', { status: 'DONE', log: '' });
+  await ins.resetInterrupted();
+  const a = await ins.state('a');
+  assert.equal(a.status, 'FAILED');
+  assert.match(a.log, /서버 재시작으로 중단/);
+  assert.equal((await ins.state('b')).status, 'DONE');
+  assert.equal((await ins.state('c')).status, 'NONE');
+  await fs.rm(dataDir, { recursive: true, force: true });
 });

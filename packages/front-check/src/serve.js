@@ -18,15 +18,24 @@ export function startServer({ dir, port = 4173, proxy = {}, spa = true, host = '
     const url = new URL(req.url, `http://${host}:${port}`);
     const hit = prefixes.find(([p]) => url.pathname === p || url.pathname.startsWith(p.endsWith('/') ? p : p + '/'));
     if (hit) return forward(req, res, hit[0], hit[1]);
-    let file = path.join(root, decodeURIComponent(url.pathname));
+    let pathname;
+    try { pathname = decodeURIComponent(url.pathname); } catch { res.writeHead(400); return res.end('bad request'); }
+    let file = path.join(root, pathname);
     if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
     if (!fs.existsSync(file)) {
       if (spa && !path.extname(url.pathname)) file = path.join(root, 'index.html');
       else { res.writeHead(404); return res.end('not found'); }
     }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
-    fs.createReadStream(file).pipe(res);
+    const stream = fs.createReadStream(file);
+    stream.on('open', () => {
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      stream.pipe(res);
+    });
+    stream.on('error', () => {
+      if (res.headersSent) return res.destroy();
+      res.writeHead(500); res.end('read error');
+    });
   });
 
   function forward(req, res, prefix, target) {
@@ -38,9 +47,16 @@ export function startServer({ dir, port = 4173, proxy = {}, spa = true, host = '
     delete headers['accept-encoding'];
     const up = mod.request({ protocol: t.protocol, hostname: t.hostname, port: t.port || (t.protocol === 'https:' ? 443 : 80), path: upstreamPath, method: req.method, headers, rejectUnauthorized: false }, (ur) => {
       res.writeHead(ur.statusCode, ur.headers);
+      ur.on('error', () => { up.destroy(); res.destroy(); });
       ur.pipe(res);
     });
-    up.on('error', (e) => { res.writeHead(502); res.end(`proxy error: ${e.message}`); });
+    // 응답을 스트리밍하던 중이면 헤더가 이미 나갔으므로 502 대신 연결만 끊는다
+    up.on('error', (e) => {
+      if (res.headersSent) return res.destroy();
+      res.writeHead(502);
+      res.end(`proxy error: ${e.message}`);
+    });
+    req.on('aborted', () => up.destroy());
     req.pipe(up);
   }
 

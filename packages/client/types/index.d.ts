@@ -15,6 +15,8 @@ export interface BugfixOptions {
   project?: string;
   projects?: Array<string | BugfixProject>;
   apiKey?: string;
+  /** 관리 콘솔 전용 - 운영자 키 (앱에는 넣지 않는다) */
+  adminKey?: string;
   user?: string | (() => string);
   context?: () => Record<string, unknown>;
   capture?: { canvases?: () => HTMLCanvasElement[]; beforeCapture?: () => void; ignore?: string[]; ignoreElement?: (el: Element) => boolean };
@@ -26,6 +28,7 @@ export interface BugfixOptions {
 }
 export interface BugfixApi {
   enabled: boolean;
+  info(): Promise<{ name: string; fixFrom: 'app' | 'admin'; canFix: boolean; autoMerge: boolean }>;
   save(payload: Record<string, unknown>): Promise<{ bugReportId: number }>;
   list(): Promise<unknown[]>;
   get(id: number): Promise<unknown>;

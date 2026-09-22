@@ -22,6 +22,7 @@ const CONFLICT_TOOLS = [
   'Read', 'Edit', 'Write', 'MultiEdit', 'Glob', 'Grep',
   'Bash(git diff:*)', 'Bash(git status:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git add:*)',
   'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(sed -n:*)',
+  'Bash(node --check:*)', 'Bash(npm test:*)',
 ];
 const GIT_ID = ['-c', 'user.name=Claude Bugfix', '-c', 'user.email=claude-bugfix@bugfix-kit.local'];
 
@@ -85,8 +86,10 @@ export class Runner {
     const ahead = this.pending++;
     const p = this.chain.then(async () => {
       this.pending--;
+      this.busy = true;
       try { await job(); }
       catch (e) { this.log.error(`[bugfix ${project.name}#${id}] 실패`, e); await onError(e); }
+      finally { this.busy = false; }
     });
     this.chain = p.catch(() => {});
     return ahead;
@@ -148,6 +151,7 @@ export class Runner {
       await this.updateFix(project, id, { fixSessionId: sessionIdOf(out) });
       await L(`Claude 종료 (${claudeSummary(out)})`);
 
+      await this.revertProtected(project, ex, wt, L);
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!changed) {
         const reason = await readIfExists(path.join(wt, '.bugfix/result.md'));
@@ -241,6 +245,7 @@ export class Runner {
       await this.appendChat(project, id, 'assistant', notBlank(answer) ? answer : '(답변 없음)');
       await L(`Claude 답변: ${firstLine(answer, 200)}`);
 
+      await this.revertProtected(project, ex, wt, L);
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!allowChange || !changed) {
         if (changed) { await ex.exec(wt, 1, ['git', 'checkout', '--', '.']); await ex.exec(wt, 1, ['git', 'clean', '-fdq', '-e', '.bugfix']); await L('질문 모드 - 변경 되돌림'); }
@@ -298,10 +303,14 @@ export class Runner {
           if (!conflicts) throw new Error('병합 실패(충돌 아님)');
           await L(`충돌 ${conflicts.split(/\r?\n/).length}개 파일 - Claude 가 해결 중…\n${conflicts}`);
           await this.claudeConflict(project, ex, id, wt, conflicts);
-          const left = (await ex.exec(wt, 1, ['git', 'diff', '--name-only', '--diff-filter=U'])).trim();
-          if (left) throw new Error(`충돌이 남아 있습니다:\n${left}`);
           const markers = await ex.execOut(wt, 1, ['git', 'grep', '-l', '-E', '^(<<<<<<<|=======|>>>>>>>)( |$)', '--', '.', ':!*.md', ':!.bugfix/*']);
           if (markers.trim()) throw new Error(`충돌 표시가 남아 있습니다:\n${markers}`);
+          // Claude 가 표시는 다 지웠는데 git add 를 못 했으면(경로·권한) 우리가 한다 - 표시가 없으니 해결된 파일이다
+          const left = (await ex.exec(wt, 1, ['git', 'diff', '--name-only', '--diff-filter=U'])).trim();
+          if (left) await ex.exec(wt, 1, ['git', 'add', '--', ...left.split(/\r?\n/)]);
+          const still = (await ex.exec(wt, 1, ['git', 'diff', '--name-only', '--diff-filter=U'])).trim();
+          if (still) throw new Error(`충돌이 남아 있습니다:\n${still}`);
+          await this.revertProtected(project, ex, wt, L, `origin/${base}`);
           await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '--no-edit']);
           await L('충돌 해결 완료');
         }
@@ -313,9 +322,17 @@ export class Runner {
         await ex.exec(wt, 5, ['git', '-c', `http.extraheader=${auth}`, 'push', '--force-with-lease', 'origin', branch]);
         await L('✓ 재검증 통과, 브랜치 갱신');
       }
-      // 푸시 직후엔 GitHub 가 병합 가능 여부를 계산 중이라 곧바로 병합하면 405 - 계산을 기다리고 실패하면 몇 번 더
-      const st = await gh.waitMergeable(pr.number, 45);
+      // 푸시 직후엔 GitHub 가 병합 가능 여부를 계산 중이라 곧바로 병합하면 405 - 계산을 기다리고 실패하면 몇 번 더.
+      // 푸시 전 값(dirty)이 잠깐 남아 있으므로 PR head 가 우리 HEAD 와 같아진 뒤의 값만 믿는다
+      const head = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
+      let st = await gh.waitMergeable(pr.number, 60, head);
       if (st.merged) throw new Error(`PR #${pr.number} 은 이미 병합된 PR 입니다 - 이번 변경은 들어가지 않았습니다. 새 PR 이 필요합니다.`);
+      if (st.mergeable === false && st.mergeableState === 'dirty') {
+        // 로컬에선 이미 origin/base 를 합쳐 충돌이 없다 - 캐시가 늦게 갱신된 것이니 조금 더 기다려 본다
+        await L('GitHub 가 아직 충돌로 표시 - 재계산 대기…');
+        await sleep(8000);
+        st = await gh.waitMergeable(pr.number, 60, head);
+      }
       if (st.mergeable === false) throw new Error(`GitHub 가 병합 불가로 판단: ${st.mergeableState}`);
       let sha = null;
       for (let attempt = 1; attempt <= 4 && !sha; attempt++) {
@@ -377,6 +394,49 @@ export class Runner {
     await L(`배포 추적 종료(${waitMin}분 경과) - GitHub Actions 에서 확인하세요`);
   }
 
+  /**
+   * 열려 있는 PR 을 정식 경로로 병합한다: base 와 합치고(충돌은 Claude) → 재검증 → 푸시 → 병합 → 실제 반영 확인.
+   * 새로고침(fix-sync)이 autoMerge 프로젝트의 열린 PR 에 대해 부르고, 큐에서 하나씩 돈다.
+   */
+  async enqueueMerge(project, id) {
+    const r = await this.store.get(project.name, id);
+    if (!r?.fixPrNumber || !notBlank(r.fixBranch)) throw Object.assign(new Error('병합할 PR 이 없습니다'), { status: 409 });
+    if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw Object.assign(new Error('작업이 진행 중입니다'), { status: 409 });
+    await this.updateFix(project, id, { fixStatus: 'QUEUED' });
+    const ahead = this.submit(project, id, () => this.runMerge(project, id), async (e) => {
+      await this.logLine(project, id, `✗ 병합 작업 실패: ${firstLine(e.message, 300)}`);
+      await this.updateFix(project, id, { fixStatus: 'PR_OPENED' });
+    });
+    await this.logLine(project, id, `▶ 병합 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
+  }
+
+  async runMerge(project, id) {
+    const r = await this.store.get(project.name, id);
+    const gh = this.gh(project);
+    const L = (s) => this.logLine(project, id, s);
+    const st = await gh.getPullRequest(r.fixPrNumber);
+    if (st.merged) { await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' }); await L('✓ 이미 병합됨'); return; }
+    if (st.state !== 'open') { await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: 'PR 이 병합되지 않고 닫혔습니다.' }); await L('✗ PR 이 닫힘'); return; }
+    await this.updateFix(project, id, { fixStatus: 'RUNNING' });
+    await L(`▶ PR #${r.fixPrNumber} 병합 시작`);
+    const ex = this.ex(project);
+    const base = project.baseBranch;
+    const auth = gh.gitAuthHeader();
+    const { repo, jobs, wt } = this.paths(project, id);
+    await this.prepareRepo(project, ex, auth, L);
+    await ex.exec(repo, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', '--prune', 'origin', base, r.fixBranch]);
+    await this.freshWorktree(ex, repo, jobs, wt, `origin/${r.fixBranch}`);
+    await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, `origin/${r.fixBranch}`]);
+    try {
+      const changed = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim();
+      const mods = this.changedModules(project, changed.split(/\r?\n/).map((f) => `M  ${f}`).join('\n'));
+      await this.prepareNodeModules(project, ex, wt, L, true);
+      await this.autoMerge(project, ex, gh, id, wt, r.fixBranch, auth, { number: r.fixPrNumber, url: r.fixPrUrl }, `fix: ${orDash(r.fixSummary)} (버그 #${id})`, mods);
+    } finally {
+      await this.removeWorktree(ex, repo, wt);
+    }
+  }
+
   /** GitHub 의 PR 상태와 리포트 상태를 맞춘다 (뷰어 '새로고침'). PR 이 열려 있으면 병합도 다시 시도 */
   async syncWithGitHub(project, id) {
     const r = await this.store.get(project.name, id);
@@ -394,11 +454,10 @@ export class Runner {
       } else if (st.state === 'closed') {
         await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: 'PR 이 병합되지 않고 닫혔습니다.' });
         await L('✗ PR 이 닫힘(미병합)');
-      } else if (project.autoMerge && st.mergeable === true) {
-        const sha = await gh.mergePullRequest(r.fixPrNumber, `fix: ${orDash(r.fixSummary)} (버그 #${id})`);
-        await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' });
-        await L(`✓ 병합 완료(새로고침에서 재시도) @ ${sha.slice(0, 8)}`);
-        if (notBlank(r.fixBranch)) await gh.deleteBranch(r.fixBranch);
+      } else if (project.autoMerge && notBlank(r.fixBranch)) {
+        // 바로 병합하지 않고 정식 경로(base 합치기 → 충돌 해결 → 재검증 → 병합)를 큐에 넣는다
+        await this.enqueueMerge(project, id);
+        return this.store.get(project.name, id);
       } else if (r.fixStatus === 'FAILED') {
         await this.updateFix(project, id, { fixStatus: 'PR_OPENED' });
       }
@@ -433,7 +492,7 @@ ${conflicts}
 
 각 파일의 충돌 표시(<<<<<<<, =======, >>>>>>>)를 보고 양쪽 변경의 의도를 모두 살리는 쪽으로 해결하세요.
 HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 쪽은 그사이 base 에 들어온 다른 사람의 변경입니다.
-한쪽을 통째로 버리지 마세요. 해결한 파일은 \`git add <파일>\` 로 표시하세요. 커밋은 하지 마세요.
+한쪽을 통째로 버리지 마세요. 현재 디렉터리가 작업 사본이므로 해결한 파일은 그냥 \`git add <상대경로>\` 로 표시하세요(\`git -C\` 나 절대경로는 허용되지 않습니다). \`node --check\`, \`npm test\` 는 쓸 수 있습니다. 커밋은 하지 마세요.
 충돌 표시를 하나도 남기지 마세요. 해결 내용을 \`.bugfix/result.md\` 끝에 "## 충돌 해결" 절로 덧붙이세요.`;
     await this.claude(project, ex, id, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
       ['-p', prompt, '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', CONFLICT_TOOLS.join(',')]);
@@ -468,7 +527,7 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
 
 모듈과 검증 명령(각 모듈 디렉터리에서 실행):
 ${mods}
-${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n` : ''}
+${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n` : ''}${project.protectedPaths?.length ? `\n건드리면 안 되는 경로(바꿔도 되돌려집니다): ${project.protectedPaths.join(', ')}\n` : ''}
 진행 방법:
   1. summary.md 와 screenshot.png, 로그의 오류 항목을 보고 무엇이 잘못됐는지 한 문장으로 정리합니다.
   2. 로그의 오류 메시지 · URL · 컴포넌트 이름으로 원인 코드를 찾습니다. 추측으로 여러 곳을 고치지 말고 원인 하나를 확정하세요.
@@ -496,6 +555,24 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
      한 항목을 \`- \` 로 시작하는 한 줄로 쓰고(들여쓴 하위 목록 금지), 많아야 5개까지 적습니다. 없으면 절을 빼세요.
 git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
 `;
+  }
+
+  /**
+   * 보호 경로(project.protectedPaths)에 생긴 변경을 되돌린다 - 버그 신고 연결 파일·CI 설정처럼 AI 가 건드리면 안 되는 곳.
+   * 되돌린 파일은 로그에 남긴다. ref 를 주면 그 기준으로(충돌 해결 뒤 base 쪽 내용으로) 되돌린다.
+   */
+  async revertProtected(project, ex, wt, L, ref = null) {
+    const paths = project.protectedPaths || [];
+    if (!paths.length) return;
+    const status = (await ex.execOut(wt, 1, ['git', 'status', '--porcelain'])).trim();
+    const files = status.split(/\r?\n/).filter(Boolean).map((l) => ({ code: l.slice(0, 2), file: l.slice(3).trim().split(' -> ').pop() }));
+    const hit = files.filter((f) => paths.some((p) => f.file === p || f.file.startsWith(p.endsWith('/') ? p : p + '/')));
+    if (!hit.length) return;
+    for (const f of hit) {
+      if (f.code.includes('?') || f.code.startsWith('A')) await ex.execOut(wt, 1, ['rm', '-rf', f.file]);
+      else await ex.execOut(wt, 1, ['git', 'checkout', ...(ref ? [ref] : []), '--', f.file]);
+    }
+    await L(`보호 경로 변경 되돌림(${hit.length}): ${hit.map((f) => f.file).join(', ')}`);
   }
 
   // ── 검증·모듈 ─────────────────────────────────────────────────────────

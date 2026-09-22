@@ -12,8 +12,8 @@
             저장된 버그 리포트
             <span v-if="hotkey" class="brv-shortcut">{{ hotkey }}</span>
           </span>
-          <span v-if="projects.length > 1" class="brv-projects">
-            <button v-for="p in projects" :key="p.key" :class="{ 'brv-projects__on': project === p.key }" @click="switchProject(p.key)">{{ p.label }}</button>
+          <span v-if="viewProjects.length > 1" class="brv-projects">
+            <button v-for="p in viewProjects" :key="p.key" :class="{ 'brv-projects__on': project === p.key }" @click="switchProject(p.key)">{{ p.label }}</button>
           </span>
           <button class="brv-close" @click="close">✕</button>
         </div>
@@ -93,14 +93,15 @@
                   <span v-if="fixBusy || fixInProgress" class="brv-spin brv-spin--sm"></span>
                   <span v-if="fixInProgress && fixElapsed" class="brv-fix-elapsed">{{ fixElapsed }}</span>
                   <span v-else-if="deployPending" class="brv-fix-elapsed"><span class="brv-spin brv-spin--sm"></span> 배포 중</span>
-                  <span v-if="detail.fixStatus" class="brv-ai__tools">
+                  <span v-if="detail.fixStatus && canFix" class="brv-ai__tools">
                     <button class="brv-ai__tool" :disabled="fixBusy" @click="refreshDetail" title="상태·로그 다시 읽기 (PR 이 열려 있으면 GitHub 와 맞춤)">새로고침</button>
                     <button class="brv-ai__tool" :disabled="fixBusy || fixInProgress" @click="requestFix" title="앞선 대화·수정을 잇지 않고 원인 조사부터 새로 고칩니다">처음부터 다시</button>
                   </span>
                 </div>
 
                 <!-- 요청 전 -->
-                <div v-if="!detail.fixStatus" class="brv-ai__start">
+                <div v-if="!detail.fixStatus && !canFix" class="brv-ai__hint">이 프로젝트의 수정은 운영자가 관리 콘솔에서 진행합니다. 신고는 접수됐습니다.</div>
+                <div v-else-if="!detail.fixStatus" class="brv-ai__start">
                   <button class="brv-fix-btn brv-fix-btn--lg" :disabled="fixBusy" @click="requestFix">AI 에게 수정 요청</button>
                   <span class="brv-ai__hint">서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.</span>
                 </div>
@@ -122,7 +123,7 @@
                     <div class="brv-suggest__title">추천 개선 <span class="brv-suggest__hint">실행을 누르면 그 내용으로 이어서 고칩니다</span></div>
                     <div v-for="(s, i) in fixSuggestions" :key="i" class="brv-suggest__item">
                       <span class="brv-suggest__text brv-selectable">{{ s }}</span>
-                      <button class="brv-fix-btn brv-fix-btn--ghost brv-suggest__run" :disabled="fixBusy || fixInProgress" @click="runSuggestion(s)">실행</button>
+                      <button v-if="canFix" class="brv-fix-btn brv-fix-btn--ghost brv-suggest__run" :disabled="fixBusy || fixInProgress" @click="runSuggestion(s)">실행</button>
                     </div>
                   </div>
 
@@ -136,7 +137,7 @@
                       <span class="brv-chat__who">AI</span>
                       <div class="brv-chat__text"><span class="brv-spin brv-spin--sm"></span> 생각 중…</div>
                     </div>
-                    <div class="brv-chat__compose">
+                    <div v-if="canFix" class="brv-chat__compose">
                       <textarea v-model="chatInput" class="brv-chat__input" rows="2" :disabled="fixBusy || fixInProgress"
                                 placeholder="질문: 왜 이렇게 고쳤어?   수정 요청: 라이트 테마에서도 맞게 고쳐줘"
                                 @keydown.ctrl.enter.prevent="sendChat('ask')" @keydown.meta.enter.prevent="sendChat('ask')"></textarea>
@@ -145,7 +146,7 @@
                         <button class="brv-fix-btn" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('change')" title="앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지">수정 요청</button>
                       </div>
                     </div>
-                    <div class="brv-ai__hint">질문은 코드를 바꾸지 않고 답만, 수정 요청은 이어서 고쳐 검증·PR·병합까지 진행합니다.</div>
+                    <div v-if="canFix" class="brv-ai__hint">질문은 코드를 바꾸지 않고 답만, 수정 요청은 이어서 고쳐 검증·PR·병합까지 진행합니다.</div>
                   </div>
                 </template>
               </div>
@@ -364,7 +365,9 @@ export default {
       chatInput: '',
       now: Date.now(),
       notice: null,
+      canFix: true,            // 프로젝트 설정(fixFrom) - 앱 사용자에게 수정 요청을 열어 두었는가
       project: null,
+      info: {},
       logTab: 'front',
       expanded: new Set(),
       showFE: { error: true, warn: true, log: false },
@@ -375,6 +378,8 @@ export default {
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.viewer || ''; },
     projects() { return this.kit?.projects || []; },
+    // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)에서는 전부
+    viewProjects() { return this.kit?.options?.adminKey ? this.projects : this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
     prNumber() { return this.detail?.fixPrNumber || (this.detail?.fixPrUrl || '').split('/').pop(); },
     logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
@@ -460,15 +465,23 @@ export default {
       this.selected = null;
       this.detail = null;
       this.expanded = new Set();
+      if (this.kit?.projectInfo) this.info = { ...(await this.kit.projectInfo()) };
+      // 앱 사용자에게 안 보이는(운영자 전용) 프로젝트가 현재 대상이면 첫 앱 프로젝트로
+      if (!this.kit?.options?.adminKey && this.info[this.kit?.project]?.canFix === false) { const first = this.projects.find((p) => this.info[p.key]?.canFix !== false); if (first) this.kit.setProject(first.key); }
       this.project = this.kit?.project || null;
+      await this.loadInfo();
       await this.fetchList();
       if (id) await this.openDetail(Number(id));     // 대시보드 등에서 특정 리포트로 바로
+    },
+    async loadInfo() {
+      try { const i = await this.kit.api.info(); this.canFix = i?.canFix !== false; } catch { this.canFix = true; }
     },
     async switchProject(key) {
       if (key === this.project) return;
       this.kit?.setProject(key);
       this.project = key;
       this.selected = null; this.detail = null; this._stopFixPolling();
+      await this.loadInfo();
       await this.fetchList();
     },
     close() { this.isOpen = false; this._stopFixPolling(); },
