@@ -61,8 +61,12 @@ function rerunInDocker(cfg) {
       try { if (fs.existsSync(nm)) mountRo(fs.realpathSync(nm)); } catch { /* 없음 */ }
     }
   }
-  const acct = cfg.login?.account ? path.dirname(expandHome(cfg.login.account)) : null;
+  // 계정 파일 디렉터리(읽기 전용)와 로그인 상태 파일 디렉터리(쓰기 - 세션 갱신이 컨테이너 밖에 남도록)
+  const acctRel = cfg.login?.form?.account || cfg.login?.account;
+  const acct = acctRel ? path.dirname(path.resolve(cfg.dir || cwd, expandHome(acctRel))) : null;
   if (acct && fs.existsSync(acct)) mountRo(acct);
+  const stateFile = cfg.login?.type === 'state' ? expandHome(cfg.login.file || path.join(cfg.dir || cwd, '.front-check-state.json')) : null;
+  if (stateFile) { const d = path.dirname(stateFile); fs.mkdirSync(d, { recursive: true }); if (!seen.has(d) && ![...seen].some((s) => d.startsWith(s + path.sep))) { seen.add(d); mounts.push('-v', `${d}:${d}`); } }
   const env = ['-e', `FC_USER=${process.env.FC_USER || ''}`, '-e', `FC_PASS=${process.env.FC_PASS || ''}`, '-e', `HOME=${os.homedir()}`];
   const args = ['run', '--rm', '--network', 'host', '--ipc=host', '-w', cwd, ...mounts, ...env, cfg.docker.image,
     'node', bin, ...process.argv.slice(2), '--no-docker'];

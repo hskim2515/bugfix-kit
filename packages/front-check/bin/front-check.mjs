@@ -70,6 +70,12 @@ try {
     const copy = (from, to) => { if (fs.existsSync(to)) { console.log(`있음(건너뜀): ${to}`); return; } fs.mkdirSync(path.dirname(to), { recursive: true }); fs.copyFileSync(from, to); console.log(`만듦: ${to}`); };
     copy(path.join(here, '../templates/front-check.config.mjs'), path.join(cwd, 'front-check.config.mjs'));
     copy(path.join(here, '../skills/frontend-check/SKILL.md'), path.join(cwd, '.claude/skills/frontend-check/SKILL.md'));
+    copy(path.join(here, '../templates/front-check.account'), path.join(cwd, 'front-check.account'));
+    // 기본은 계정 파일·결과·세션을 커밋하지 않는다. 개발용 테스트 계정을 저장소에 두려면 .gitignore 에서 front-check.account 를 지운다
+    const gi = path.join(cwd, '.gitignore');
+    const cur = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8') : '';
+    const add = ['front-check-out/', '.front-check-state.json', 'front-check.account'].filter((l) => !cur.split(/\r?\n/).includes(l));
+    if (add.length) { fs.writeFileSync(gi, cur.replace(/\n?$/, '\n') + '# front-check\n' + add.join('\n') + '\n'); console.log(`.gitignore 에 추가: ${add.join(', ')}`); }
     process.exit(0);
   }
   console.error(`모르는 명령: ${cmd}\n\n${HELP}`);

@@ -35,14 +35,14 @@ export async function login(page, cfg, baseUrl, log = console) {
     // 상태는 컨텍스트를 만들 때 이미 주입됐다(stateFileFor). 여기서는 살아 있는지 확인하고, 죽었으면 갱신을 시도한다
     const file = stateFileFor(cfg);
     if (!file || !fs.existsSync(file)) {
-      if (readAccount(l.form || l)) { await formLogin(page, { ...(l.form || {}), ...pickForm(l) }, baseUrl, cfg, log); await saveState(page, file, log); return { type, ok: true, refreshed: 'created' }; }
+      if (readAccount(l.form || l, cfg.dir)) { await formLogin(page, { ...(l.form || {}), ...pickForm(l) }, baseUrl, cfg, log); await saveState(page, file, log); return { type, ok: true, refreshed: 'created' }; }
       throw new Error(`로그인 상태 파일이 없습니다: ${file || '(login.file 미설정)'} - 먼저 \`front-check login\` 을 실행하세요`);
     }
     if (l.done) {
       await page.goto(new URL(l.url || '/', baseUrl).href, { waitUntil: 'domcontentloaded', timeout: cfg.browser.timeoutMs });
       const alive = await page.waitForSelector(l.done, { timeout: l.checkTimeoutMs || 15000 }).then(() => true).catch(() => false);
       if (!alive) {
-        if (!readAccount(l.form || l)) throw new Error(`저장된 로그인 세션이 만료됐습니다(${l.done} 안 뜸) - \`front-check login\` 을 다시 실행하세요`);
+        if (!readAccount(l.form || l, cfg.dir)) throw new Error(`저장된 로그인 세션이 만료됐습니다(${l.done} 안 뜸) - \`front-check login\` 을 다시 실행하세요`);
         log.warn('[front-check] 세션 만료 - 다시 로그인해 상태 파일을 갱신합니다');
         await formLogin(page, { ...(l.form || {}), ...pickForm(l) }, baseUrl, cfg, log);
         await saveState(page, file, log);
@@ -69,13 +69,13 @@ export function stateFileFor(cfg) {
 
 function pickForm(l) {
   const o = {};
-  for (const k of ['url', 'user', 'pass', 'submit', 'done', 'account', 'timeoutMs']) if (l[k] !== undefined) o[k] = l[k];
+  for (const k of ['url', 'user', 'pass', 'submit', 'done', 'account', 'credentials', 'timeoutMs']) if (l[k] !== undefined) o[k] = l[k];
   return o;
 }
 
 async function formLogin(page, l, baseUrl, cfg, log) {
-  const acct = readAccount(l);
-  if (!acct) throw new Error(`로그인 계정이 없습니다: ${l.account || 'FC_USER/FC_PASS'} (첫 줄 아이디, 둘째 줄 비밀번호)`);
+  const acct = readAccount(l, cfg.dir);
+  if (!acct) throw new Error(`로그인 계정이 없습니다: ${l.account || 'credentials'} 또는 FC_USER/FC_PASS (user=아이디 / password=비밀번호)`);
   if (!l.user || !l.pass) throw new Error('form 로그인에는 user/pass 선택자가 필요합니다');
   const timeout = l.timeoutMs || cfg.browser.timeoutMs;
   await page.goto(new URL(l.url || '/login', baseUrl).href, { waitUntil: 'domcontentloaded', timeout });

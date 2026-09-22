@@ -99,9 +99,9 @@ export async function recordLogin(opt = {}) {
   const file = path.resolve(opt.out || stateFileFor({ ...cfg, login: { ...l, type: 'state' } }) || path.join(cfg.dir, '.front-check-state.json'));
   const baseUrl = opt.url || cfg.baseUrl || (cfg.serve ? `http://127.0.0.1:${cfg.serve.port}` : '');
   if (!baseUrl) throw new Error('대상 주소가 없습니다: --url 또는 설정 baseUrl');
-  const form = { ...(l.form || {}), ...Object.fromEntries(['url', 'user', 'pass', 'submit', 'done', 'account', 'timeoutMs'].filter((k) => l[k] !== undefined).map((k) => [k, l[k]])) };
+  const form = { ...(l.form || {}), ...Object.fromEntries(['url', 'user', 'pass', 'submit', 'done', 'account', 'credentials', 'timeoutMs'].filter((k) => l[k] !== undefined).map((k) => [k, l[k]])) };
   const { readAccount } = await import('./config.js');
-  const canForm = !!(form.user && form.pass && readAccount(form));
+  const canForm = !!(form.user && form.pass && readAccount(form, cfg.dir));
   const browser = await launchBrowser(cfg, { noDocker: opt.noDocker, headed: !canForm || opt.headed, log });
   try {
     const context = await browser.newContext({ viewport: { width: cfg.browser.viewport[0], height: cfg.browser.viewport[1] }, locale: cfg.browser.locale, ignoreHTTPSErrors: true });

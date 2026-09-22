@@ -1,0 +1,4 @@
+# front-check 로그인 계정 (개발 서버용 테스트 계정만. 실 사용자 계정 금지)
+# 형식: properties(user=/password=) · JSON · 두 줄(아이디/비밀번호)
+user=
+password=

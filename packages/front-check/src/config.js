@@ -64,16 +64,21 @@ export async function loadConfig(file) {
 }
 
 /**
- * 계정 파일 또는 환경변수 FC_USER/FC_PASS. 값은 로그·리포트에 절대 남기지 않는다.
+ * 로그인 자격. 우선순위: 환경변수 FC_USER/FC_PASS → 설정의 credentials → 계정 파일(account).
+ *   credentials: { user, password }          설정 파일(프로젝트 안)에 직접 - 개발용 테스트 계정이면 저장소에 넣어도 무방
+ *   account: './front-check.account'         프로젝트 안 파일(설정 파일 기준 상대 경로) 또는 ~/… 절대 경로
  * 파일 형식은 셋 중 아무거나:
  *   properties  user=아이디 / password=비밀번호   (키: user|id|username|아이디, password|pass|pw|비밀번호)
  *   JSON        { "user": "…", "password": "…" }
  *   두 줄        첫 줄 아이디, 둘째 줄 비밀번호
+ * 값은 로그·리포트에 절대 남기지 않는다.
  */
-export function readAccount(login) {
+export function readAccount(login, baseDir = process.cwd()) {
   if (process.env.FC_USER && process.env.FC_PASS) return { user: process.env.FC_USER, pass: process.env.FC_PASS };
+  const c = login?.credentials;
+  if (c && (c.user || c.id) && (c.password || c.pass)) return { user: String(c.user || c.id), pass: String(c.password || c.pass) };
   if (!login?.account) return null;
-  const f = expandHome(login.account);
+  const f = path.resolve(baseDir, expandHome(login.account));
   if (!fs.existsSync(f)) return null;
   return parseAccount(fs.readFileSync(f, 'utf8'));
 }
