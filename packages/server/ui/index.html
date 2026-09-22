@@ -127,7 +127,6 @@
   </nav>
   <div class="right">
     <span class="dim" id="tick"></span>
-    <button class="btn" id="refresh">새로고침</button>
     <button class="btn" id="logout" title="저장된 운영자 키 지우기">키 지우기</button>
   </div>
 </header>
@@ -722,7 +721,7 @@
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
-    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); return; }
+    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); return; }
     const sh = e.target.closest('.shots figure'); if (sh) { const img = sh.querySelector('img'); if (img) { const big = document.createElement('div'); big.className = 'shotbig'; big.innerHTML = `<img src="${img.src}"><div class="dim">${esc(sh.dataset.shot)} (눌러서 닫기)</div>`; big.onclick = () => big.remove(); document.body.appendChild(big); } return; }
     const sb = e.target.closest('.shotbig'); if (sb) { sb.remove(); return; }
     const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
@@ -770,7 +769,6 @@
   document.addEventListener('change', (e) => { const kt = e.target.closest('[data-ktype]'); if (kt) { if (kt.checked) kHidden.delete(kt.dataset.ktype); else kHidden.add(kt.dataset.ktype); kgRefresh(); } });
   const kRun = (mode) => async () => { const names = data.projects.map((p) => p.name); if (mode === 'full' && !confirm(`${names.join(', ')} 의 지식 그래프를 처음부터 다시 만들까요? (5~15분, Claude 비용 발생)`)) return; const errs = []; for (const name of names) { try { await api('POST', `/admin/knowledge/${name}`, { mode }); } catch (x) { errs.push(`${name}: ${x.message}`); } } await loadKnowledge(); if (errs.length) alert(errs.join('\n')); };
   $('#kUpdate').onclick = kRun('update'); $('#kFull').onclick = kRun('full');
-  $('#refresh').addEventListener('click', () => { load(); if (settings) loadSettings(); });
   $('#logout').addEventListener('click', () => { localStorage.removeItem(KEY); key = ''; showLogin(); });
   $('#enter').addEventListener('click', () => { key = $('#key').value.trim(); localStorage.setItem(KEY, key); load(); });
   $('#key').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#enter').click(); });
