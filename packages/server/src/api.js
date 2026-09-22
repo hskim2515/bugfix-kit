@@ -176,6 +176,13 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     return FileStore.fixState(await store.get(p.name, r.bugReportId));
   }));
 
+  /** 열린 PR 을 정식 경로로 병합 (관리 콘솔·자동 병합 프로젝트용) */
+  pr.post('/reports/:id/merge', fixGuard, wrap(async (req) => {
+    const r = await load(req);
+    await runner.enqueueMerge(req.project, r.bugReportId);
+    return FileStore.fixState(await store.get(req.project.name, r.bugReportId));
+  }));
+
   pr.post('/reports/:id/fix-sync', wrap(async (req) => {
     const r = await load(req);
     return FileStore.fixState(await runner.syncWithGitHub(req.project, r.bugReportId));
