@@ -298,11 +298,14 @@
     const total = data.projects.reduce((n, p) => n + p.reports.length, 0);
     const running = data.running;
     $('#meta').textContent = `프로젝트 ${data.projects.length} · 리포트 ${total} · 큐 ${data.queue}`;
-    $('#cards').innerHTML = data.projects.map((p) => `
-      <div class="card"><h3>${esc(p.name)} <span class="dim">${esc(p.githubRepo)} · ${esc(p.baseBranch)}${p.autoMerge ? ' · 자동 병합' : ' · PR 만'}</span></h3>
-        <div class="big">${p.reports.length}</div>
-        <div class="row">${['RUNNING', 'QUEUED', 'PR_OPENED', 'FAILED', 'MERGED'].filter((k) => p.counts[k]).map((k) => `<span class="pill p-${k}">${fixLabel[k]} ${p.counts[k]}</span>`).join('') || '<span>수정 요청 없음</span>'}</div>
-      </div>`).join('') + (running ? `
+    // 프로젝트를 나누지 않고 한 장 - 수정 상태 합계와 저장소 목록만
+    const counts = {};
+    for (const p of data.projects) for (const [k, n] of Object.entries(p.counts || {})) counts[k] = (counts[k] || 0) + n;
+    $('#cards').innerHTML = `
+      <div class="card"><h3>리포트 <span class="dim">${data.projects.map((p) => `${esc(p.name)} ${esc(p.githubRepo)} · ${esc(p.baseBranch)}${p.autoMerge ? '' : ' · PR 만'}`).join(' / ')}</span></h3>
+        <div class="big">${total}</div>
+        <div class="row">${['RUNNING', 'QUEUED', 'PR_OPENED', 'FAILED', 'MERGED'].filter((k) => counts[k]).map((k) => `<span class="pill p-${k}">${fixLabel[k]} ${counts[k]}</span>`).join('') || '<span>수정 요청 없음</span>'}</div>
+      </div>` + (running ? `
       <div class="card running"><h3>지금 진행 중 · ${esc(running.project)} #${running.bugReportId} <span class="pill p-${running.fixStatus}">${fixLabel[running.fixStatus]}</span> <span class="dim">${running.fixRequestedAt ? '요청 ' + ago(running.fixRequestedAt) : ''}</span></h3>
         <div>${esc((running.problem || '').slice(0, 160))}</div><pre class="log">${esc(running.logTail || '(로그 없음)')}</pre></div>` : '');
     const rows = data.projects.flatMap((p) => p.reports.map((r) => ({ ...r, project: p.name }))).filter((r) => {
