@@ -1,0 +1,15 @@
+{
+  "name": "bugfix-kit",
+  "private": true,
+  "description": "앱 안 버그 리포트 → Claude Code 자동 수정 → 검증 → PR → 병합 → 헤드리스 화면 확인. 여러 프로젝트에 붙이는 도구 모음",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "server": "node packages/server/bin/bugfix-server.mjs",
+    "test": "npm test --workspaces --if-present"
+  }
+}

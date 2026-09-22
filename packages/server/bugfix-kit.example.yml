@@ -1,0 +1,68 @@
+# bugfix-server 설정 예시. 복사해서 bugfix-kit.yml 로 쓰고, 비밀값은 환경변수로:
+#   BUGFIX_GITHUB_TOKEN   GitHub PAT (classic, repo 권한) - 또는 github.tokenFile
+#   BUGFIX_KEY_LHDT       프로젝트 lhdt 의 API 키 (X-Bugfix-Key) - 또는 projects.lhdt.apiKey
+
+server:
+  port: 8790
+  dataDir: ./data            # 리포트 JSON 저장 (프로젝트별 하위 디렉터리)
+  workDir: /data/bugfix-kit  # 저장소 사본·작업 worktree·node_modules 캐시
+  claudeBin: claude          # PATH 에 없으면 절대 경로
+  pathExtra: /home/gaia3d/.local/bin:/opt/java/jdk-21.0.2/bin
+  javaHome: /opt/java/jdk-21.0.2
+  model: ""                  # 비우면 claude 기본 모델
+  maxTurns: 40
+  timeoutMinutes: 45         # Claude 한 번 실행 상한 (후속 대화는 절반)
+  verifyTimeoutMinutes: 20   # 검증 명령 하나당 상한
+  runAsUser: ""              # 다른 계정으로 돌릴 때(sudo -n 필요). 보통 비움
+
+github:
+  tokenFile: ~/.config/bugfix-kit/github-token   # 한 줄, chmod 600
+
+projects:
+  lhdt:
+    repo: https://github.com/Gaia3D/lhdt.git
+    githubRepo: Gaia3D/lhdt
+    baseBranch: develop-new
+    autoMerge: true
+    cors: [https://lhdt.gaia3d.dev, http://localhost:8080, http://localhost:3000]
+    description: "LHDT(3D GIS: Vue 3 + CesiumJS 프론트 `lhdt-user-front`, Spring Boot 4 + MyBatis 백엔드 `lhdt-rest`)"
+    conventions: |
+      - 주석은 한국어.
+      - 프론트 SCSS 는 `lhdt-user-front/public/scss` 를 고친 뒤
+        `cd lhdt-user-front/public/scss && sass main.scss ../css/ko/main.css --style=compressed --no-source-map` 로 빌드합니다
+        (sass 는 PATH 에 있습니다. 안 되면 `../../node_modules/.bin/sass`). 빼먹어도 바깥에서 한 번 더 빌드합니다.
+    env:
+      NODE_OPTIONS: --openssl-legacy-provider
+    modules:
+      - name: front
+        match: lhdt-user-front/
+        dir: lhdt-user-front
+        nodeModulesCache: true
+        prebuild:
+          - when: lhdt-user-front/public/scss/
+            cwd: lhdt-user-front/public/scss
+            run: ../../node_modules/.bin/sass main.scss ../css/ko/main.css --style=compressed --no-source-map
+        verify:
+          - npx vue-cli-service lint --no-fix
+          - npm run build
+      - name: back
+        match: lhdt-rest/
+        dir: .
+        verify:
+          - ./gradlew :lhdt-rest:compileJava -q
+    allowedTools:
+      - "Bash(npx vue-cli-service:*)"
+      - "Bash(npx eslint:*)"
+      - "Bash(./gradlew:*)"
+      - "Bash(sass:*)"
+      - "Bash(npx sass:*)"
+      - "Bash(node_modules/.bin/sass:*)"
+      - "Bash(../../node_modules/.bin/sass:*)"
+
+  # 두 번째 프로젝트는 이 블록만 추가하면 된다
+  # tnc:
+  #   repo: https://github.com/Gaia3D/tnc.git
+  #   githubRepo: Gaia3D/tnc
+  #   baseBranch: develop
+  #   modules:
+  #     - { name: web, match: web/, dir: web, nodeModulesCache: true, verify: [npm run lint, npm run build] }

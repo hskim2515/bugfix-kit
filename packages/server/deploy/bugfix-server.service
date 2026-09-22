@@ -1,0 +1,21 @@
+# 사용자 단위 systemd 유닛 (sudo 불필요). 설치:
+#   mkdir -p ~/.config/systemd/user && cp deploy/bugfix-server.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now bugfix-server
+#   loginctl enable-linger $USER      # 로그아웃 후에도 유지
+#   journalctl --user -u bugfix-server -f
+[Unit]
+Description=bugfix-kit server (bug report API + Claude Code auto-fix)
+After=network.target
+
+[Service]
+WorkingDirectory=%h/bugfix-kit/packages/server
+Environment=BUGFIX_CONFIG=%h/bugfix-kit/packages/server/bugfix-kit.yml
+# nvm 등 로그인 셸의 PATH 를 그대로 쓰기 위해 bash -lc 로 띄운다
+ExecStart=/bin/bash -lc 'exec node bin/bugfix-server.mjs'
+Restart=on-failure
+RestartSec=5
+# 진행 중이던 Claude 작업이 잘리지 않게 여유 있게 기다린다
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

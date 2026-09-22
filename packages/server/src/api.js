@@ -1,0 +1,133 @@
+import express from 'express';
+import { FileStore } from './store.js';
+import { HttpError, notBlank } from './util.js';
+
+const STATUSES = new Set(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']);
+const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 'screenshot', 'contextJson', 'frontendLogs', 'backendLogs', 'networkLogs', 'mutationLog'];
+
+/**
+ * HTTP API. 응답은 `{ content }` 하나로 감싼다(프론트 SDK 와 lhdt 뷰어가 res.data.content 로 읽는다).
+ *
+ *   POST   /api/p/:project/reports              리포트 저장 → { bugReportId }
+ *   GET    /api/p/:project/reports              목록(가벼운 필드)
+ *   GET    /api/p/:project/reports/:id          상세
+ *   GET    /api/p/:project/reports/:id/fix      진행 상태만(스크린샷·로그 제외) - 진행 중 3초 폴링용
+ *   PATCH  /api/p/:project/reports/:id/status   { status }
+ *   DELETE /api/p/:project/reports/:id
+ *   POST   /api/p/:project/reports/:id/request-fix
+ *   POST   /api/p/:project/reports/:id/fix-chat { message, mode: 'ask'|'change' }
+ *   POST   /api/p/:project/reports/:id/fix-sync
+ *
+ * 인증: 프로젝트에 apiKey 가 있으면 `X-Bugfix-Key` 헤더가 같아야 한다. 보고자는 `X-Bugfix-User` 헤더(앱이 로그인 사용자를 넣는다) 또는 body.reporter.
+ */
+export function createApi(cfg, store, runner, log = console) {
+  const app = express();
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: '60mb' }));
+
+  // CORS - 프로젝트 cors 목록(없으면 전부 허용). 프리플라이트는 프로젝트를 모르므로 요청 origin 을 그대로 돌려준다
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Bugfix-Key, X-Bugfix-User, Authorization');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+    }
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
+
+  const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
+
+  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending }));
+
+  const pr = express.Router({ mergeParams: true });
+  app.use('/api/p/:project', (req, res, next) => {
+    const project = cfg.projects[req.params.project];
+    if (!project) return next(new HttpError(404, `모르는 프로젝트: ${req.params.project}`));
+    const origin = req.headers.origin;
+    if (origin && project.cors?.length && !project.cors.includes(origin)) return next(new HttpError(403, `허용되지 않은 origin: ${origin}`));
+    if (notBlank(project.apiKey) && req.get('X-Bugfix-Key') !== project.apiKey) return next(new HttpError(401, 'API 키가 맞지 않습니다(X-Bugfix-Key)'));
+    req.project = project;
+    next();
+  }, pr);
+
+  pr.post('/reports', wrap(async (req) => {
+    const b = req.body || {};
+    if (!notBlank(b.problem) && !notBlank(b.reproSteps)) throw new HttpError(400, '문제 또는 재현 절차를 적어 주세요');
+    const report = {};
+    for (const k of REPORT_FIELDS) report[k] = b[k] == null ? null : (typeof b[k] === 'string' ? b[k] : JSON.stringify(b[k]));
+    report.reporter = req.get('X-Bugfix-User') || b.reporter || 'anonymous';
+    const saved = await store.save(req.project.name, report);
+    log.info(`[bugfix ${req.project.name}] 리포트 #${saved.bugReportId} (${report.reporter})`);
+    return { bugReportId: saved.bugReportId };
+  }));
+
+  pr.get('/reports', wrap((req) => store.list(req.project.name)));
+
+  const load = async (req) => {
+    const id = Number(req.params.id);
+    const r = Number.isInteger(id) ? await store.get(req.project.name, id) : null;
+    if (!r) throw new HttpError(404, `리포트가 없습니다: ${req.params.id}`);
+    return r;
+  };
+
+  pr.get('/reports/:id', wrap(load));
+  pr.get('/reports/:id/fix', wrap(async (req) => FileStore.fixState(await load(req))));
+
+  pr.patch('/reports/:id/status', wrap(async (req, res) => {
+    const st = req.body?.status;
+    if (!STATUSES.has(st)) throw new HttpError(400, `유효하지 않은 상태값: ${st}`);
+    const r = await load(req);
+    await store.update(req.project.name, r.bugReportId, { status: st });
+    res.status(204).end();
+  }));
+
+  pr.delete('/reports/:id', wrap(async (req, res) => {
+    const r = await load(req);
+    await store.delete(req.project.name, r.bugReportId);
+    res.status(204).end();
+  }));
+
+  pr.post('/reports/:id/request-fix', wrap(async (req) => {
+    const p = req.project;
+    if (!notBlank(cfg.githubToken())) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
+    const r = await load(req);
+    if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '이미 수정이 진행 중입니다.');
+    await store.update(p.name, r.bugReportId, (c) => ({
+      ...c,
+      fixStatus: 'QUEUED', fixBranch: null, fixPrUrl: null, fixPrNumber: null, fixSummary: null, fixLog: '', fixSessionId: null, fixChat: null,
+      fixRequestedAt: new Date().toISOString(), fixUpdatedAt: new Date().toISOString(),
+      status: c.status === 'OPEN' ? 'IN_PROGRESS' : c.status,
+    }));
+    await runner.enqueue(p, r.bugReportId);
+    return FileStore.fixState(await store.get(p.name, r.bugReportId));
+  }));
+
+  pr.post('/reports/:id/fix-chat', wrap(async (req) => {
+    const p = req.project;
+    const { message, mode } = req.body || {};
+    if (!notBlank(message)) throw new HttpError(400, '메시지가 비어 있습니다.');
+    const r = await load(req);
+    if (!r.fixStatus) throw new HttpError(409, "먼저 '수정 요청' 을 실행한 뒤에 이어서 대화할 수 있습니다.");
+    if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '작업이 진행 중입니다. 끝난 뒤에 보내세요.');
+    await runner.appendChat(p, r.bugReportId, 'user', message.trim());
+    await runner.enqueueFollowUp(p, r.bugReportId, message.trim(), mode === 'change' ? 'change' : 'ask');
+    return FileStore.fixState(await store.get(p.name, r.bugReportId));
+  }));
+
+  pr.post('/reports/:id/fix-sync', wrap(async (req) => {
+    const r = await load(req);
+    return FileStore.fixState(await runner.syncWithGitHub(req.project, r.bugReportId));
+  }));
+
+  app.use((req, res) => res.status(404).json({ message: `없는 경로: ${req.method} ${req.path}` }));
+  // eslint-disable-next-line no-unused-vars
+  app.use((err, req, res, next) => {
+    const status = err.status || (err.type === 'entity.too.large' ? 413 : 500);
+    if (status >= 500) log.error('[bugfix] API 오류', err);
+    res.status(status).json({ message: err.message || '오류' });
+  });
+  return app;
+}
