@@ -72,11 +72,20 @@ export function loadConfig(file) {
   }
   if (Object.keys(projects).length === 0) throw new Error('projects 가 비어 있습니다');
 
-  return {
+  const cfgObj = {
     server,
     github,
     projects,
     file: abs,
+    /** yml·env 를 다시 읽어 같은 객체에 반영한다 (대시보드에서 저장한 뒤). 포트 변경만 재시작 필요 */
+    reload() {
+      const fresh = loadConfig(abs);
+      Object.assign(cfgObj.server, fresh.server);
+      Object.assign(cfgObj.github, fresh.github);
+      for (const k of Object.keys(cfgObj.projects)) delete cfgObj.projects[k];
+      Object.assign(cfgObj.projects, fresh.projects);
+      return cfgObj;
+    },
     /** 토큰: (프로젝트 것) → 환경변수 → 파일(매번 읽어 재시작 없이 교체 가능). 없으면 null */
     githubToken(project) {
       if (project?.githubTokenValue) return project.githubTokenValue;
@@ -91,6 +100,7 @@ export function loadConfig(file) {
       }
     },
   };
+  return cfgObj;
 }
 
 /** KEY=VALUE 파일(# 주석, 따옴표 허용). 없으면 {} */

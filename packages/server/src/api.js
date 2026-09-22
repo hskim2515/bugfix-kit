@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FileStore } from './store.js';
 import { HttpError, notBlank } from './util.js';
+import { adminRouter } from './admin.js';
 
 const STATUSES = new Set(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']);
 const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 'screenshot', 'contextJson', 'frontendLogs', 'backendLogs', 'networkLogs', 'mutationLog'];
@@ -76,6 +77,7 @@ export function createApi(cfg, store, runner, log = console) {
     }
     return { projects, running, queue: runner.pending, now: new Date().toISOString() };
   }));
+  app.use('/api/admin', admin, adminRouter(cfg, store, runner, log));
 
   const pr = express.Router({ mergeParams: true });
   app.use('/api/p/:project', (req, res, next) => {
