@@ -104,12 +104,15 @@ export class FileStore {
   }
 
   /**
-   * 서버가 재시작되면 돌던 작업은 사라진다 - '고치는 중' 으로 남지 않게 정리한다.
-   * PR 을 이미 올린 뒤였다면 PR_OPENED 로(뷰어 새로고침이 병합 여부를 맞춘다), 아니면 FAILED.
+   * 서버가 재시작되면 돌던 작업은 사라진다. 끊긴 작업 목록을 돌려주고 상태를 정리한다:
+   *   - PR 을 이미 올린 뒤(자동 병합 단계)면 PR_OPENED (뷰어 새로고침이 병합 여부를 맞춘다)
+   *   - 아직이면 QUEUED 로 되돌린다 - 호출자(bin)가 다시 큐에 넣는다. worktree 는 매번 새로 만드니 처음부터 다시 돌려도 안전하다
+   * 돌려주는 값: [{ project, id, kind: 'fix' | 'followup', message?, mode? }]
    */
   async resetInterrupted(log = console) {
+    const redo = [];
     let projects = [];
-    try { projects = await fs.readdir(this.dataDir); } catch { return; }
+    try { projects = await fs.readdir(this.dataDir); } catch { return redo; }
     for (const p of projects) {
       let names = [];
       try { names = await fs.readdir(this.dir(p)); } catch { continue; }
@@ -119,15 +122,21 @@ export class FileStore {
         const r = await this.get(p, id);
         if (!r || !['QUEUED', 'RUNNING'].includes(r.fixStatus)) continue;
         const hasPr = r.fixPrNumber != null;
+        // 후속 대화 중이었나: 마지막 대화가 사용자 메시지면 그 요청을 다시 보낸다
+        let chat = [];
+        try { chat = r.fixChat ? JSON.parse(r.fixChat) : []; } catch { /* */ }
+        const last = chat[chat.length - 1];
+        const followup = last && last.role === 'user' ? last : null;
         await this.update(p, id, (c) => ({
           ...c,
-          fixStatus: hasPr ? 'PR_OPENED' : 'FAILED',
-          fixSummary: hasPr ? c.fixSummary : '서버 재시작으로 작업이 중단됐습니다. 다시 요청하세요.',
-          fixLog: (c.fixLog || '') + `${new Date().toTimeString().slice(0, 8)}  ✗ 서버 재시작으로 중단${hasPr ? ' - PR 은 열려 있습니다. 새로고침으로 상태를 맞추거나 직접 병합하세요' : ''}\n`,
+          fixStatus: hasPr ? 'PR_OPENED' : 'QUEUED',
+          fixLog: (c.fixLog || '') + `${new Date().toTimeString().slice(0, 8)}  ↻ 서버 재시작으로 끊김${hasPr ? ' - PR 은 열려 있습니다. 새로고침으로 상태를 맞추거나 직접 병합하세요' : ' - 다시 큐에 넣습니다'}\n`,
           fixUpdatedAt: nowIso(),
         }));
-        log.warn(`[bugfix] ${p}#${id} 재시작으로 중단 → ${hasPr ? 'PR_OPENED' : 'FAILED'}`);
+        if (!hasPr) redo.push(followup ? { project: p, id, kind: 'followup', message: followup.text, mode: /^추천 개선 실행:|수정|고쳐/.test(followup.text) ? 'change' : 'ask', prevStatus: null } : { project: p, id, kind: 'fix' });
+        log.warn(`[bugfix] ${p}#${id} 재시작으로 끊김 → ${hasPr ? 'PR_OPENED' : '다시 큐에'}`);
       }
     }
+    return redo;
   }
 }

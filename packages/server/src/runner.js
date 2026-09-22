@@ -85,8 +85,10 @@ export class Runner {
     const ahead = this.pending++;
     const p = this.chain.then(async () => {
       this.pending--;
+      this.busy = true;
       try { await job(); }
       catch (e) { this.log.error(`[bugfix ${project.name}#${id}] 실패`, e); await onError(e); }
+      finally { this.busy = false; }
     });
     this.chain = p.catch(() => {});
     return ahead;

@@ -44,7 +44,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
-  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending }));
+  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy }));
 
   // ── 운영자 대시보드: /api/ui/ (nginx 가 /bugfix/ → /api/ 이면 https://…/bugfix/ui/) ──
   const here = path.dirname(fileURLToPath(import.meta.url));
