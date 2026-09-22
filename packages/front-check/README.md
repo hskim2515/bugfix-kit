@@ -62,14 +62,18 @@ export default {
 앱마다 인증이 다르므로(폼·SSO·MFA·토큰) **로그인된 브라우저 상태 파일(storageState = 쿠키+localStorage)** 을 공통으로 쓴다.
 
 ```bash
-npx front-check login              # 폼 자격이 있으면 자동, 없으면 창을 띄워 사람이 로그인(SSO·MFA) → 상태 파일 저장
+# 가장 쉬운 길: 계정 파일 하나만 두면 끝 (상태 파일은 자동으로 만들고 만료 때 갱신)
+mkdir -p ~/.config/myapp && (umask 077; printf 'user=테스트아이디\npassword=비밀번호\n' > ~/.config/myapp/e2e-account)
+
+# 계정 파일을 둘 수 없는 앱(SSO·MFA): 한 번 사람이 로그인해 상태 파일을 만든다
+npx front-check login              # 창이 뜨면 로그인 → 상태 파일 저장 (개발 PC 에서 만들어 서버로 복사 가능)
 npx front-check check --scenario main   # login.type: 'state' 면 그 파일을 주입해 로그인된 채로 시작
 ```
 
 | type | 설명 |
 |---|---|
 | `state` | 상태 파일 주입. `done` 선택자가 안 뜨면(만료) `form` 자격이 있을 때만 자동 갱신, 없으면 "다시 login" 으로 명확히 실패 |
-| `form` | 아이디·비밀번호 폼. 계정 파일(첫 줄 아이디, 둘째 줄 비밀번호, 600) 또는 `FC_USER`/`FC_PASS`. `saveState` 로 상태 파일도 저장 |
+| `form` | 아이디·비밀번호 폼. 계정 파일(`user=…`/`password=…` properties, JSON, 또는 두 줄 · chmod 600) 또는 `FC_USER`/`FC_PASS`. `saveState` 로 상태 파일도 저장 |
 | `storage` | localStorage 만 주입(토큰 방식 앱) |
 | `custom` | `run(page, { baseUrl, config })` 함수 - 서비스 계정으로 토큰 발급 등 앱이 직접 |
 | `none` | 로그인 없음 |

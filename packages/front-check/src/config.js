@@ -63,12 +63,37 @@ export async function loadConfig(file) {
   return merged;
 }
 
-/** 계정 파일(첫 줄 아이디, 둘째 줄 비밀번호) 또는 환경변수 FC_USER/FC_PASS. 값은 로그·리포트에 절대 남기지 않는다 */
+/**
+ * 계정 파일 또는 환경변수 FC_USER/FC_PASS. 값은 로그·리포트에 절대 남기지 않는다.
+ * 파일 형식은 셋 중 아무거나:
+ *   properties  user=아이디 / password=비밀번호   (키: user|id|username|아이디, password|pass|pw|비밀번호)
+ *   JSON        { "user": "…", "password": "…" }
+ *   두 줄        첫 줄 아이디, 둘째 줄 비밀번호
+ */
 export function readAccount(login) {
   if (process.env.FC_USER && process.env.FC_PASS) return { user: process.env.FC_USER, pass: process.env.FC_PASS };
   if (!login?.account) return null;
   const f = expandHome(login.account);
   if (!fs.existsSync(f)) return null;
-  const [user = '', pass = ''] = fs.readFileSync(f, 'utf8').split(/\r?\n/).map((s) => s.trim());
+  return parseAccount(fs.readFileSync(f, 'utf8'));
+}
+
+export function parseAccount(text) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  const U = ['user', 'id', 'username', 'userid', 'login', '아이디'], P = ['password', 'pass', 'pw', 'passwd', '비밀번호'];
+  const pick = (o) => {
+    const k = Object.keys(o);
+    const u = k.find((x) => U.includes(x.toLowerCase())), p = k.find((x) => P.includes(x.toLowerCase()));
+    return u && p && o[u] && o[p] ? { user: String(o[u]).trim(), pass: String(o[p]).trim() } : null;
+  };
+  if (t.startsWith('{')) { try { return pick(JSON.parse(t)); } catch { return null; } }
+  const lines = t.split(/\r?\n/).map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
+  if (lines.some((l) => /^[^=:]+\s*[=:]\s*.+$/.test(l) && !/^https?:/.test(l))) {
+    const o = {};
+    for (const l of lines) { const m = l.match(/^([^=:]+?)\s*[=:]\s*(.+)$/); if (m) o[m[1].trim()] = m[2].trim().replace(/^["']|["']$/g, ''); }
+    return pick(o);
+  }
+  const [user = '', pass = ''] = lines;
   return user && pass ? { user, pass } : null;
 }

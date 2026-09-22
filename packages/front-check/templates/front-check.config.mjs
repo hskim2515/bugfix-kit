@@ -16,7 +16,7 @@ export default {
     done: '#app .main',                    // 로그인된 화면에만 있는 요소
     form: {                                // 있으면 login 명령·만료 갱신에 쓴다 (없으면 창을 띄워 사람이 로그인)
       url: '/login', user: '#username', pass: '#password', submit: 'button[type=submit]',
-      account: '~/.config/myapp/e2e-account',
+      account: '~/.config/myapp/e2e-account',   // user=아이디 / password=비밀번호 (properties·JSON·두 줄 형식 모두 가능)
     },
   },
 
