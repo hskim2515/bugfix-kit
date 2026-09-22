@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import YAML from 'yaml';
-import { readEnvFile } from './config.js';
+import { loadConfig, readEnvFile } from './config.js';
 import { GitHub } from './github.js';
 import { expandHome, HttpError, notBlank } from './util.js';
 
@@ -34,10 +34,17 @@ export function adminRouter(cfg, store, runner, log = console) {
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
   // ── yml 읽기/쓰기 (주석은 유지되지 않는다 - 저장 전 .bak 을 남긴다) ──
+  // 새 내용은 .tmp 에 써서 loadConfig 로 먼저 검증하고, 통과할 때만 교체한다 (깨진 yml 이 남으면 다음 재시작에 서버가 뜨지 않는다)
   const readYml = () => YAML.parse(fs.readFileSync(cfg.file, 'utf8')) || {};
   const writeYml = (doc) => {
+    const tmp = `${cfg.file}.tmp`;
+    fs.writeFileSync(tmp, YAML.stringify(doc, { lineWidth: 0 }), { encoding: 'utf8', mode: 0o600 });
+    try { loadConfig(tmp); } catch (e) {
+      try { fs.unlinkSync(tmp); } catch { /* 없음 */ }
+      throw new HttpError(400, `설정 검증 실패: ${e.message}`);
+    }
     try { fs.copyFileSync(cfg.file, `${cfg.file}.bak`); } catch { /* 첫 저장 */ }
-    fs.writeFileSync(cfg.file, YAML.stringify(doc, { lineWidth: 0 }), { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(tmp, cfg.file);
     cfg.reload();
   };
   const writeEnv = (file, patch) => {
