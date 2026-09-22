@@ -1,6 +1,9 @@
 <template>
   <div class="bugfix-root">
-    <div v-if="isOpen" class="brv-overlay" @click.self="close">
+    <!-- 바깥(오버레이)에서 누르고 뗀 경우에만 닫는다: 창 안에서 드래그하다 밖에서 떼면 click 이 오버레이로 가서 닫히던 문제 -->
+    <div v-if="isOpen" class="brv-overlay"
+      @mousedown="backdropPressed = $event.target === $event.currentTarget"
+      @click.self="backdropPressed && close()">
       <div class="brv-modal">
 
         <!-- 헤더 -->
@@ -79,9 +82,9 @@
                 <div class="brv-row"><span>일시</span><span class="brv-selectable">{{ formatDate(detail.insertDate) }}</span></div>
               </div>
 
-              <!-- Claude 자동 수정 -->
+              <!-- AI 자동 수정 -->
               <div class="brv-section">
-                <div class="brv-label">Claude 자동 수정</div>
+                <div class="brv-label">AI 자동 수정</div>
                 <div class="brv-row">
                   <span>상태</span>
                   <span>
@@ -99,6 +102,16 @@
                   <a class="brv-link" :href="detail.fixPrUrl" target="_blank" rel="noopener">{{ detail.fixPrUrl.replace(/^https?:\/\/github\.com\//, '') }}</a>
                 </div>
                 <div v-if="detail.fixSummary" class="brv-text brv-selectable brv-fix-summary">{{ detail.fixSummary }}</div>
+
+                <!-- AI 가 남긴 추천 개선: 누르면 그 내용을 그대로 '수정 요청' 으로 보낸다 -->
+                <div v-if="fixSuggestions.length" class="brv-suggest">
+                  <div class="brv-suggest__title">추천 개선 <span class="brv-suggest__hint">눌러서 바로 수정 요청</span></div>
+                  <div v-for="(s, i) in fixSuggestions" :key="i" class="brv-suggest__item">
+                    <span class="brv-suggest__text brv-selectable">{{ s }}</span>
+                    <button class="brv-fix-btn brv-suggest__run" :disabled="fixBusy || fixInProgress" @click="runSuggestion(s)"
+                            title="이 추천을 AI 에게 수정 요청으로 보냅니다 (고친 뒤 검증 → PR → 병합)">실행</button>
+                  </div>
+                </div>
                 <details v-if="detail.fixLog" class="brv-fix-log" :open="fixInProgress">
                   <summary>진행 로그</summary>
                   <pre ref="fixLogPre" class="brv-selectable">{{ detail.fixLog }}</pre>
@@ -107,11 +120,11 @@
                 <!-- 이어서 대화: 질문(코드 변경 없음) · 추가 요청(수정 → 검증 → PR/병합) -->
                 <div v-if="detail.fixStatus" class="brv-chat">
                   <div v-for="(m, i) in fixChat" :key="i" :class="['brv-chat__msg', `brv-chat__msg--${m.role}`]">
-                    <span class="brv-chat__who">{{ m.role === 'user' ? '나' : 'Claude' }}</span>
+                    <span class="brv-chat__who">{{ m.role === 'user' ? '나' : 'AI' }}</span>
                     <div class="brv-chat__text brv-selectable">{{ m.text }}</div>
                   </div>
                   <div v-if="fixInProgress && fixChat.length && fixChat[fixChat.length - 1].role === 'user'" class="brv-chat__msg brv-chat__msg--assistant">
-                    <span class="brv-chat__who">Claude</span>
+                    <span class="brv-chat__who">AI</span>
                     <div class="brv-chat__text"><span class="brv-spin brv-spin--sm"></span> 생각 중…</div>
                   </div>
                   <textarea v-model="chatInput" class="brv-chat__input" rows="2" :disabled="fixBusy || fixInProgress"
@@ -119,16 +132,18 @@
                             @keydown.ctrl.enter.prevent="sendChat('ask')" @keydown.meta.enter.prevent="sendChat('ask')"></textarea>
                   <div class="brv-fix-actions">
                     <button class="brv-fix-btn brv-fix-btn--ghost" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('ask')" title="코드는 바꾸지 않고 답만 합니다">질문</button>
-                    <button class="brv-fix-btn" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('change')" title="같은 세션에서 추가로 고치고 검증 → PR → 병합까지">추가 수정 요청</button>
+                    <button class="brv-fix-btn" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('change')" title="앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지">수정 요청</button>
                   </div>
                 </div>
+                <!-- 첫 요청은 큰 버튼, 이후 이어서 고치기는 위 대화창에서 하고 여기서는 '처음부터 다시' 만 둔다 -->
                 <div class="brv-fix-actions">
-                  <button class="brv-fix-btn" :disabled="fixBusy || fixInProgress" @click="requestFix">
-                    {{ fixInProgress ? 'Claude 가 고치는 중…' : (detail.fixStatus ? '다시 수정 요청' : 'Claude 에게 수정 요청') }}
+                  <button v-if="!detail.fixStatus || fixInProgress" class="brv-fix-btn" :disabled="fixBusy || fixInProgress" @click="requestFix">
+                    {{ fixInProgress ? 'AI 가 고치는 중…' : 'AI 에게 수정 요청' }}
                   </button>
+                  <button v-else class="brv-fix-btn brv-fix-btn--ghost" :disabled="fixBusy" @click="requestFix" title="앞선 대화·수정을 잇지 않고 원인 조사부터 새로 고칩니다">처음부터 다시</button>
                   <button v-if="detail.fixStatus" class="brv-fix-btn brv-fix-btn--ghost" :disabled="fixBusy" @click="refreshDetail">새로고침</button>
                 </div>
-                <div class="brv-hint">개발서버의 Claude Code 가 원인을 찾아 고치고, 검증(lint·build)이 통과하면 PR 을 올린 뒤 <b>바로 병합</b>합니다. 그사이 다른 변경과 충돌하면 Claude 가 풀고 다시 검증합니다. 병합되지 않으면 PR 이 열린 채 남습니다.</div>
+                <div class="brv-hint">서버의 AI 가 원인을 찾아 고치고, 검증(lint·build)이 통과하면 PR 을 올린 뒤 <b>바로 병합</b>합니다. 그사이 다른 변경과 충돌하면 AI 가 풀고 다시 검증합니다. 병합되지 않으면 PR 이 열린 채 남습니다.<template v-if="detail.fixStatus"><br>고친 뒤에는 위 입력창에서 <b>질문</b>(코드 변경 없음)이나 <b>수정 요청</b>(이어서 고침)을 보낼 수 있습니다.</template></div>
               </div>
 
               <!-- 문제 상황 -->
@@ -312,7 +327,7 @@
 const FIX_LABELS = {
   none:      '요청 전',
   QUEUED:    '대기 중',
-  RUNNING:   'Claude 가 고치는 중',
+  RUNNING:   'AI 가 고치는 중',
   PR_OPENED: 'PR 올라옴 · 병합 안 됨(로그 확인)',
   MERGED:    '병합 완료',
   FAILED:    '실패 · 진행 로그 확인',
@@ -334,6 +349,7 @@ export default {
     return {
       STATUSES,
       isOpen: false,
+      backdropPressed: false,
       loading: false,
       list: [],
       selected: null,
@@ -355,6 +371,9 @@ export default {
     hotkey() { return this.kit?.options?.hotkeys?.viewer || ''; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
     fixChat() { try { return this.detail?.fixChat ? JSON.parse(this.detail.fixChat) : []; } catch { return []; } },
+    fixSuggestions() {
+      try { const v = this.detail?.fixSuggestions ? JSON.parse(this.detail.fixSuggestions) : []; return Array.isArray(v) ? v : []; } catch { return []; }
+    },
     // 진행 중 경과 시간 - 후속 대화면 마지막 내 메시지부터, 아니면 수정 요청 시각부터
     fixElapsed() {
       const chat = this.fixChat;
@@ -475,7 +494,7 @@ export default {
       return STATUSES.find(s => s.value === status)?.label ?? '접수';
     },
 
-    // ── Claude 자동 수정 ──
+    // ── AI 자동 수정 ──
     fixLabel(st) { return FIX_LABELS[st || 'none'] || st; },
     fixShort(st) { return FIX_SHORT[st] || st; },
     async requestFix() {
@@ -485,21 +504,27 @@ export default {
       try {
         const r = await this.kit.api.requestFix(id);
         if (r) { this.detail = { ...this.detail, ...r }; this._syncListFix(r); }
-        this.showNotice('수정 요청', '서버에서 Claude 가 고치기 시작합니다. 진행 로그가 여기에 쌓이고, PR 이 올라오면 링크가 표시됩니다.', 'success');
+        this.showNotice('수정 요청', '서버에서 AI 가 고치기 시작합니다. 진행 로그가 여기에 쌓이고, PR 이 올라오면 링크가 표시됩니다.', 'success');
         this._startFixPolling();
       } catch (e) {
         this.showNotice('수정 요청 실패', e?.message || '요청에 실패했습니다.', 'error');
       } finally { this.fixBusy = false; }
     },
-    async sendChat(mode) {
-      const msg = this.chatInput.trim();
+    // 추천 개선 실행 - 입력창에 쓰던 내용은 건드리지 않고 추천 문장을 그대로 수정 요청으로 보낸다
+    runSuggestion(text) {
+      if (!window.confirm(`이 추천을 AI 에게 수정 요청으로 보낼까요?\n\n${text}`)) return;
+      this.sendChat('change', `추천 개선 실행: ${text}`);
+    },
+    async sendChat(mode, text) {
+      const fromInput = text === undefined;
+      const msg = (fromInput ? this.chatInput : text).trim();
       if (!msg || !this.detail || this.fixBusy) return;
       const id = this.detail.bugReportId;
       this.fixBusy = true;
       try {
         const r = await this.kit.api.fixChat(id, msg, mode);
         if (r) { this.detail = { ...this.detail, ...r }; this._syncListFix(r); }
-        this.chatInput = '';
+        if (fromInput) this.chatInput = '';
         this._startFixPolling();
       } catch (e) {
         this.showNotice('전송 실패', e?.message || '실패했습니다.', 'error');
@@ -733,6 +758,13 @@ export default {
 /* 배경을 직접 칠하므로 글자색도 직접 - 어두운 테마에서 글자색이 밝게 상속되어 안 보였다 */
 .brv-fix-log pre { margin: 6px 0 0; max-height: 260px; overflow: auto; padding: 8px; background: #1f2530; color: #d8dee6; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: 11px; line-height: 1.45; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .brv-fix-summary { color: inherit; }
+.brv-suggest { margin-top: 10px; border-top: 1px dashed #c9d0d8; padding-top: 8px; }
+.brv-suggest__title { font-size: 12px; font-weight: 600; color: #334; margin-bottom: 4px; }
+.brv-suggest__hint { margin-left: 6px; font-size: 11px; font-weight: 400; color: #778; }
+.brv-suggest__item { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: 12px; line-height: 1.5; }
+.brv-suggest__item + .brv-suggest__item { border-top: 1px solid #eef1f4; }
+.brv-suggest__text { flex: 1; }
+.brv-suggest__run { flex-shrink: 0; padding: 3px 10px; font-size: 11px; }
 .brv-chat { margin-top: 10px; border-top: 1px dashed #c9d0d8; padding-top: 8px; }
 .brv-chat__msg { margin: 6px 0; font-size: 12px; }
 .brv-chat__who { display: inline-block; min-width: 44px; font-size: 11px; color: #667; }

@@ -163,6 +163,7 @@ export class Runner {
 
       const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
       const summary = result.title || `버그 #${id} 수정`;
+      await this.saveSuggestions(project, id, result.body);
       const commitMsg = `fix: ${summary} (버그 #${id})\n\n${result.body || ''}\n\n버그 리포트 #${id}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
       await ex.exec(wt, 1, ['git', 'checkout', '-b', branch]);
       await ex.exec(wt, 1, ['git', 'add', '-A']);
@@ -227,7 +228,8 @@ export class Runner {
       const allowed = allowChange ? this.allowedTools(project) : READ_ONLY_TOOLS;
       const preface = allowChange
         ? '사용자의 추가 요청입니다. 앞서 고친 내용 위에 아래 요청을 반영하세요. 고친 뒤 검증 명령을 통과시키고, '
-          + '`.bugfix/result.md` 를 같은 형식(# 한 줄 요약 / ## 원인 / ## 고친 내용 / ## 검증 / ## 확인이 필요한 점)으로 다시 쓰세요. '
+          + '`.bugfix/result.md` 를 같은 형식(# 한 줄 요약 / ## 원인 / ## 고친 내용 / ## 검증 / ## 확인이 필요한 점 / ## 추천 개선)으로 다시 쓰세요. '
+          + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. '
           + 'git 커밋·푸시는 하지 마세요. 마지막 답변은 무엇을 바꿨는지 한국어로 간단히.\n\n요청: '
         : '사용자의 질문입니다. 코드를 바꾸지 말고 한국어로 간결하게 답하세요. 필요하면 파일을 읽어 근거를 대세요.\n\n질문: ';
       const out = await this.claudeResume(project, ex, id, wt, r.fixSessionId, preface + message, allowed, allowChange ? 40 : 15);
@@ -250,6 +252,7 @@ export class Runner {
       await L('✓ 검증 통과');
       const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
       const summary = result.title || `버그 #${id} 추가 수정`;
+      await this.saveSuggestions(project, id, result.body);
       const commitMsg = `fix: ${summary} (버그 #${id} 추가 요청)\n\n${result.body || ''}\n\n요청: ${firstLine(message, 200)}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
       const branch = prOpen ? r.fixBranch : `claude/bugfix-${id}-${stamp()}`;
       if (!prOpen) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
@@ -397,6 +400,14 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
       ['-p', prompt, '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', CONFLICT_TOOLS.join(',')]);
   }
 
+  /** 추천 개선을 리포트에 둔다 - 뷰어가 목록으로 보여 주고, 누르면 그 줄을 추가 요청으로 보낸다. 실패해도 작업은 계속 */
+  async saveSuggestions(project, id, body) {
+    try {
+      const items = parseSuggestions(body);
+      await this.updateFix(project, id, { fixSuggestions: items.length ? JSON.stringify(items) : null });
+    } catch (e) { this.log.warn(`[bugfix ${project.name}#${id}] 추천 개선 저장 실패: ${e.message}`); }
+  }
+
   allowedTools(project) { return [...new Set([...DEFAULT_TOOLS, ...(project.allowedTools || [])])]; }
 
   prompt(project, r) {
@@ -436,7 +447,11 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
      ...
      ## 확인이 필요한 점
      ...
+     ## 추천 개선
+     - <이어서 하면 좋을 개선 한 가지. 이 줄 그대로 AI 에게 수정 요청으로 보내 실행할 수 있게 구체적으로>
      \`\`\`
+     \`## 추천 개선\` 은 앱의 버그 리포트 화면에 목록으로 뜨고, 사용자가 누르면 그 줄이 그대로 추가 요청으로 실행됩니다.
+     한 항목을 \`- \` 로 시작하는 한 줄로 쓰고(들여쓴 하위 목록 금지), 많아야 5개까지 적습니다. 없으면 절을 빼세요.
 git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
 `;
   }
@@ -512,6 +527,24 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
     try { await ex.exec(repo, 2, ['git', 'worktree', 'remove', '--force', wt]); }
     catch (e) { this.log.warn('[bugfix] worktree 정리 실패:', e.message); }
   }
+}
+
+/** result.md 본문의 '## 추천 개선' 절 → 한 줄 항목 목록 (맨 앞 '- ' / '1. ' 만, 들여쓴 줄은 무시) */
+export function parseSuggestions(body) {
+  const out = [];
+  if (!body) return out;
+  let inSection = false;
+  for (const line of String(body).split(/\r?\n/)) {
+    if (line.startsWith('#')) { inSection = /^#{1,3}\s*추천/.test(line); continue; }
+    if (!inSection) continue;
+    const m = line.match(/^(?:[-*]|\d+[.)])\s+(.+)$/);
+    if (!m) continue;
+    const item = m[1].replace(/\*\*/g, '').trim();
+    if (!item) continue;
+    out.push(item.length > 500 ? item.slice(0, 500) + '…' : item);
+    if (out.length >= 8) break;
+  }
+  return out;
 }
 
 async function readIfExists(p) {

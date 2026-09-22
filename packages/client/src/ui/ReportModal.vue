@@ -8,7 +8,18 @@
       </div>
     </div>
 
-    <div v-if="isOpen" class="bug-report-overlay" @click.self="close">
+    <!-- 바깥(오버레이)에서 누르고 뗀 경우에만 닫는다: 창 안에서 드래그하다 밖에서 떼면 click 이 오버레이로 가서 닫히던 문제 -->
+    <div v-if="isOpen" class="bug-report-overlay"
+      @mousedown="backdropPressed = $event.target === $event.currentTarget"
+      @click.self="backdropPressed && close()">
+      <!-- 캡처 이미지 그리기·표시 편집기 -->
+      <ScreenshotEditor
+        v-if="isEditingShot && screenshotUrl"
+        :src="screenshotUrl"
+        @apply="onShotEdited"
+        @cancel="isEditingShot = false"
+      />
+
       <div class="bug-report-modal">
 
         <!-- 헤더 -->
@@ -40,11 +51,16 @@
                 <button class="bug-btn-sm" @click="recapture" :disabled="isCapturing">
                   {{ isCapturing ? '캡처 중...' : '다시 찍기' }}
                 </button>
+                <button class="bug-btn-sm" @click="isEditingShot = true" :disabled="!screenshotUrl">그리기·표시</button>
+                <button class="bug-btn-sm" @click="$refs.shotFile.click()">이미지 불러오기</button>
+                <input ref="shotFile" type="file" accept="image/*" hidden @change="onShotFile" />
               </div>
-              <div class="screenshot-wrap">
+              <div class="screenshot-wrap" :class="{ 'screenshot-wrap--editable': screenshotUrl }"
+                title="클릭해서 그리기·표시" @click="screenshotUrl && (isEditingShot = true)">
                 <img v-if="screenshotUrl" :src="screenshotUrl" class="screenshot-img" alt="screenshot" />
                 <div v-else class="screenshot-placeholder">캡처 중...</div>
               </div>
+              <div class="screenshot-hint">이미지를 붙여넣기(Ctrl+V)해도 캡처 대신 쓸 수 있습니다.</div>
             </div>
 
             <!-- 심각도 -->
@@ -388,6 +404,8 @@
 </template>
 
 <script>
+import ScreenshotEditor from './ScreenshotEditor.vue';
+
 const SEVERITY_OPTIONS = [
   { value: 'CRITICAL', label: '치명적' },
   { value: 'HIGH',     label: '높음' },
@@ -397,20 +415,38 @@ const SEVERITY_OPTIONS = [
 
 export default {
   name: 'BugfixReportModal',
+  components: { ScreenshotEditor },
   // kit: createBugfix() 결과. Web Component 로 쓸 때는 엘리먼트 프로퍼티(el.kit = kit)로 들어온다
   props: { kit: { type: Object, default: null } },
   emits: ['open-viewer'],
   expose: ['open', 'close'],
   mounted() {
-    this._onKeydown = (e) => { if (e.key === 'Escape' && this.isOpen) this.close(); };
+    this._onKeydown = (e) => {
+      if (e.key !== 'Escape' || !this.isOpen) return;
+      // 편집기가 열려 있으면 편집기만 닫는다 (그린 내용 때문에 신고 창까지 닫히지 않도록)
+      if (this.isEditingShot) this.isEditingShot = false;
+      else this.close();
+    };
+    // 신고 창이 열려 있을 때 붙여넣은 이미지를 스크린샷으로 쓴다
+    this._onPaste = (e) => {
+      if (!this.isOpen || this.isEditingShot) return;
+      const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+      if (!item) return;
+      e.preventDefault();
+      this.loadShotFile(item.getAsFile());
+    };
     window.addEventListener('keydown', this._onKeydown);
+    window.addEventListener('paste', this._onPaste);
   },
   beforeUnmount() {
     window.removeEventListener('keydown', this._onKeydown);
+    window.removeEventListener('paste', this._onPaste);
   },
   data() {
     return {
       isOpen: false,
+      backdropPressed: false,
+      isEditingShot: false,
       isCapturing: false,
       activeTab: 'basic',
       screenshotUrl: null,
@@ -583,7 +619,36 @@ export default {
 
     close() {
       this.isOpen = false;
+      this.isEditingShot = false;
       this.screenshotUrl = null;
+    },
+
+    onShotEdited(dataUrl) {
+      this.screenshotUrl = dataUrl;
+      this.isEditingShot = false;
+    },
+
+    onShotFile(e) {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      this.loadShotFile(file);
+    },
+
+    // 사용자가 고른(붙여넣은) 이미지를 PNG dataURL 로 바꿔 스크린샷 자리에 넣는다
+    loadShotFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        this.screenshotUrl = canvas.toDataURL('image/png');
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => URL.revokeObjectURL(url);
+      img.src = url;
     },
     // 저장 목록: Vue 앱은 open-viewer 이벤트로, Web Component 는 kit 이 붙여 둔 뷰어를 직접 연다
     openViewer() {
@@ -671,6 +736,8 @@ export default {
 </script>
 
 <style scoped>
+.screenshot-wrap--editable { cursor: zoom-in; }
+.screenshot-hint { margin-top: 4px; font-size: 11px; color: #667788; }
 .bug-capture-overlay {
   position: fixed;
   inset: 0;

@@ -6,7 +6,7 @@ LHDT 에서 만든 기능을 여러 프로젝트에 붙일 수 있게 라이브�
 | 패키지 | 역할 | 상태 |
 |---|---|---|
 | [`packages/server`](packages/server) | 리포트 저장 + 자동 수정 파이프라인 서비스 (프로젝트 여러 개를 설정 파일로) | ✅ |
-| `packages/client` | 브라우저 SDK - 로그·네트워크·DOM 변화·화면 수집, 신고 모달, 진행/대화 뷰어 (Web Component) | 예정 |
+| [`packages/client`](packages/client) | 브라우저 SDK - 로그·네트워크·상태 변화·화면 수집, 신고 모달(그리기·표시 편집기), 진행/대화/추천 개선 뷰어 (Web Component · Vue) | ✅ |
 | `packages/front-check` | 헤드리스 화면 검증 CLI (Playwright, 도커 폴백) + Claude 스킬 | 예정 |
 | `packages/skills` | `.claude/skills` 묶음 - 프로젝트에 복사해 쓰는 Claude Code 절차 | 예정 |
 

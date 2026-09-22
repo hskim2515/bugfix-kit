@@ -8,6 +8,7 @@ import { trimLog, stripKeys, writeReportFiles } from '../src/reportFiles.js';
 import { progressLine, claudeSummary, sessionIdOf, resultTextOf } from '../src/claude.js';
 import { FileStore } from '../src/store.js';
 import { describe as describeCmd } from '../src/exec.js';
+import { parseSuggestions } from '../src/runner.js';
 
 test('parseResult: 첫 줄이 제목, 나머지가 본문', () => {
   assert.deepEqual(parseResult('# 제목\n## 원인\n내용'), { title: '제목', body: '## 원인\n내용' });
@@ -91,4 +92,10 @@ test('FileStore: 저장·조회·목록·갱신·재시작 정리', async () => 
 
 test('describe: sudo/env 래핑과 토큰 헤더를 감춘다', () => {
   assert.equal(describeCmd(['sudo', '-n', '-u', 'x', 'env', 'PATH=/a', 'git', '-c', 'http.extraheader=Authorization: Basic abc', 'push']), 'git -c http.extraheader=Authorization: *** push');
+});
+
+test('parseSuggestions: 추천 개선 절의 한 줄 항목만', () => {
+  const body = '## 원인\n- 아님\n## 추천 개선\n- **첫째** 항목\n  - 들여쓴 건 무시\n2. 둘째\n## 검증\n- 아님';
+  assert.deepEqual(parseSuggestions(body), ['첫째 항목', '둘째']);
+  assert.deepEqual(parseSuggestions(''), []);
 });

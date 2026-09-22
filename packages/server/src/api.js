@@ -97,7 +97,7 @@ export function createApi(cfg, store, runner, log = console) {
     if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '이미 수정이 진행 중입니다.');
     await store.update(p.name, r.bugReportId, (c) => ({
       ...c,
-      fixStatus: 'QUEUED', fixBranch: null, fixPrUrl: null, fixPrNumber: null, fixSummary: null, fixLog: '', fixSessionId: null, fixChat: null,
+      fixStatus: 'QUEUED', fixBranch: null, fixPrUrl: null, fixPrNumber: null, fixSummary: null, fixLog: '', fixSessionId: null, fixChat: null, fixSuggestions: null,
       fixRequestedAt: new Date().toISOString(), fixUpdatedAt: new Date().toISOString(),
       status: c.status === 'OPEN' ? 'IN_PROGRESS' : c.status,
     }));
