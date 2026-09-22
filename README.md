@@ -1,100 +1,119 @@
 # bugfix-kit
 
-앱에서 버그를 신고하면(**Shift+F9**) AI 가 알아서 고치고, 검증하고, 화면까지 확인한 뒤, PR 을 올려 병합하고, 배포까지 지켜봅니다.
-Vue·React·순수 HTML 어디에나 붙고, 서버 한 대로 여러 프로젝트를 담당합니다.
+> **앱에서 버그를 신고하면, AI 가 고쳐서 배포까지 해 줍니다.**
 
+```mermaid
+flowchart LR
+    A["🙋 사용자<br/>앱에서 Shift+F9<br/>화면·로그 자동 첨부"] --> B["🤖 AI (Claude Code)<br/>원인 찾아 코드 수정<br/>실시간 로그"]
+    B --> C["✅ 검증<br/>lint · build · compile"]
+    C --> D["🖥️ 화면 확인<br/>헤드리스 브라우저로<br/>실제 화면 열어봄"]
+    D --> E["🔀 PR → 병합"]
+    E --> F["🚀 배포 확인"]
+    F -. "질문 · 추가 수정 요청 · 추천 개선" .-> B
 ```
-앱에서 신고  →  AI 가 코드 수정  →  lint·build 검증  →  헤드리스로 화면 확인  →  PR → 병합  →  배포 확인
-(Shift+F9)      (실시간 로그)                              (front-check)                    (Actions 추적)
-```
 
-세 부분으로 되어 있습니다.
-
-| | 무엇 | 어디에 |
-|---|---|---|
-| `packages/server` | 리포트 저장 + 자동 수정 파이프라인 + **관리 콘솔** | 개발서버 한 대 |
-| `packages/client` | 신고 창·목록 뷰어·수집기 (브라우저 SDK) | 각 앱 프론트 |
-| `packages/front-check` | 헤드리스 브라우저로 화면 확인하는 CLI + Claude 스킬 | 각 앱 저장소 |
+리포트 하나에 **5~10분**, 비용 **$0.5~1**. Vue·React·순수 HTML 어디에나 붙습니다.
 
 ---
 
-## 어떻게 돌아가나 (리포트 하나의 흐름)
+## 구성
 
-1. 사용자가 앱에서 **Shift+F9** → 화면 캡처(펜으로 표시 가능) + 그 직전의 콘솔·네트워크·상태 변화가 자동으로 붙습니다. 문제를 적고 **서버 저장**.
-2. **Shift+F10** 목록에서 리포트를 열고 **AI 에게 수정 요청**.
-3. 서버가 저장소를 받아 Claude Code 를 돌립니다. 무엇을 읽고 고치는지 **실시간 로그**로 보입니다.
-4. 검증 명령(lint·build·compile) → 프론트가 바뀌었으면 front-check 가 **로그인해서 실제 화면**을 열어 확인.
-5. PR → 자동 병합 → **배포 완료**까지 로그에 이어집니다.
-6. 그 뒤 **질문**(코드 안 바꿈) / **수정 요청**(이어서 고침) / AI 의 **추천 개선** 버튼.
-
-리포트 하나에 보통 5~10분, Claude 비용 $0.5~1.
+```mermaid
+flowchart TB
+    subgraph APP["각 앱 (프론트)"]
+        C1["📦 client<br/>신고 창 · 목록 뷰어 · 수집기<br/>(두 줄로 설치)"]
+    end
+    subgraph SRV["개발서버 한 대"]
+        S1["🖧 server<br/>리포트 저장 · 자동 수정 파이프라인"]
+        S2["🎛️ 관리 콘솔 /bugfix/ui/<br/>프로젝트 · 키 · 점검 · 로그"]
+        S3["🔍 front-check<br/>헤드리스 화면 확인"]
+    end
+    subgraph GH["GitHub"]
+        G1["저장소 · PR · Actions 배포"]
+    end
+    C1 -- 리포트 --> S1
+    S1 -- 실시간 로그 --> C1
+    S1 --> S3
+    S1 -- PR·병합 --> G1
+    G1 -- 배포 결과 --> S1
+```
 
 ---
 
-## 시작하기
+## 시작하기 — 3단계
 
-### 1) 서버 (한 번만)
+```mermaid
+flowchart LR
+    S["① 서버 켜기<br/>(한 번만, 5분)"] --> K["② 콘솔에서 설정<br/>키 넣고 · 프로젝트 추가 · 점검"] --> A["③ 앱에 두 줄<br/>SDK 설치"]
+```
+
+### ① 서버 켜기
 
 ```bash
 git clone https://github.com/hskim2515/bugfix-kit.git ~/bugfix-kit && cd ~/bugfix-kit && npm install
 cp packages/server/bugfix-kit.example.yml packages/server/bugfix-kit.yml
 mkdir -p ~/.config/bugfix-kit && (umask 077; echo "ADMIN_KEY=$(openssl rand -hex 16)" > ~/.config/bugfix-kit/default.env)
-claude login                                   # 서버 계정에서 한 번 (터미널 필요)
+claude login                                                   # 터미널에서 한 번
 docker pull mcr.microsoft.com/playwright:v1.47.2-jammy
 cp packages/server/deploy/bugfix-server.service ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now bugfix-server && loginctl enable-linger $USER
 ```
-nginx 에 한 줄: `location ^~ /bugfix/ { proxy_pass http://127.0.0.1:8790/api/; client_max_body_size 60m; }`
+nginx: `location ^~ /bugfix/ { proxy_pass http://127.0.0.1:8790/api/; client_max_body_size 60m; }`
 
-이제 **관리 콘솔** `https://앱주소/bugfix/ui/` 로 들어갑니다(키는 방금 만든 `ADMIN_KEY`). 나머지는 거기서 합니다.
+### ② 관리 콘솔 `https://앱주소/bugfix/ui/`
 
-### 2) 관리 콘솔에서
+첫 화면의 **시작 체크리스트**가 남은 일을 알려 줍니다.
 
-| 탭 | 여기서 하는 일 |
+| 탭 | 한 줄 요약 |
 |---|---|
-| 키·계정 | GitHub 토큰(전용 봇 계정의 PAT 권장), 테스트 계정 아이디/비밀번호 |
-| 프로젝트 | 프로젝트 추가: 저장소·브랜치·검증 명령(`npm run lint`, `npm run build` …)·앱 주소 |
-| 점검 | GitHub·저장소·Claude·docker 가 잘 붙는지 버튼으로 확인 |
-| 리포트 | 전 프로젝트 현황, 진행 중 작업 로그, 리포트 열어 보기 |
+| 🔑 키·계정 | GitHub 토큰, 테스트 계정 넣기 |
+| 📁 프로젝트 | 저장소 주소·브랜치·검증 명령 적고 저장 |
+| 🩺 점검 | 버튼 눌러서 잘 붙었는지 확인 |
+| 📋 리포트 | 신고 현황, 진행 중 로그, 리포트 열어 보기 |
 
-비밀값은 전부 서버 홈(`~/.config/bugfix-kit/`)에만 저장되고 저장소에는 들어가지 않습니다.
+비밀값은 서버 홈에만 저장됩니다. 저장소에는 절대 안 들어갑니다.
 
-### 3) 앱 저장소에
+### ③ 앱에 두 줄
 
 ```bash
-npm i -D github:hskim2515/bugfix-kit#v0.1.20
-npx front-check init          # front-check.config.mjs (로그인 선택자·화면 절차) + Claude 스킬
+npm i -D github:hskim2515/bugfix-kit#v0.1.21 && npx front-check init
 ```
-
-프론트에 두 줄:
-
 ```js
 // Vue
 import { createBugfix } from 'bugfix-kit/client/vue'; import 'bugfix-kit/client/style.css';
 export const kit = createBugfix({ endpoint: '/bugfix', project: 'myapp', apiKey: '…', interceptors: { console: true, network: { axios: [rest] }, mutation: store, router } });
-// App.vue: <ReportModal :kit="kit" /> <Viewer ref="viewer" :kit="kit" />
-
-// React / 그 외
+// React / HTML
 import { createBugfix } from 'bugfix-kit/client';
 export const kit = createBugfix({ endpoint: '/bugfix', project: 'myapp', apiKey: '…', interceptors: { console: true, network: { fetch: true }, router: true } }).mount();
 ```
 
-끝. Shift+F9 로 신고, Shift+F10 으로 목록.
+끝. **Shift+F9** 신고 · **Shift+F10** 목록.
+
+---
+
+## 사용자는 이것만
+
+```mermaid
+flowchart LR
+    R["Shift+F9<br/>신고"] --> L["Shift+F10<br/>목록 열기"] --> F["AI 에게 수정 요청"] --> W["로그 보며 기다리기<br/>(5~10분)"] --> M{"결과"}
+    M -- "병합 완료" --> D["배포까지 자동"]
+    M -- "더 고치고 싶다" --> Q["입력창에 쓰고<br/>질문 / 수정 요청"]
+    M -- "AI 추천이 마음에 든다" --> S["추천 개선 [실행]"]
+```
 
 ---
 
 ## 자주 묻는 것
 
-- **백엔드도 고치나요?** 네. 같은 저장소면 프론트·백엔드 모두 고칩니다. 백엔드 검증은 컴파일·테스트까지(실제 API 호출 확인은 아직 없음).
-- **신고 창 자체가 이상하면?** 신고 창에서 대상을 "버그 신고 도구"로 바꾸면 bugfix-kit 저장소로 PR 이 갑니다.
-- **운영 서버에 영향은?** 없습니다. 개발서버 저장소·브랜치만 건드리고, front-check 는 운영 주소로 나가는 요청을 차단할 수 있습니다(`blockRequests`).
-- **개인정보는?** 신고자·문제 원문은 PR 에 안 들어갑니다. 로그의 인증 관련 값은 마스킹되고, Claude 에게는 오류 위주로 추린 로그만 갑니다.
-- **서버를 재시작하면?** 돌던 작업만 끊깁니다(PR 을 올린 뒤면 그대로 남음). 앱 서버 재배포와는 무관합니다.
-- **프론트/백엔드가 다른 저장소면?** 프로젝트 두 개로 등록하고 신고할 때 대상을 고릅니다.
+| 질문 | 답 |
+|---|---|
+| 백엔드도 고치나요? | 네, 같은 저장소면 프론트·백엔드 다. 백엔드 검증은 컴파일·테스트까지 |
+| 신고 창 자체가 이상하면? | 신고 창에서 대상을 **버그 신고 도구**로 바꾸면 bugfix-kit 저장소로 PR |
+| 운영 서버에 영향은? | 없음. 개발 저장소·브랜치만 건드리고, front-check 는 운영 주소 요청을 차단 가능 |
+| 개인정보는? | 신고자·문제 원문은 PR 에 안 들어감. 인증값 마스킹, AI 에겐 추린 로그만 |
+| 서버를 재시작하면? | 돌던 작업만 끊김. 앱 서버 재배포와는 무관 |
+| 프론트/백엔드 저장소가 다르면? | 프로젝트 두 개로 등록하고 신고할 때 대상 선택 |
 
-## 문제가 생기면
+문제가 생기면 콘솔 **점검** 탭과 **로그** 탭. 서버 갱신: `cd ~/bugfix-kit && git checkout -- package-lock.json && git pull && npm install && systemctl --user restart bugfix-server`
 
-콘솔 **점검** 탭 → 각 항목 검사. 로그는 **로그** 탭.
-서버 갱신: `cd ~/bugfix-kit && git checkout -- package-lock.json && git pull && npm install && systemctl --user restart bugfix-server`
-
-자세한 옵션은 [server](packages/server) · [client](packages/client) · [front-check](packages/front-check) README.
+자세한 옵션: [server](packages/server) · [client](packages/client) · [front-check](packages/front-check)

@@ -53,6 +53,17 @@
   .empty { padding: 30px; text-align: center; color: var(--dim); }
   #login { max-width: 420px; margin: 80px auto; }
   .err { color: var(--bad); font-size: 12px; margin-top: 8px; }
+  .intro { margin: 4px 0 14px; color: var(--dim); font-size: 12.5px; }
+  .intro b { color: var(--text); font-weight: 500; }
+  .checklist { grid-column: 1 / -1; }
+  .checklist ol { margin: 6px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 14px; }
+  .checklist li { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; }
+  .checklist li .ic { width: 18px; text-align: center; flex-shrink: 0; }
+  .checklist li a { color: var(--accent); text-decoration: none; }
+  .checklist .done { color: var(--dim); text-decoration: line-through; }
+  .steps { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--dim); margin: 2px 0 12px; }
+  .steps span.s { background: rgba(110,160,255,0.12); border: 1px solid rgba(110,160,255,0.3); border-radius: 20px; padding: 3px 10px; color: var(--text); }
+  .steps span.ar { color: #55617a; }
   /* 설정 폼 */
   .form { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; align-items: start; }
   .form label { color: var(--dim); font-size: 12px; padding-top: 6px; }
@@ -80,12 +91,12 @@
   <h1>bugfix-kit</h1>
   <span class="sub" id="meta">관리</span>
   <nav class="tabs" id="tabs">
-    <button data-t="reports" class="on">리포트</button>
-    <button data-t="projects">프로젝트</button>
-    <button data-t="secrets">키·계정</button>
-    <button data-t="server">서버 설정</button>
-    <button data-t="checks">점검</button>
-    <button data-t="logs">로그</button>
+    <button data-t="reports" class="on">📋 리포트</button>
+    <button data-t="projects">📁 프로젝트</button>
+    <button data-t="secrets">🔑 키·계정</button>
+    <button data-t="server">⚙️ 서버</button>
+    <button data-t="checks">🩺 점검</button>
+    <button data-t="logs">🧾 로그</button>
   </nav>
   <div class="right">
     <span class="dim" id="tick"></span>
@@ -107,6 +118,8 @@
   <section id="app" hidden>
     <!-- 리포트 -->
     <div data-tab="reports">
+      <p class="intro"><b>사용자가 앱에서 Shift+F9 로 신고한 것</b>이 여기 모입니다. 행을 누르면 그 리포트를 열어 AI 에게 수정을 시키거나 질문할 수 있어요.</p>
+      <div class="card checklist" id="checklist" hidden></div>
       <div class="cards" id="cards"></div>
       <div class="toolbar">
         <span class="seg" id="projSeg"></span>
@@ -122,7 +135,8 @@
 
     <!-- 프로젝트 -->
     <div data-tab="projects" hidden>
-      <h2>프로젝트 <small>저장하면 <code>bugfix-kit.yml</code> 에 반영되고 재시작 없이 적용됩니다 (이전 파일은 .bak)</small></h2>
+      <p class="intro"><b>AI 가 고칠 저장소를 등록하는 곳.</b> 어디서 코드를 받아오고(저장소·브랜치), 고친 뒤 뭘로 확인할지(검증 명령)를 적습니다. 저장하면 바로 적용됩니다.</p>
+      <div class="steps"><span class="s">1 저장소 주소</span><span class="ar">→</span><span class="s">2 브랜치</span><span class="ar">→</span><span class="s">3 앱 주소</span><span class="ar">→</span><span class="s">4 모듈 = 어느 폴더를 어떤 명령으로 검증할지</span><span class="ar">→</span><span class="s">저장</span></div>
       <div class="plist" id="plist"></div>
       <div class="card">
         <div class="form" id="pform">
@@ -154,16 +168,18 @@
 
     <!-- 키·계정 -->
     <div data-tab="secrets" hidden>
-      <h2>공용 <small>서버 홈의 <code>github-token</code> · <code>default.env</code>. 값은 저장 뒤 다시 보이지 않고 "설정됨(…끝 4자)" 로만 표시</small></h2>
+      <p class="intro"><b>비밀번호·토큰은 여기에만.</b> 서버 컴퓨터 안(<code>~/.config/bugfix-kit/</code>)에 저장되고 저장소에는 절대 안 들어갑니다. 저장하면 값은 다시 보이지 않고 "설정됨"만 표시돼요.</p>
+      <h2>모든 프로젝트 공통</h2>
       <div class="card" id="gsec"></div>
-      <h2>프로젝트별 <small><code>~/.config/bugfix-kit/projects/&lt;이름&gt;.env</code> - 공용보다 우선</small></h2>
+      <h2>프로젝트마다 다르게 <small>여기 값이 공통보다 우선</small></h2>
       <div class="plist" id="splist"></div>
       <div class="card" id="psec"></div>
     </div>
 
     <!-- 서버 설정 -->
     <div data-tab="server" hidden>
-      <h2>서버 설정 <small>포트 변경만 재시작 필요</small></h2>
+      <p class="intro"><b>보통은 건드릴 일이 없는 설정.</b> AI 가 한 번에 얼마나 오래·많이 일할지, 프로그램 경로 같은 것들입니다. 포트만 바꾸면 재시작이 필요해요.</p>
+      <h2>서버 설정</h2>
       <div class="card">
         <div class="form" id="sform">
           <label>포트</label><input id="s_port">
@@ -185,7 +201,8 @@
 
     <!-- 점검 -->
     <div data-tab="checks" hidden>
-      <h2>연결 점검 <small>버튼을 누르면 그 자리에서 검사합니다</small></h2>
+      <p class="intro"><b>잘 붙었는지 버튼으로 확인.</b> 뭔가 안 되면 여기부터 눌러 보세요. ✓ 면 정상, ✗ 면 그 줄에 이유가 나옵니다.</p>
+      <h2>연결 점검</h2>
       <div class="cards checks">
         <div class="card"><div class="body"><h3>GitHub 토큰 · 저장소 권한</h3><div id="c_github" class="dim">토큰으로 GitHub 사용자를 확인하고 프로젝트마다 저장소 접근 권한을 봅니다</div></div><button class="btn" data-check="github">검사</button></div>
         <div class="card"><div class="body"><h3>Claude Code</h3><div id="c_claude" class="dim">실행 파일·버전·로그인 흔적</div></div><button class="btn" data-check="claude">검사</button></div>
@@ -197,6 +214,7 @@
 
     <!-- 로그 -->
     <div data-tab="logs" hidden>
+      <p class="intro"><b>서버가 남긴 기록.</b> 리포트 진행 로그는 리포트 탭에 있고, 여기는 서버 자체의 로그입니다.</p>
       <h2>서버 로그 <small id="logsrc"></small></h2>
       <div class="toolbar"><button class="btn" id="loadLogs">다시 읽기</button><label class="dim"><input type="checkbox" id="autoLogs"> 5초마다</label></div>
       <pre class="log tall" id="logs">(다시 읽기를 누르세요)</pre>
@@ -235,6 +253,7 @@
       if (!project || !data.projects.some((p) => p.name === project)) project = data.projects[0]?.name || '';
       ensureKit(); renderReports();
       $('#login').hidden = true; $('#app').hidden = false;
+      if (!quick) loadChecklist();
       $('#tick').textContent = `갱신 ${new Date().toLocaleTimeString()}`;
     } catch (e) { $('#tick').textContent = `연결 실패: ${e.message}`; }
   }
@@ -242,6 +261,30 @@
     if (kit) return;
     kit = BugfixKit.createBugfix({ endpoint: API, user: 'admin', hotkeys: false, interceptors: { console: false }, projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })) }).mount();
   }
+  // 시작 체크리스트 - 설정 상태와 빠른 점검으로 "남은 일" 을 보여 준다
+  let quick = null;
+  async function loadChecklist() {
+    try {
+      const st = await api('GET', '/admin/settings');
+      if (!quick) quick = { claude: await api('POST', '/admin/check/claude').catch(() => null), docker: await api('POST', '/admin/check/docker').catch(() => null) };
+      const anyAccount = !!st.global.FC_USER || st.projects.some((p) => p.secrets.FC_USER);
+      const anyReport = st.projects.some((p) => p.reports > 0);
+      const items = [
+        { ok: !!st.global.GITHUB_TOKEN, text: 'GitHub 토큰 넣기', go: 'secrets' },
+        { ok: !!quick.claude?.loggedIn, text: 'Claude 로그인 (서버 터미널에서 claude login)', go: 'checks' },
+        { ok: !!quick.docker?.imagePresent, text: '헤드리스 브라우저 이미지 (docker pull)', go: 'checks' },
+        { ok: st.projects.length > 0, text: '프로젝트 등록', go: 'projects' },
+        { ok: anyAccount, text: '테스트 계정 넣기 (로그인 뒤 화면 확인용)', go: 'secrets' },
+        { ok: anyReport, text: '앱에 SDK 붙이고 첫 신고 받기', go: null },
+      ];
+      const done = items.filter((i) => i.ok).length;
+      const el = $('#checklist');
+      if (done === items.length) { el.hidden = true; return; }
+      el.hidden = false;
+      el.innerHTML = `<h3>🚀 시작 체크리스트 <span class="dim">${done}/${items.length} 완료</span></h3><ol>${items.map((i) => `<li><span class="ic">${i.ok ? '✅' : '⬜'}</span><span class="${i.ok ? 'done' : ''}">${esc(i.text)}${!i.ok && i.go ? ` <a href="#" data-go="${i.go}">→ 가기</a>` : ''}</span></li>`).join('')}</ol>`;
+    } catch { /* 설정 API 실패는 무시 */ }
+  }
+
   function renderReports() {
     const cur = data.projects.find((p) => p.name === project);
     const total = data.projects.reduce((n, p) => n + p.reports.length, 0);
@@ -364,6 +407,7 @@
 
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
+    const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
     const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); return; }
     const pb = e.target.closest('#projSeg button'); if (pb) { project = pb.dataset.p; localStorage.setItem('bugfix-admin-project', project); renderReports(); return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
@@ -375,7 +419,7 @@
       let body;
       if (k === '__new') { const [kk, ...rest] = input.value.split('='); if (!kk || !rest.length) return alert('KEY=VALUE 형식으로'); body = { [kk.trim()]: rest.join('=').trim() }; }
       else { if (!input.value) return alert('값을 입력하세요'); body = { [k]: input.value }; }
-      try { const r = await api('PUT', `/admin/secrets/${scope}`, body); input.value = ''; if (r.adminKeyChanged) { localStorage.setItem(KEY, body.ADMIN_KEY); key = body.ADMIN_KEY; } await loadSettings(); } catch (x) { alert(x.message); }
+      try { const r = await api('PUT', `/admin/secrets/${scope}`, body); input.value = ''; if (r.adminKeyChanged) { localStorage.setItem(KEY, body.ADMIN_KEY); key = body.ADMIN_KEY; } await loadSettings(); loadChecklist(); } catch (x) { alert(x.message); }
       return;
     }
     const cl = e.target.closest('[data-clear]'); if (cl) { if (!confirm(`${cl.dataset.clear} 를 지울까요?`)) return; try { await api('PUT', `/admin/secrets/${cl.dataset.scope}`, { [cl.dataset.clear]: null }); await loadSettings(); } catch (x) { alert(x.message); } return; }
