@@ -509,7 +509,9 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
       // exit 1(기준 초과)도 명령 실패로 오므로 출력에서 JSON 을 건져 본다
       const m = String(e.message || '').match(/\{[\s\S]*\}\s*$/);
       if (m) { try { const r = JSON.parse(m[0]); const c = r.collected || {}; const line = `✗ 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`; await L(`화면 확인 ${line}`); return line; } catch { /* 아래 */ } }
-      await L(`화면 확인 실패(계속 진행): ${firstLine(e.message, 200)}`);
+      // 원인이 보이도록 명령 출력의 마지막 줄들도 남긴다
+      const tailLines = String(e.message || '').split(/\r?\n/).filter((l) => l.trim() && !/^\s+at /.test(l)).slice(-4).join('\n');
+      await L(`화면 확인 실패(계속 진행):\n${tailLines.slice(0, 600)}`);
       return `(실행 실패) ${firstLine(e.message, 200)}`;
     }
   }

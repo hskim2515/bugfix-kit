@@ -44,17 +44,21 @@ export async function check(opt = {}) {
 
   let server = null;
   let baseUrl = opt.url || cfg.baseUrl;
-  if (!opt.url && cfg.serve && !opt.noServe) {
-    server = await startServer({ ...cfg.serve, dir: path.resolve(cfg.dir, cfg.serve.dir) });
-    baseUrl = server.url;
-    log.info(`[front-check] ${cfg.serve.dir} 서빙 ${baseUrl}`);
-  }
-  if (!baseUrl) throw new Error('대상 주소가 없습니다: --url, 설정 baseUrl, 또는 serve 중 하나');
+  const willServe = !opt.url && cfg.serve && !opt.noServe;
+  if (!baseUrl && !willServe) throw new Error('대상 주소가 없습니다: --url, 설정 baseUrl, 또는 serve 중 하나');
+  if (willServe && !fs.existsSync(path.resolve(cfg.dir, cfg.serve.dir, 'index.html'))) throw new Error(`서빙할 dist 가 없습니다: ${path.resolve(cfg.dir, cfg.serve.dir)} (먼저 빌드하세요)`);
 
   let browser = null;
   const data = { baseUrl, scenario: scenarioName, steps: [], failures: [], screenshots: [], collected: {}, console: [], pageErrors: [], failedRequests: [], login: null, fatal: null };
   try {
+    // 브라우저를 먼저 - 못 띄우면 docker 로 다시 실행되는데, 그 전에 서버(포트)를 잡아 두면 컨테이너 안의 재실행이 EADDRINUSE 로 죽는다
     browser = await launchBrowser(cfg, { noDocker: opt.noDocker, headed: opt.headed, log });
+    if (willServe) {
+      server = await startServer({ ...cfg.serve, dir: path.resolve(cfg.dir, cfg.serve.dir) });
+      baseUrl = server.url;
+      data.baseUrl = baseUrl;
+      log.info(`[front-check] ${cfg.serve.dir} 서빙 ${baseUrl}`);
+    }
     const stateFile = stateFileFor(cfg);
     const context = await browser.newContext({
       viewport: { width: cfg.browser.viewport[0], height: cfg.browser.viewport[1] }, locale: cfg.browser.locale, ignoreHTTPSErrors: true,
