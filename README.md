@@ -76,7 +76,7 @@ nginx: `location ^~ /bugfix/ { proxy_pass http://127.0.0.1:8790/api/; client_max
 ### ③ 앱에 두 줄
 
 ```bash
-npm i -D github:hskim2515/bugfix-kit#v0.1.29 && npx front-check init
+npm i -D github:hskim2515/bugfix-kit#v0.1.30 && npx front-check init
 ```
 ```js
 // Vue
