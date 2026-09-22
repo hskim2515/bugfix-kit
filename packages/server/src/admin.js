@@ -2,7 +2,8 @@ import express from 'express';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import YAML from 'yaml';
 import { readEnvFile } from './config.js';
 import { GitHub } from './github.js';
@@ -23,6 +24,18 @@ import { expandHome, HttpError, notBlank } from './util.js';
  *   GET  /logs                        서버 로그 꼬리(journalctl)
  * 비밀값은 어떤 응답에도 원문을 넣지 않는다(설정 여부 + 끝 4자).
  */
+
+const execFileP = promisify(execFile);
+/** spawnSync 처럼 { status, stdout, stderr } 를 돌려주는 비동기 실행 (실패·타임아웃에도 throw 하지 않는다). 이벤트 루프를 막지 않는다. */
+async function run(cmd, args, opts = {}) {
+  try {
+    const { stdout, stderr } = await execFileP(cmd, args, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, ...opts });
+    return { status: 0, stdout, stderr };
+  } catch (e) {
+    return { status: typeof e.code === 'number' ? e.code : null, stdout: e.stdout || '', stderr: e.stderr || e.message || '' };
+  }
+}
+
 export function adminRouter(cfg, store, runner, log = console) {
   const r = express.Router();
   const CONFIG_DIR = expandHome('~/.config/bugfix-kit');
@@ -75,7 +88,7 @@ export function adminRouter(cfg, store, runner, log = console) {
       global: { GITHUB_TOKEN: mask(readToken()), ADMIN_KEY: mask(cfg.server.adminKey), FC_USER: globalEnv.FC_USER || '', FC_PASS: mask(globalEnv.FC_PASS),
         extra: Object.keys(globalEnv).filter((k) => !['ADMIN_KEY', 'GITHUB_TOKEN', 'FC_USER', 'FC_PASS'].includes(k)), tokenFile: TOKEN_FILE, envFile: GLOBAL_ENV },
       projects,
-      status: envStatus(),
+      status: await envStatus(),
       queue: runner.pending,
     };
   }));
@@ -157,14 +170,14 @@ export function adminRouter(cfg, store, runner, log = console) {
     const p = cfg.projects[req.params.name];
     if (!p) throw new HttpError(404, '없는 프로젝트');
     const gh = new GitHub(p.githubRepo, () => cfg.githubToken(p), log);
-    const res = spawnSync('git', ['-c', `http.extraheader=${gh.gitAuthHeader()}`, 'ls-remote', '--heads', p.repo, p.baseBranch], { encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 30000 });
+    const res = await run('git', ['-c', `http.extraheader=${gh.gitAuthHeader()}`, 'ls-remote', '--heads', p.repo, p.baseBranch], { encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 30000 });
     const ok = res.status === 0 && res.stdout.trim().length > 0;
     return { ok, message: ok ? `${p.baseBranch} @ ${res.stdout.trim().slice(0, 12)}` : (res.stderr || res.stdout || '').replace(/Authorization: Basic \S+/g, '***').trim().split('\n').slice(-2).join(' ') || `브랜치 ${p.baseBranch} 없음` };
   }));
 
   r.post('/check/claude', wrap(async () => {
     const bin = cfg.server.claudeBin || 'claude';
-    const v = spawnSync(bin, ['--version'], { encoding: 'utf8', timeout: 20000, env: { ...process.env, PATH: `${cfg.server.pathExtra ? cfg.server.pathExtra + ':' : ''}${process.env.PATH}` } });
+    const v = await run(bin, ['--version'], { encoding: 'utf8', timeout: 20000, env: { ...process.env, PATH: `${cfg.server.pathExtra ? cfg.server.pathExtra + ':' : ''}${process.env.PATH}` } });
     const home = os.homedir();
     const cred = ['.claude/.credentials.json', '.claude.json'].map((f) => path.join(home, f)).find((f) => fs.existsSync(f));
     let loggedIn = false;
@@ -174,9 +187,9 @@ export function adminRouter(cfg, store, runner, log = console) {
   }));
 
   r.post('/check/docker', wrap(async () => {
-    const d = spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8', timeout: 20000 });
+    const d = await run('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8', timeout: 20000 });
     const img = 'mcr.microsoft.com/playwright:v1.47.2-jammy';
-    const i = d.status === 0 ? spawnSync('docker', ['image', 'inspect', img, '--format', '{{.Size}}'], { encoding: 'utf8', timeout: 20000 }) : null;
+    const i = d.status === 0 ? await run('docker', ['image', 'inspect', img, '--format', '{{.Size}}'], { encoding: 'utf8', timeout: 20000 }) : null;
     return { available: d.status === 0, version: (d.stdout || '').trim(), image: img, imagePresent: !!(i && i.status === 0), hint: d.status !== 0 ? 'docker 가 없으면 front-check 는 설치된 Chrome/Chromium 을 씁니다' : (i.status !== 0 ? `docker pull ${img}` : '') };
   }));
 
@@ -186,7 +199,7 @@ export function adminRouter(cfg, store, runner, log = console) {
     const url = (p.cors || [])[0];
     if (!url) throw new HttpError(400, '프로젝트 cors 에 앱 주소가 있어야 합니다');
     const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
-    const res = spawnSync('node', [bin, 'check', '--url', url, '--no-serve', '--out', path.join(os.tmpdir(), `fc-admin-${p.name}`), '--json', '--steps', JSON.stringify([{ goto: '/' }, { waitFor: 2500 }, { eval: 'document.title' }])],
+    const res = await run('node', [bin, 'check', '--url', url, '--no-serve', '--out', path.join(os.tmpdir(), `fc-admin-${p.name}`), '--json', '--steps', JSON.stringify([{ goto: '/' }, { waitFor: 2500 }, { eval: 'document.title' }])],
       { encoding: 'utf8', timeout: 180000, cwd: os.tmpdir(), env: { ...process.env, ...(readEnvFile(projEnv(p.name))) } });
     const i = (res.stdout || '').indexOf('{');
     const j = i >= 0 ? JSON.parse(res.stdout.slice(i)) : null;
@@ -195,19 +208,29 @@ export function adminRouter(cfg, store, runner, log = console) {
 
   r.get('/logs', wrap(async (req) => {
     const n = Math.min(500, Number(req.query.n) || 200);
-    const j = spawnSync('journalctl', ['--user', '-u', 'bugfix-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { encoding: 'utf8', timeout: 20000 });
+    const j = await run('journalctl', ['--user', '-u', 'bugfix-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { encoding: 'utf8', timeout: 20000 });
     if (j.status === 0 && j.stdout.trim() && !/^-- No entries --/.test(j.stdout.trim())) return { source: 'journalctl', text: j.stdout };
-    const s = spawnSync('systemctl', ['--user', 'status', 'bugfix-server', '-n', String(n), '--no-pager'], { encoding: 'utf8', timeout: 20000 });
+    const s = await run('systemctl', ['--user', 'status', 'bugfix-server', '-n', String(n), '--no-pager'], { encoding: 'utf8', timeout: 20000 });
     return { source: 'systemctl', text: s.stdout || s.stderr || '(로그를 읽을 수 없습니다 - journald 사용자 로그가 꺼져 있을 수 있습니다)' };
   }));
 
   function readToken() { try { return fs.readFileSync(TOKEN_FILE, 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return process.env.BUGFIX_GITHUB_TOKEN || null; } }
-  function envStatus() {
-    const du = (d) => { try { const r = spawnSync('du', ['-sh', d], { encoding: 'utf8', timeout: 20000 }); return (r.stdout || '').split('\t')[0].trim(); } catch { return ''; } };
+  // du 는 디렉터리가 클수록 오래 걸린다 - 결과를 1분 캐시 (GET /settings 마다 돌지 않게)
+  const duCache = new Map();
+  const du = async (d) => {
+    const hit = duCache.get(d);
+    if (hit && Date.now() - hit.at < 60000) return hit.value;
+    const r = await run('du', ['-sh', d], { timeout: 20000 });
+    const value = (r.stdout || '').split('\t')[0].trim();
+    duCache.set(d, { at: Date.now(), value });
+    return value;
+  };
+  async function envStatus() {
+    const [workDirSize, dataDirSize, git] = await Promise.all([du(cfg.server.workDir), du(cfg.server.dataDir), run('git', ['--version'], { timeout: 20000 })]);
     return {
       node: process.version, platform: `${os.type()} ${os.release()}`, hostname: os.hostname(), user: os.userInfo().username,
-      uptimeSec: Math.round(process.uptime()), workDir: cfg.server.workDir, workDirSize: du(cfg.server.workDir), dataDir: cfg.server.dataDir, dataDirSize: du(cfg.server.dataDir),
-      git: (spawnSync('git', ['--version'], { encoding: 'utf8' }).stdout || '').trim(),
+      uptimeSec: Math.round(process.uptime()), workDir: cfg.server.workDir, workDirSize, dataDir: cfg.server.dataDir, dataDirSize,
+      git: (git.stdout || '').trim(),
     };
   }
   return r;
