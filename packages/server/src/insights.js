@@ -109,13 +109,15 @@ export class Insights {
       await fs.writeFile(path.join(dir, 'recent-commits.txt'), await ex.execOut(wt, 1, ['git', 'log', '-30', '--stat', '--format=%h %ad %an %s', '--date=short']), 'utf8');
       await L(`재료 준비: 리포트 ${reports.length}건 · 최근 커밋 30개`);
 
+      // 도구는 읽기 전용 목록이지만 결과 파일(.bugfix/insights.json) 은 써야 하므로 acceptEdits 가 필요하다(allowedTools 의 Write(경로) 규칙만으로는 -p 모드에서 거부됨).
+      // 이 작업 사본은 분석 뒤 버려지고 커밋·푸시도 없으므로 코드가 바뀌어도 어디에도 반영되지 않는다.
       await L('Claude 분석 중… (읽기 전용)');
       // onProgress 는 await 없이 불리므로 기록 프로미스를 모아 두었다가 DONE 저장 전에 모두 끝낸다
       const pending = [];
       let out;
       try {
         out = await runClaudeStream(ex, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
-          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', '30', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
           (line) => { pending.push(this.logLine(name, `  ${line}`).catch((e) => this.log.warn(`[insights ${name}] 로그 기록 실패: ${e.message}`))); });
       } finally {
         await Promise.all(pending);
