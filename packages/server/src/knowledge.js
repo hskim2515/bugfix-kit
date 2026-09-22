@@ -310,6 +310,36 @@ function tokens(s) {
 }
 const STOP = new Set(['the', 'and', 'that', 'this', 'with', 'from', 'null', 'undefined', 'error', 'true', 'false', 'http', 'https', 'www', '있음', '없음', '문제', '오류', '화면', '클릭', '버튼', '하면', '됩니다', '않음', '안됨', '에서', '으로', '합니다', '입니다', '경우', '이후', '다시', '계속', '때문', '같음', '있습니다', '없습니다']);
 
+/** 타입별 층(왼쪽 → 오른쪽): 화면·메뉴 → 기능 → 구현 파일 → API → 백엔드 → 테이블 */
+export const LAYER = { module: 0, screen: 1, menu: 2, feature: 3, component: 4, store: 4, util: 4, api: 5, service: 6, table: 7 };
+
+/** 단서와 맞는 노드 + 이웃을 부분 그래프 데이터로 (뷰어가 그림으로 그린다) */
+export function relevantGraph(g, hints, { max = 14 } = {}) {
+  if (!g?.nodes?.length || !hints?.length) return { nodes: [], edges: [] };
+  const hs = hints.map((h) => String(h).toLowerCase());
+  const score = (n) => {
+    const hay = `${n.label} ${n.route || ''} ${n.path || ''} ${n.desc || ''} ${n.id}`.toLowerCase();
+    let s = 0;
+    for (const h of hs) {
+      if (!hay.includes(h)) continue;
+      s += h.includes('/') || h.includes('.') ? 3 : 1;
+      if (n.label.toLowerCase() === h) s += 3;
+    }
+    if (s && (n.type === 'menu' || n.type === 'screen' || n.type === 'feature')) s += 1;
+    return s;
+  };
+  const scored = g.nodes.map((n) => ({ n, s: score(n) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, max);
+  if (!scored.length) return { nodes: [], edges: [] };
+  const byId = new Map(g.nodes.map((n) => [n.id, n]));
+  const picked = new Map(scored.map((x) => [x.n.id, { ...x.n, hit: true, score: x.s }]));
+  const adj = new Map();
+  for (const e of g.edges) { (adj.get(e.from) || adj.set(e.from, []).get(e.from)).push(e); (adj.get(e.to) || adj.set(e.to, []).get(e.to)).push(e); }
+  for (const id of scored.slice(0, 6).map((x) => x.n.id)) for (const e of adj.get(id) || []) { const o = e.from === id ? e.to : e.from; if (byId.has(o) && !picked.has(o) && picked.size < max * 3) picked.set(o, { ...byId.get(o), hit: false }); }
+  const nodes = [...picked.values()].map((n) => ({ ...n, layer: LAYER[n.type] ?? 3 }));
+  const edges = g.edges.filter((e) => picked.has(e.from) && picked.has(e.to));
+  return { nodes, edges };
+}
+
 /** 단서와 맞는 노드를 고르고 1홉 이웃까지 넓혀 마크다운으로 */
 export function renderRelevant(g, hints, { max = 14 } = {}) {
   if (!g?.nodes?.length || !hints?.length) return '';

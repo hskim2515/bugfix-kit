@@ -113,6 +113,10 @@ export class Insights {
       await L(`재료 준비: 리포트 ${reports.length}건 · 최근 커밋 30개${kg ? ' · 지식 그래프' : ''}`);
       // 재료 3: 배포된 개발 화면을 헤드리스로 열어 본 결과(콘솔 오류·실패 요청·절차 실패·스크린샷). 스크린샷은 서버에 보관해 콘솔에서 본다
       const fcNote = await this.headless(project, ex, wt, dir, L);
+      // 이미 리포트로 넘겼거나 사람이 지운 제안은 다시 내지 않게
+      const prevSt = await this.state(name);
+      const skip = [...new Set([...(prevSt.dismissed || []), ...(prevSt.items || []).filter((x) => x.reportId).map((x) => x.title)])].slice(-60);
+      if (skip.length) await fs.writeFile(path.join(dir, 'skip.md'), `# 다시 내지 말 것(이미 리포트로 처리했거나 운영자가 무시한 제안)\n\n${skip.map((t) => `- ${t}`).join('\n')}\n`, 'utf8');
 
       // 도구는 읽기 전용 목록이지만 결과 파일(.bugfix/insights.json) 은 써야 하므로 acceptEdits 가 필요하다(allowedTools 의 Write(경로) 규칙만으로는 -p 모드에서 거부됨).
       // 이 작업 사본은 분석 뒤 버려지고 커밋·푸시도 없으므로 코드가 바뀌어도 어디에도 반영되지 않는다.
@@ -122,7 +126,7 @@ export class Insights {
       let out;
       try {
         out = await runClaudeStream(ex, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
-          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus, fcNote), '--max-turns', String(Math.max(40, this.cfg.server.maxTurns)), '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus, fcNote, skip.length), '--max-turns', String(Math.max(40, this.cfg.server.maxTurns)), '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
           (line) => { pending.push(this.logLine(name, `  ${line}`).catch((e) => this.log.warn(`[insights ${name}] 로그 기록 실패: ${e.message}`))); });
       } finally {
         await Promise.all(pending);
@@ -200,7 +204,7 @@ export class Insights {
     return line;
   }
 
-  prompt(project, focus, fcNote = '') {
+  prompt(project, focus, fcNote = '', skipCount = 0) {
     const mods = project.modules.map((m) => `  - \`${m.dir}\`: ${m.verify.map((v) => `\`${v}\``).join(' → ') || '검증 없음'}`).join('\n');
     return `${project.description || `\`${project.githubRepo}\``} 저장소입니다. 사용자가 신고하기 전에 **고칠 점을 먼저 찾는** 일입니다. 코드는 고치지 마세요 - 찾아서 목록으로만.
 
@@ -210,7 +214,8 @@ export class Insights {
   - \`.bugfix/knowledge.md\` (있으면): 메뉴 → 기능 → 파일 지식 그래프. 어느 기능이 어떤 파일인지 여기서 먼저 찾으세요.${fcNote ? `
   - \`.bugfix/front-check.md\`: 배포된 개발 화면을 헤드리스로 열어 본 결과(${fcNote}). 콘솔 오류·실패 요청·절차 실패는 실제 사용자가 겪는 문제이므로 우선 후보이고, 스크린샷을 Read 로 열어 화면이 깨졌는지도 보세요.` : ''}
   - 코드 자체. 모듈:
-${mods || '  - (모듈 규칙 없음)'}
+${mods || '  - (모듈 규칙 없음)'}${skipCount ? `
+  - \`.bugfix/skip.md\`: 이미 리포트로 처리했거나 운영자가 무시한 제안 ${skipCount}건 - 같은 내용은 다시 내지 마세요.` : ''}
 ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
 찾을 것(우선순위 순):
   1. 실제로 동작이 틀리는 결함 - 예외 처리 누락으로 화면이 멈추는 곳, null/undefined 접근, 잘못된 조건, 경합, 리소스 누수, 잘못된 API 사용

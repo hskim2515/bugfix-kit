@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { normalize, hintsFromReport, renderRelevant, renderTree } from '../src/knowledge.js';
+import { normalize, hintsFromReport, renderRelevant, renderTree, relevantGraph } from '../src/knowledge.js';
 import { Shots, mergeShots } from '../src/shots.js';
 
 const g = normalize({
@@ -64,4 +64,13 @@ test('Shots: 보관·정리·경로 검사', async () => {
   const merged = JSON.parse(mergeShots(JSON.stringify(a), b, 1));
   assert.equal(merged.length, 1);
   assert.equal(merged[0].file, b[0].file);
+});
+
+test('relevantGraph: 맞는 노드(hit)와 이웃, 층 번호', () => {
+  const r = relevantGraph(g, ['DistrictListPopup.vue']);
+  const hit = r.nodes.filter((n) => n.hit).map((n) => n.id);
+  assert.deepEqual(hit, ['component:DistrictListPopup']);
+  assert.ok(r.nodes.some((n) => n.id === 'api:districts' && n.layer === 5));
+  assert.ok(r.edges.some((e) => e.from === 'component:DistrictListPopup' && e.to === 'api:districts'));
+  assert.deepEqual(relevantGraph(g, ['zzz']), { nodes: [], edges: [] });
 });

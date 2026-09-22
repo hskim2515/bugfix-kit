@@ -167,6 +167,7 @@
       </div>
       <details class="card" id="iLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="iLog"></pre></details>
       <div class="card" id="iShotsWrap" hidden><div class="dim" id="iShotsHead"></div><div class="shots" id="iShots"></div></div>
+      <div class="dim" id="iDoneNote" hidden style="margin:0 0 8px"></div>
       <table><thead><tr><th style="width:70px">심각도</th><th class="pcol">프로젝트</th><th>제안</th><th style="width:220px">파일</th><th style="width:60px">확신</th><th style="width:200px"></th></tr></thead><tbody id="iRows"></tbody></table>
       <div class="empty" id="iEmpty">분석 실행을 누르면 AI 가 최근 리포트·커밋·코드를 읽고 고칠 점을 찾습니다 (5분 안팎, Claude 비용 발생)</div>
     </div>
@@ -179,6 +180,8 @@
         <button class="btn" id="kUpdate" title="마지막 구축 이후 바뀐 파일만 반영">갱신</button>
         <button class="btn" id="kFull" title="처음부터 다시 만든다 (5~15분, Claude 비용 발생)">전체 구축</button>
         <input type="search" id="kQ" placeholder="메뉴·기능·파일 검색" style="min-width:280px">
+        <button class="btn" id="kExpandAll" title="모든 노드 펼치기">모두 펼치기</button>
+        <button class="btn" id="kCollapse" title="화면·메뉴만">접기</button>
       </div>
       <details class="card" id="kLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="kLog"></pre></details>
       <div class="card kg" id="kGraphWrap">
@@ -386,7 +389,12 @@
       $('#iShotsHead').textContent = withShots.map(({ name, st }) => `${multi ? name + ': ' : ''}화면 확인 ${st.frontCheck || ''} · ${ago(st.shotsAt)}`).join(' · ');
       const el = $('#iShots'); if (el.dataset.key !== withShots.map(({ st }) => st.shotsAt).join()) { el.dataset.key = withShots.map(({ st }) => st.shotsAt).join(); el.innerHTML = ''; for (const { name, st } of withShots) { const d = document.createElement('div'); d.className = 'shots'; el.appendChild(d); renderShots(d, name, st.shots); } }
     }
-    const items = states.flatMap(({ name, st }) => (st.items || []).map((it) => ({ ...it, project: name })));
+    // 리포트로 넘긴 항목은 리포트 탭에서 보므로 여기서는 뺀다
+    const everything = states.flatMap(({ name, st }) => (st.items || []).map((it) => ({ ...it, project: name })));
+    const done = everything.filter((it) => it.reportId);
+    const items = everything.filter((it) => !it.reportId);
+    $('#iDoneNote').hidden = !done.length;
+    $('#iDoneNote').innerHTML = done.length ? `리포트로 넘긴 제안 ${done.length}건은 여기서 빠집니다: ${done.map((it) => `<a href="#" data-open="${it.reportId}" data-ip="${esc(it.project)}">#${it.reportId}</a>`).join(' ')}` : '';
     const order = { HIGH: 0, MEDIUM: 1, LOW: 2 };
     items.sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
     $('#iEmpty').hidden = items.length > 0 || busy;
@@ -394,7 +402,7 @@
       <td><div>${esc(it.title)}</div><div class="dim" style="white-space:pre-wrap;margin-top:4px">${esc(it.evidence)}</div><div style="margin-top:4px;color:#b9c3d0">→ ${esc(it.proposal)}</div></td>
       <td class="dim" style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all">${it.files.map(esc).join('<br>')}${it.shots?.length ? `<div>📷 ${it.shots.map(esc).join(', ')}</div>` : ''}</td>
       <td class="dim">${Math.round((it.confidence || 0) * 100)}%</td>
-      <td>${it.reportId ? `<span class="dim">리포트 #${it.reportId}</span> <button class="btn" data-open="${it.reportId}">열기</button>` : `<button class="btn" data-ireport="${it.id}">리포트로</button> <button class="btn primary" data-ifix="${it.id}">바로 수정</button>`}</td></tr>`).join('');
+      <td><button class="btn" data-ireport="${it.id}">리포트로</button> <button class="btn primary" data-ifix="${it.id}">바로 수정</button> <button class="btn" data-idel="${it.id}" title="이 제안을 지웁니다. 다음 분석에서 같은 내용은 다시 나오지 않습니다">삭제</button></td></tr>`).join('');
     clearInterval(iTimer); if (busy) iTimer = setInterval(loadInsights, 4000);
   }
 
@@ -418,6 +426,25 @@
   const K_LABEL = { module: '모듈', screen: '화면', menu: '메뉴', feature: '기능', component: '컴포넌트', store: '스토어', util: '유틸', api: 'API', service: '서비스', table: '테이블' };
   const K_LINK = { contains: 'rgba(255,255,255,0.45)', uses: 'rgba(160,170,190,0.35)', calls: 'rgba(239,71,111,0.6)', reads: 'rgba(255,183,3,0.5)', writes: 'rgba(247,140,107,0.7)', navigates: 'rgba(6,214,160,0.6)' };
   let kg3d = null, kgLibs = null, kHidden = new Set(), kSel = null, kNbr = new Map();
+  // 드릴다운: 처음엔 모듈·화면·메뉴만. 노드를 누르면 그 아래(contains/uses/calls/reads/writes 로 나가는 것)가 펼쳐진다
+  let kExpanded = new Set(), kShown = new Set(), kAll = false;
+  const K_LAYER = { module: 0, screen: 1, menu: 2, feature: 3, component: 4, store: 4, util: 4, api: 5, service: 6, table: 7 };
+  let kOut = new Map(), kIn = new Map();
+  function kgRecompute() {
+    kShown = new Set();
+    if (!kMerged) return;
+    if (kAll) { for (const n of kMerged.nodes) kShown.add(n.id); return; }
+    const top = kMerged.nodes.filter((n) => n.type === 'module' || n.type === 'screen' || n.type === 'menu');
+    for (const n of top) kShown.add(n.id);
+    const visited = new Set();
+    const walk2 = (id) => { if (visited.has(id) || !kExpanded.has(id)) return; visited.add(id); for (const c of kOut.get(id) || []) { kShown.add(c); walk2(c); } };
+    for (const id of [...kExpanded]) if (kShown.has(id)) walk2(id);
+  }
+  function kgExpandTo(id) { // 조상까지 펼쳐 보이게 (검색·패널에서 이동할 때)
+    const seen = new Set();
+    const up = (x, d) => { if (d > 8 || seen.has(x)) return; seen.add(x); for (const p of kIn.get(x) || []) { kExpanded.add(p); up(p, d + 1); } };
+    up(id, 0);
+  }
   async function kgLoadLibs() {
     if (kgLibs) return kgLibs;
     // 두 라이브러리가 같은 three.js 인스턴스를 써야 한다(다르면 Sprite 가 렌더러와 안 맞아 터진다) - esm.sh 의 deps 고정으로 하나로
@@ -435,13 +462,17 @@
     }
     const deg = new Map();
     for (const l of links) { deg.set(l.source, (deg.get(l.source) || 0) + 1); deg.set(l.target, (deg.get(l.target) || 0) + 1); }
-    for (const n of nodes) n.deg = deg.get(n.id) || 0;
+    for (const n of nodes) { n.deg = deg.get(n.id) || 0; n.fx = (K_LAYER[n.type] ?? 3) * 95; }   // 층(왼→오): 모듈 화면 메뉴 기능 파일 API 백엔드 테이블
+    kOut = new Map(); kIn = new Map();
+    for (const l of links) { (kOut.get(l.source) || kOut.set(l.source, []).get(l.source)).push(l.target); (kIn.get(l.target) || kIn.set(l.target, []).get(l.target)).push(l.source); }
+    kExpanded = new Set(); kAll = false;
     kNbr = new Map();
     for (const l of links) { (kNbr.get(l.source) || kNbr.set(l.source, new Set()).get(l.source)).add(l.target); (kNbr.get(l.target) || kNbr.set(l.target, new Set()).get(l.target)).add(l.source); }
     return { nodes, links };
   }
   function kgMatch(n) { const qq = kq.trim().toLowerCase(); return !!qq && `${n.label} ${n.path || ''} ${n.route || ''} ${n.desc || ''}`.toLowerCase().includes(qq); }
-  function kgVisible(n) { return !kHidden.has(n.type); }
+  function kgVisible(n) { return !kHidden.has(n.type) && kShown.has(n.id); }
+  function kgHasKids(n) { return (kOut.get(n.id) || []).some((c) => !kShown.has(c)); }
   function kgDim(n) {
     const qq = kq.trim();
     if (kSel) return n.id !== kSel && !kNbr.get(kSel)?.has(n.id);
@@ -463,9 +494,10 @@
         .nodeThreeObjectExtend(true)
         .nodeThreeObject((n) => {
           // 모듈·화면·메뉴는 이름을 항상 띄운다. 나머지는 선택·검색에 걸린 것만
-          const show = ['module', 'screen', 'menu'].includes(n.type) || kgMatch(n) || n.id === kSel || (kSel && kNbr.get(kSel)?.has(n.id));
+          const show = !kAll || ['module', 'screen', 'menu'].includes(n.type) || kgMatch(n) || n.id === kSel || (kSel && kNbr.get(kSel)?.has(n.id));
           if (!show || kgDim(n)) return false;
-          const t = new SpriteText(n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label);
+          const more = kgHasKids(n) ? ' ▸' : '';
+          const t = new SpriteText((n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label) + more);
           t.color = n.type === 'module' ? '#ffd166' : '#e8eefc'; t.textHeight = n.type === 'module' ? 12 : n.type === 'screen' ? 8 : n.type === 'menu' ? 6 : 3.5;
           t.backgroundColor = 'rgba(10,12,18,0.55)'; t.padding = 1; t.borderRadius = 2;
           t.position.y = 7 + Math.min(n.deg, 30) * 0.25;
@@ -478,15 +510,19 @@
         .linkLabel((l) => `${esc(l.source.label)} ─${esc(l.rel)}→ ${esc(l.target.label)}`)
         .nodeVisibility(kgVisible)
         .linkVisibility((l) => kgVisible(l.source) && kgVisible(l.target))
-        .onNodeClick((n) => { kgSelect(n.id === kSel ? null : n.id); kgFly(n); })
+        .onNodeClick((n) => {
+          if (kgHasKids(n)) kExpanded.add(n.id); else if (kExpanded.has(n.id) && (kOut.get(n.id) || []).length) kExpanded.delete(n.id);
+          kgRecompute(); kgSelect(n.id === kSel && !kgHasKids(n) ? null : n.id); kgFly(n);
+        })
         .onBackgroundClick(() => kgSelect(null))
         .warmupTicks(60).cooldownTicks(200);
-      kg3d.d3Force('charge').strength(-140);
-      kg3d.d3Force('link').distance((l) => l.rel === 'contains' ? 24 : 40);
+      kg3d.d3Force('charge').strength(-60);
+      kg3d.d3Force('link').distance((l) => l.rel === 'contains' ? 40 : 70);
       window.addEventListener('resize', () => kg3d && kg3d.width(el.clientWidth).height(el.clientHeight));
     }
     kg3d.width(el.clientWidth).height(el.clientHeight);
-    if (force) kg3d.graphData(kMerged);
+    kgRecompute();
+    if (force) { kg3d.graphData(kMerged); setTimeout(() => kg3d.zoomToFit(600, 40, (n) => kShown.has(n.id)), 1500); }
     else kgRefresh();
   }
   function kgRefresh() { if (!kg3d) return; kg3d.nodeColor(kg3d.nodeColor()).nodeThreeObject(kg3d.nodeThreeObject()).linkColor(kg3d.linkColor()).linkDirectionalParticles(kg3d.linkDirectionalParticles()).nodeVisibility(kg3d.nodeVisibility()).linkVisibility(kg3d.linkVisibility()); }
@@ -512,12 +548,13 @@
   function kgLegend(nodes) {
     const cnt = {}; for (const n of nodes) cnt[n.type] = (cnt[n.type] || 0) + 1;
     $('#kLegend').innerHTML = Object.keys(K_LABEL).filter((t) => cnt[t]).map((t) => `<label><input type="checkbox" data-ktype="${t}" ${kHidden.has(t) ? '' : 'checked'}><span class="sw" style="background:${K_COLORS[t]}"></span>${K_LABEL[t]} <span class="dim">${cnt[t]}</span></label>`).join('')
-      + `<div class="hint">드래그 회전 · 휠 확대 · 노드 클릭 = 이웃 강조 · 빈 곳 클릭 = 해제<br>선: <span style="color:${K_LINK.contains}">포함</span> · <span style="color:#ef476f">호출</span> · <span style="color:#ffb703">읽기</span>/<span style="color:#f78c6b">쓰기</span> · <span style="color:#06d6a0">이동</span></div>`;
+      + `<div class="hint">왼→오: 모듈 · 화면 · 메뉴 · 기능 · 파일 · API · 백엔드 · 테이블<br>처음엔 화면·메뉴만 - ▸ 표시 노드를 누르면 아래가 펼쳐짐 · 빈 곳 클릭 = 선택 해제<br>선: <span style="color:${K_LINK.contains}">포함</span> · <span style="color:#ef476f">호출</span> · <span style="color:#ffb703">읽기</span>/<span style="color:#f78c6b">쓰기</span> · <span style="color:#06d6a0">이동</span></div>`;
   }
   function kgSearch() {
     if (!kg3d || !kMerged) return;
     kSel = null; $('#kInfo').hidden = true;
-    kgRefresh();
+    if (kq.trim()) for (const n of kMerged.nodes) if (kgMatch(n)) kgExpandTo(n.id);
+    kgRecompute(); kgRefresh();
     const first = kq.trim() ? kMerged.nodes.find((n) => kgMatch(n) && kgVisible(n)) : null;
     if (first) kgFly(first);
   }
@@ -688,7 +725,8 @@
     const sh = e.target.closest('.shots figure'); if (sh) { const img = sh.querySelector('img'); if (img) { const big = document.createElement('div'); big.className = 'shotbig'; big.innerHTML = `<img src="${img.src}"><div class="dim">${esc(sh.dataset.shot)} (눌러서 닫기)</div>`; big.onclick = () => big.remove(); document.body.appendChild(big); } return; }
     const sb = e.target.closest('.shotbig'); if (sb) { sb.remove(); return; }
     const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
-    const op = e.target.closest('[data-open]'); if (op && kit) { kit.setProject(op.closest('tr')?.dataset.ip); kit.openViewer(Number(op.dataset.open)); return; }
+    const op = e.target.closest('[data-open]'); if (op && kit) { e.preventDefault(); kit.setProject(op.dataset.ip || op.closest('tr')?.dataset.ip); kit.openViewer(Number(op.dataset.open)); return; }
+    const idl = e.target.closest('[data-idel]'); if (idl) { const proj = idl.closest('tr')?.dataset.ip; if (!confirm('이 제안을 지울까요? 다음 분석에서 같은 내용은 다시 나오지 않습니다.')) return; try { await api('DELETE', `/admin/insights/${proj}/items/${idl.dataset.idel}`); await loadInsights(); } catch (x) { alert(x.message); } return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
     const tr = e.target.closest('tr.r'); if (tr && kit) { kit.setProject(tr.dataset.p); kit.openViewer(Number(tr.dataset.id)); return; }
     const pl = e.target.closest('#plist button'); if (pl) { editing = pl.dataset.p; renderProjects(); return; }
@@ -724,7 +762,9 @@
   document.addEventListener('click', (e) => {
     const kv = e.target.closest('#kViewSeg button'); if (kv) { kView = kv.dataset.kv; document.querySelectorAll('#kViewSeg button').forEach((b) => b.classList.toggle('on', b === kv)); $('#kGraphWrap').hidden = kView !== '3d'; $('#kTree').hidden = kView !== 'tree'; if (kView === '3d' && kMerged) kgRender(!kg3d).catch(() => {}); else if (kView === 'tree') loadKnowledge(); return; }
     const kc = e.target.closest('[data-kclose]'); if (kc) { kgSelect(null); return; }
-    const ko = e.target.closest('[data-kgo]'); if (ko) { const n = kMerged?.nodes.find((x) => x.id === ko.dataset.kgo); if (n) { kgSelect(n.id); kgFly(n); } return; }
+    const ko = e.target.closest('[data-kgo]'); if (ko) { const n = kMerged?.nodes.find((x) => x.id === ko.dataset.kgo); if (n) { kgExpandTo(n.id); kExpanded.add(n.id); kgRecompute(); kgSelect(n.id); kgFly(n); } return; }
+    if (e.target.closest('#kExpandAll')) { kAll = true; kgRecompute(); kgRefresh(); setTimeout(() => kg3d && kg3d.zoomToFit(600, 40), 300); return; }
+    if (e.target.closest('#kCollapse')) { kAll = false; kExpanded = new Set(); kSel = null; $('#kInfo').hidden = true; kgRecompute(); kgRefresh(); setTimeout(() => kg3d && kg3d.zoomToFit(600, 40, (n) => kShown.has(n.id)), 300); return; }
   });
   document.addEventListener('change', (e) => { const kt = e.target.closest('[data-ktype]'); if (kt) { if (kt.checked) kHidden.delete(kt.dataset.ktype); else kHidden.add(kt.dataset.ktype); kgRefresh(); } });
   const kRun = (mode) => async () => { const names = data.projects.map((p) => p.name); if (mode === 'full' && !confirm(`${names.join(', ')} 의 지식 그래프를 처음부터 다시 만들까요? (5~15분, Claude 비용 발생)`)) return; const errs = []; for (const name of names) { try { await api('POST', `/admin/knowledge/${name}`, { mode }); } catch (x) { errs.push(`${name}: ${x.message}`); } } await loadKnowledge(); if (errs.length) alert(errs.join('\n')); };

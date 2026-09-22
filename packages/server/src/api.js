@@ -89,6 +89,21 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   app.get('/api/admin/knowledge/:project/graph', admin, wrap(async (req) => { const s = knowledge ? await knowledge.state(proj(req).name) : {}; return { nodes: s.nodes || [], edges: s.edges || [], head: s.head || null }; }));
   app.post('/api/admin/knowledge/:project', admin, wrap(async (req) => { if (!knowledge) throw new HttpError(503, '지식 그래프 기능이 꺼져 있습니다'); await knowledge.enqueue(proj(req), { mode: req.body?.mode === 'full' ? 'full' : 'update', reason: '콘솔' }); return knowledge.summary(proj(req).name); }));
 
+  // 제안 삭제 - 목록에서 빼고 제목을 '무시' 목록에 남겨 다음 분석에서 같은 것을 다시 내지 않게
+  app.delete('/api/admin/insights/:project/items/:id', admin, wrap(async (req) => {
+    if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
+    const p = proj(req);
+    const id = Number(req.params.id);
+    let removed = null;
+    await insights.save(p.name, (cur) => {
+      removed = (cur.items || []).find((x) => x.id === id) || null;
+      const dismissed = [...(cur.dismissed || []), ...(removed ? [removed.title] : [])].slice(-60);
+      return { items: (cur.items || []).filter((x) => x.id !== id), dismissed };
+    });
+    if (!removed) throw new HttpError(404, '없는 제안');
+    return { ok: true };
+  }));
+
   app.post('/api/admin/insights/:project/report', admin, wrap(async (req) => {
     if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
     const p = proj(req);
@@ -164,6 +179,14 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   };
 
   pr.get('/reports/:id', wrap(load));
+  // 이 신고와 관련된 지식 그래프 부분 - AI 가 프롬프트로 받는 것과 같은 선택. 그래프가 없으면 빈 목록
+  pr.get('/reports/:id/knowledge', wrap(async (req) => {
+    const r = await load(req);
+    const g = knowledge ? await knowledge.graph(req.project.name) : null;
+    if (!g) return { nodes: [], edges: [], available: false };
+    const { relevantGraph, hintsFromReport } = await import('./knowledge.js');
+    return { ...relevantGraph(g, hintsFromReport(r)), available: true };
+  }));
   pr.get('/reports/:id/fix', wrap(async (req) => FileStore.fixState(await load(req))));
 
   pr.patch('/reports/:id/status', wrap(async (req, res) => {

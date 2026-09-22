@@ -121,6 +121,22 @@
                   </div>
                   <div v-if="detail.fixSummary" class="brv-ai__summary brv-selectable">{{ detail.fixSummary }}</div>
 
+                  <!-- 이 신고와 관련된 지식 그래프 부분 - AI 가 참고한 것과 같은 선택. 화면 → 기능 → 파일 → API → 백엔드 층으로 -->
+                  <details v-if="kgLayout" class="brv-kg" open>
+                    <summary>관련 기능·파일 <span class="brv-suggest__hint">지식 그래프에서 이 신고와 이어진 부분 · 노란 테두리 = 신고 내용과 직접 맞는 것</span></summary>
+                    <div class="brv-kg__wrap">
+                      <svg :viewBox="`0 0 ${kgLayout.w} ${kgLayout.h}`" :style="{ width: kgLayout.w + 'px', height: kgLayout.h + 'px' }" class="brv-kg__svg">
+                        <text v-for="c in kgLayout.cols" :key="'c' + c.layer" :x="c.x" y="12" class="brv-kg__col">{{ c.title }}</text>
+                        <path v-for="(e, i) in kgLayout.edges" :key="'e' + i" :d="e.d" :class="['brv-kg__edge', 'brv-kg__edge--' + e.rel, { 'brv-kg__edge--dim': kgHover && e.from !== kgHover && e.to !== kgHover }]" />
+                        <g v-for="n in kgLayout.nodes" :key="n.id" :transform="`translate(${n.x},${n.y})`" :class="['brv-kg__node', { 'brv-kg__node--hit': n.hit, 'brv-kg__node--dim': kgHover && kgHover !== n.id && !kgNbr(n.id) }]" @mouseenter="kgHover = n.id" @mouseleave="kgHover = null">
+                          <title>{{ n.label }}{{ n.path ? '\n' + n.path : '' }}{{ n.route ? '\n' + n.route : '' }}{{ n.desc ? '\n' + n.desc : '' }}</title>
+                          <rect :width="n.w" :height="n.h" rx="4" :fill="kgColor(n.type)" />
+                          <text x="6" y="14" class="brv-kg__label">{{ n.short }}</text>
+                        </g>
+                      </svg>
+                    </div>
+                  </details>
+
                   <!-- 수정 뒤 헤드리스 화면 확인(front-check) 스크린샷 - 서버에 보관된 것 -->
                   <div v-if="fixShots.length" class="brv-shots">
                     <div class="brv-shots__title">화면 확인 <span class="brv-suggest__hint">{{ fixShots[fixShots.length - 1].label }}</span></div>
@@ -386,6 +402,8 @@ export default {
       now: Date.now(),
       notice: null,
       canFix: true,            // 프로젝트 설정(fixFrom) - 앱 사용자에게 수정 요청을 열어 두었는가
+      kg: null,                // 이 신고의 관련 부분 그래프 { nodes, edges }
+      kgHover: null,
       shotUrls: {},            // fixShots file → object URL
       bigShot: null,           // 크게 보는 스크린샷
       project: null,
@@ -403,6 +421,37 @@ export default {
     // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)은 목록을 한데 모아 보여 주고 프로젝트를 골라 열므로 전환 탭이 없다
     // 도구 문제 리포트는 이 프로젝트 코드와 무관하므로 수정 UI 를 두지 않는다
     fixable() { return this.canFix && !this.detail?.tool; },
+    /** 관련 부분 그래프를 층(열)으로 배치한 SVG 좌표 - 열: 화면·메뉴 / 기능 / 파일 / API / 백엔드 / 테이블 */
+    kgLayout() {
+      const g = this.kg;
+      if (!g?.nodes?.length) return null;
+      const COLS = [{ layers: [0, 1, 2], title: '화면·메뉴' }, { layers: [3], title: '기능' }, { layers: [4], title: '구현 파일' }, { layers: [5], title: 'API' }, { layers: [6], title: '백엔드' }, { layers: [7], title: '테이블' }];
+      const colW = 168, rowH = 30, top = 22, gapX = 26;
+      const used = COLS.map((c) => g.nodes.filter((n) => c.layers.includes(n.layer))).map((ns, i) => ({ ...COLS[i], ns })).filter((c) => c.ns.length);
+      const nodes = [], cols = [];
+      let x = 8;
+      for (const c of used) {
+        cols.push({ layer: c.layers[0], x, title: c.title });
+        c.ns.sort((a, b) => (b.hit - a.hit) || (b.score || 0) - (a.score || 0));
+        c.ns.forEach((n, i) => {
+          const short = n.label.length > 22 ? n.label.slice(0, 21) + '…' : n.label;
+          nodes.push({ ...n, x, y: top + i * rowH, w: colW - gapX, h: 20, short });
+        });
+        x += colW;
+      }
+      const at = new Map(nodes.map((n) => [n.id, n]));
+      const edges = [];
+      for (const e of g.edges) {
+        const a = at.get(e.from), b = at.get(e.to);
+        if (!a || !b || a === b) continue;
+        const [l, r] = a.x <= b.x ? [a, b] : [b, a];
+        const x1 = l.x + l.w, y1 = l.y + l.h / 2, x2 = r.x, y2 = r.y + r.h / 2;
+        const d = l.x === r.x ? `M${x1},${y1} C${x1 + 18},${y1} ${x2 + l.w + 18},${y2} ${x2 + l.w},${y2}` : `M${x1},${y1} C${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
+        edges.push({ d, rel: e.rel, from: e.from, to: e.to });
+      }
+      const h = top + Math.max(...used.map((c) => c.ns.length)) * rowH + 4;
+      return { nodes, edges, cols, w: x + 4, h };
+    },
     fixShots() { try { return this.detail?.fixShots ? JSON.parse(this.detail.fixShots) : []; } catch { return []; } },
     viewProjects() { return this.kit?.options?.adminKey ? [] : this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
     prNumber() { return this.detail?.fixPrNumber || (this.detail?.fixPrUrl || '').split('/').pop(); },
@@ -499,6 +548,13 @@ export default {
       await this.fetchList();
       if (id) await this.openDetail(Number(id));     // 대시보드 등에서 특정 리포트로 바로
     },
+    kgColor(t) { return { module: '#6b5b1f', screen: '#1f5e4f', menu: '#1f4a6b', feature: '#334c66', component: '#4a3466', store: '#6b4a2a', util: '#3d4450', api: '#6b2a3a', service: '#6b3f2a', table: '#5e4a1f' }[t] || '#3a4050'; },
+    kgNbr(id) { return !!this.kg?.edges.some((e) => (e.from === this.kgHover && e.to === id) || (e.to === this.kgHover && e.from === id)); },
+    async loadKnowledge(id) {
+      this.kg = null;
+      if (!this.kit?.api?.knowledge) return;
+      try { const k = await this.kit.api.knowledge(id); if (this.selected === id && k?.nodes?.length) this.kg = k; } catch { /* 그래프 없음 */ }
+    },
     async loadShots(list) {
       for (const s of list || []) {
         if (this.shotUrls[s.file] || !this.kit?.api?.shot) continue;
@@ -538,6 +594,7 @@ export default {
       this.expanded = new Set();
       try {
         this.detail = (await this.kit.api.get(id)) ?? null;
+        this.loadKnowledge(id);
         // 에러 있는 탭으로 초기 포커스
         if (this.detail) {
           const fe = (() => { try { return JSON.parse(this.detail.frontendLogs || '[]'); } catch { return []; } })();
@@ -722,6 +779,21 @@ export default {
 .brv-fix-btn--lg { padding: 9px 18px; font-size: 13px; }
 .brv-ai__hint { font-size: 11px; color: #8898aa; line-height: 1.5; margin-top: 6px; }
 .brv-ai__meta { display: flex; gap: 10px; align-items: center; font-size: 12px; margin-bottom: 6px; }
+.brv-kg { margin: 8px 0 4px; font-size: 11px; }
+.brv-kg summary { cursor: pointer; color: #aab; }
+.brv-kg__wrap { overflow-x: auto; margin-top: 6px; padding-bottom: 4px; }
+.brv-kg__svg { display: block; font-family: inherit; }
+.brv-kg__col { font-size: 10px; fill: #889; }
+.brv-kg__label { font-size: 11px; fill: #e6ebf5; pointer-events: none; }
+.brv-kg__node rect { stroke: rgba(255,255,255,0.12); stroke-width: 1; transition: opacity .15s; }
+.brv-kg__node--hit rect { stroke: #f2d35b; stroke-width: 1.5; }
+.brv-kg__node--dim { opacity: 0.25; }
+.brv-kg__edge { fill: none; stroke: rgba(170,180,200,0.35); stroke-width: 1; transition: opacity .15s; }
+.brv-kg__edge--contains { stroke: rgba(230,235,245,0.5); }
+.brv-kg__edge--calls { stroke: rgba(239,71,111,0.6); }
+.brv-kg__edge--reads, .brv-kg__edge--writes { stroke: rgba(255,183,3,0.55); }
+.brv-kg__edge--navigates { stroke: rgba(6,214,160,0.6); }
+.brv-kg__edge--dim { opacity: 0.12; }
 .brv-shots { margin: 8px 0 6px; }
 .brv-shots__title { font-size: 11px; color: #aab; margin-bottom: 4px; }
 .brv-shots__strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
