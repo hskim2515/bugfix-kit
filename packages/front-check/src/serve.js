@@ -21,7 +21,8 @@ export function startServer({ dir, port = 4173, proxy = {}, spa = true, host = '
     let pathname;
     try { pathname = decodeURIComponent(url.pathname); } catch { res.writeHead(400); return res.end('bad request'); }
     let file = path.join(root, pathname);
-    if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
+    const rel = path.relative(root, file);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) { res.writeHead(403); return res.end(); }
     if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
     if (!fs.existsSync(file)) {
       if (spa && !path.extname(url.pathname)) file = path.join(root, 'index.html');
