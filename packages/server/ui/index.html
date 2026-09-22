@@ -93,6 +93,7 @@
   <span class="sub" id="meta">관리</span>
   <nav class="tabs" id="tabs">
     <button data-t="reports" class="on">리포트</button>
+    <button data-t="insights">제안</button>
     <button data-t="projects">프로젝트</button>
     <button data-t="secrets">키·계정</button>
     <button data-t="server">서버</button>
@@ -131,6 +132,19 @@
       </div>
       <table><thead><tr><th>#</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead><tbody id="rows"></tbody></table>
       <div class="empty" id="empty" hidden>리포트가 없습니다</div>
+    </div>
+
+    <!-- 제안 -->
+    <div data-tab="insights" hidden>
+      <div class="toolbar">
+        <span class="seg" id="iProjSeg"></span>
+        <input type="search" id="iFocus" placeholder="특히 볼 것 (선택)" style="min-width:320px">
+        <button class="btn primary" id="iRun">분석 실행</button>
+        <span class="dim" id="iState"></span>
+      </div>
+      <details class="card" id="iLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="iLog"></pre></details>
+      <table><thead><tr><th style="width:70px">심각도</th><th>제안</th><th style="width:220px">파일</th><th style="width:60px">확신</th><th style="width:200px"></th></tr></thead><tbody id="iRows"></tbody></table>
+      <div class="empty" id="iEmpty">분석 실행을 누르면 AI 가 최근 리포트·커밋·코드를 읽고 고칠 점을 찾습니다 (5분 안팎, Claude 비용 발생)</div>
     </div>
 
     <!-- 프로젝트 -->
@@ -304,6 +318,28 @@
     $('#empty').hidden = rows.length > 0;
   }
 
+  // ── 제안 ──
+  let iProject = '', iTimer = null;
+  const sevPill = (s) => `<span class="pill ${s === 'HIGH' ? 'p-FAILED' : s === 'MEDIUM' ? 'p-PR_OPENED' : 'p-MERGED'}">${s}</span>`;
+  async function loadInsights() {
+    if (!data) return;
+    if (!iProject || !data.projects.some((p) => p.name === iProject)) iProject = project || data.projects[0]?.name || '';
+    $('#iProjSeg').innerHTML = data.projects.map((p) => `<button data-ip="${esc(p.name)}" class="${p.name === iProject ? 'on' : ''}">${esc(p.name)}</button>`).join('');
+    let st; try { st = await api('GET', `/admin/insights/${iProject}`); } catch (e) { $('#iState').textContent = e.message; return; }
+    const busy = ['QUEUED', 'RUNNING'].includes(st.status);
+    $('#iRun').disabled = busy;
+    $('#iState').textContent = busy ? `${st.status === 'QUEUED' ? '대기 중' : '분석 중'}…` : st.ranAt ? `마지막 분석 ${ago(st.ranAt)} · ${esc(st.head || '')}` : '';
+    $('#iLog').textContent = st.log || ''; $('#iLogWrap').open = busy; if (busy) $('#iLog').scrollTop = $('#iLog').scrollHeight;
+    const items = st.items || [];
+    $('#iEmpty').hidden = items.length > 0 || busy;
+    $('#iRows').innerHTML = items.map((it) => `<tr><td>${sevPill(it.severity)}<div class="dim">${esc(it.kind)}</div></td>
+      <td><div>${esc(it.title)}</div><div class="dim" style="white-space:pre-wrap;margin-top:4px">${esc(it.evidence)}</div><div style="margin-top:4px;color:#b9c3d0">→ ${esc(it.proposal)}</div></td>
+      <td class="dim" style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all">${it.files.map(esc).join('<br>')}</td>
+      <td class="dim">${Math.round((it.confidence || 0) * 100)}%</td>
+      <td>${it.reportId ? `<span class="dim">리포트 #${it.reportId}</span> <button class="btn" data-open="${it.reportId}">열기</button>` : `<button class="btn" data-ireport="${it.id}">리포트로</button> <button class="btn primary" data-ifix="${it.id}">바로 수정</button>`}</td></tr>`).join('');
+    clearInterval(iTimer); if (busy) iTimer = setInterval(loadInsights, 4000);
+  }
+
   // ── 설정 공통 ──
   async function loadSettings() { settings = await api('GET', '/admin/settings'); renderProjects(); renderSecrets(); renderServer(); renderChecks(); }
   const lines = (s) => String(s || '').split('\n').map((x) => x.trim()).filter(Boolean);
@@ -402,7 +438,10 @@
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
-    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); return; }
+    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); return; }
+    const ip = e.target.closest('#iProjSeg button'); if (ip) { iProject = ip.dataset.ip; loadInsights(); return; }
+    const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } return; }
+    const op = e.target.closest('[data-open]'); if (op && kit) { kit.setProject(iProject); kit.openViewer(Number(op.dataset.open)); return; }
     const pb = e.target.closest('#projSeg button'); if (pb) { project = pb.dataset.p; localStorage.setItem('bugfix-admin-project', project); renderReports(); return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
     const tr = e.target.closest('tr.r'); if (tr && kit) { kit.setProject(project); kit.openViewer(Number(tr.dataset.id)); return; }
@@ -427,6 +466,7 @@
   $('#delProject').onclick = async () => { if (!editing || !confirm(`${editing} 프로젝트 설정을 지울까요? (리포트 데이터는 남습니다)`)) return; try { await api('DELETE', `/admin/projects/${editing}`); editing = null; await loadSettings(); await load(); } catch (e) { alert(e.message); } };
   $('#saveServer').onclick = async () => { const b = {}; for (const k of ['port', 'claudeBin', 'pathExtra', 'javaHome', 'model', 'maxTurns', 'timeoutMinutes', 'verifyTimeoutMinutes', 'workDir', 'dataDir']) b[k] = $(`#s_${k}`).value; $('#smsg').textContent = '저장 중…'; try { const r = await api('PUT', '/admin/server', b); $('#smsg').textContent = r.restartNeeded ? '저장됨 - 포트는 재시작 뒤 적용' : '저장됨 - 바로 적용'; } catch (e) { $('#smsg').textContent = e.message; } };
   $('#loadLogs').onclick = loadLogs;
+  $('#iRun').onclick = async () => { if (!confirm(`${iProject} 을 분석할까요? (5분 안팎, Claude 비용 발생)`)) return; try { await api('POST', `/admin/insights/${iProject}`, { focus: $('#iFocus').value }); await loadInsights(); } catch (e) { alert(e.message); } };
   $('#q').addEventListener('input', (e) => { q = e.target.value; renderReports(); });
   $('#refresh').addEventListener('click', () => { load(); if (settings) loadSettings(); });
   $('#logout').addEventListener('click', () => { localStorage.removeItem(KEY); key = ''; showLogin(); });

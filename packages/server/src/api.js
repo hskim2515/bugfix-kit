@@ -24,7 +24,7 @@ const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 's
  *
  * 인증: 프로젝트에 apiKey 가 있으면 `X-Bugfix-Key` 헤더가 같아야 한다. 보고자는 `X-Bugfix-User` 헤더(앱이 로그인 사용자를 넣는다) 또는 body.reporter.
  */
-export function createApi(cfg, store, runner, log = console) {
+export function createApi(cfg, store, runner, log = console, insights = null) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '60mb' }));
@@ -78,6 +78,22 @@ export function createApi(cfg, store, runner, log = console) {
     return { projects, running, queue: runner.pending, now: new Date().toISOString() };
   }));
   app.use('/api/admin', admin, adminRouter(cfg, store, runner, log));
+
+  // ── 제안(Insights): AI 가 먼저 고칠 점을 찾는다 ──
+  const proj = (req) => { const p = cfg.projects[req.params.project]; if (!p) throw new HttpError(404, `모르는 프로젝트: ${req.params.project}`); return p; };
+  app.get('/api/admin/insights/:project', admin, wrap(async (req) => insights ? insights.state(proj(req).name) : { status: 'NONE', items: [] }));
+  app.post('/api/admin/insights/:project', admin, wrap(async (req) => { if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다'); await insights.enqueue(proj(req), { focus: String(req.body?.focus || '').slice(0, 500) }); return insights.state(proj(req).name); }));
+  app.post('/api/admin/insights/:project/report', admin, wrap(async (req) => {
+    if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
+    const p = proj(req);
+    const st = await insights.state(p.name);
+    const item = st.items?.find((x) => x.id === Number(req.body?.id));
+    if (!item) throw new HttpError(404, '없는 제안');
+    const id = await insights.toReport(p, item, { fix: !!req.body?.fix, reporter: req.body?.reporter || 'insights' });
+    // 만든 제안은 목록에서 '리포트 #n' 으로 표시되게
+    await insights.save(p.name, { items: st.items.map((x) => (x.id === item.id ? { ...x, reportId: id } : x)) });
+    return { bugReportId: id };
+  }));
 
   const pr = express.Router({ mergeParams: true });
   app.use('/api/p/:project', (req, res, next) => {
