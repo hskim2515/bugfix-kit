@@ -6277,7 +6277,7 @@ function ow(e, A, t, r, s, n) {
     ], 32)) : F("", !0)
   ]);
 }
-const Ff = /* @__PURE__ */ Er(xc, [["render", ow], ["__scopeId", "data-v-54bd78f2"]]), Bw = {
+const Ff = /* @__PURE__ */ Er(xc, [["render", ow], ["__scopeId", "data-v-74a7fee8"]]), Bw = {
   none: "요청 전",
   QUEUED: "대기 중",
   RUNNING: "AI 가 고치는 중",

@@ -160,6 +160,7 @@ export class Runner {
       await L(`검증(${mods.map((m) => m.name).join(' · ') || '규칙 없음'})…`);
       await this.verify(project, ex, wt, mods);
       await L('✓ 검증 통과');
+      const check = await this.frontCheck(project, ex, id, wt, mods);
 
       const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
       const summary = result.title || `버그 #${id} 수정`;
@@ -174,7 +175,7 @@ export class Runner {
 
       // 보고자·문제 원문은 저장소를 보는 모든 사람에게 공개되므로 넣지 않는다 - 번호로 앱 안에서 찾아본다
       const prTitle = `fix: ${summary} (버그 #${id})`;
-      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 bugfix-kit 이 Claude Code 를 돌려 만들었습니다. `
+      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 bugfix-kit 이 Claude Code 를 돌려 만들었습니다. `
         + (project.autoMerge ? '검증이 통과해 자동으로 병합됩니다.' : '검토 후 병합하세요.');
       const pr = await gh.createPullRequest(prTitle, prBody, branch, base);
       await this.updateFix(project, id, { fixStatus: 'PR_OPENED', fixPrUrl: pr.url, fixPrNumber: pr.number });
@@ -250,6 +251,7 @@ export class Runner {
       await L('검증…');
       await this.verify(project, ex, wt, mods);
       await L('✓ 검증 통과');
+      const check = await this.frontCheck(project, ex, id, wt, mods);
       const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
       const summary = result.title || `버그 #${id} 추가 수정`;
       await this.saveSuggestions(project, id, result.body);
@@ -267,7 +269,7 @@ export class Runner {
         pr = { number: r.fixPrNumber, url: r.fixPrUrl };
         await L(`기존 PR 갱신: ${pr.url}`);
       } else {
-        const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 bugfix-kit 이 만들었습니다.`
+        const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 bugfix-kit 이 만들었습니다.`
           + (project.autoMerge ? ' 검증이 통과해 자동으로 병합됩니다.' : ' 검토 후 병합하세요.');
         pr = await gh.createPullRequest(prTitle, prBody, branch, base);
         await this.updateFix(project, id, { fixPrNumber: pr.number });
@@ -476,6 +478,39 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
         await ex.sh(path.join(wt, pb.cwd || m.dir), tmo, pb.run);
       }
       for (const cmd of m.verify || []) await ex.sh(dir, tmo, cmd);
+    }
+  }
+
+  /**
+   * 검증 뒤 실제 화면 확인(front-check). 프로젝트 설정 frontCheck: { cwd, command, when: [모듈명], timeoutMinutes }.
+   * 실패해도 작업은 계속하고(비치명), 요약을 진행 로그와 PR 본문에 남긴다. command 는 --json 으로 result 를 stdout 에 내야 한다.
+   */
+  async frontCheck(project, ex, id, wt, mods) {
+    const fc = project.frontCheck;
+    if (!fc?.command) return null;
+    if (fc.when?.length && !mods.some((m) => fc.when.includes(m.name))) return null;
+    const L = (s) => this.logLine(project, id, s);
+    await L('화면 확인(front-check)…');
+    try {
+      const out = await ex.sh(path.join(wt, fc.cwd || '.'), fc.timeoutMinutes || 10, fc.command);
+      const i = out.indexOf('{');
+      const r = i >= 0 ? JSON.parse(out.slice(i)) : null;
+      if (!r) throw new Error('front-check 출력에 JSON 이 없습니다');
+      const c = r.collected || {};
+      const line = `${r.ok ? '✓' : '✗'} 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`;
+      await L(`화면 확인 ${line}`);
+      const details = [
+        ...(r.console || []).filter((m) => m.type === 'error').slice(0, 3).map((m) => `- 콘솔: ${firstLine(m.text, 140)}`),
+        ...(r.failures || []).slice(0, 3).map((f) => `- 절차: ${firstLine(f, 140)}`),
+      ];
+      if (r.screenshots?.length) details.push(`- 스크린샷 ${r.screenshots.length}장 (${r.outDir || fc.cwd || '.'})`);
+      return [line, ...details].join('\n');
+    } catch (e) {
+      // exit 1(기준 초과)도 명령 실패로 오므로 출력에서 JSON 을 건져 본다
+      const m = String(e.message || '').match(/\{[\s\S]*\}\s*$/);
+      if (m) { try { const r = JSON.parse(m[0]); const c = r.collected || {}; const line = `✗ 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`; await L(`화면 확인 ${line}`); return line; } catch { /* 아래 */ } }
+      await L(`화면 확인 실패(계속 진행): ${firstLine(e.message, 200)}`);
+      return `(실행 실패) ${firstLine(e.message, 200)}`;
     }
   }
 

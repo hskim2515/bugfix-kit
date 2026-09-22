@@ -20,7 +20,16 @@
     "./client/vue": "./packages/client/dist/bugfix-client.vue.js",
     "./client/style.css": "./packages/client/dist/style.css",
     "./client/dist/*": "./packages/client/dist/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./front-check": "./packages/front-check/src/index.js"
   },
-  "version": "0.1.1"
+  "version": "0.1.1",
+  "bin": {
+    "front-check": "packages/front-check/bin/front-check.mjs"
+  },
+  "dependencies": {
+    "pixelmatch": "^6.0.0",
+    "playwright-core": "1.47.2",
+    "pngjs": "^7.0.0"
+  }
 }

@@ -1,0 +1,74 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+export const expandHome = (p) => (p ? p.replace(/^~(?=$|\/)/, os.homedir()) : p);
+
+const DEFAULTS = {
+  baseUrl: '',
+  // serve: { dir: 'dist', port: 4173, proxy: { '/api': 'https://…' }, spa: true }  - 빌드 결과를 임시로 서빙
+  serve: null,
+  // login: { type: 'none' | 'form' | 'storage', url, user, pass, submit, done, account, storage, timeoutMs }
+  login: { type: 'none' },
+  browser: {
+    // 'chrome' 이면 설치된 Google Chrome, 비우면 playwright chromium(없으면 docker 폴백)
+    channel: process.env.FC_CHANNEL || '',
+    executablePath: process.env.FC_CHROME || '',
+    headless: true,
+    viewport: [1440, 900],
+    webgl: 'swiftshader',         // Cesium·Three 가 헤드리스에서도 그려지게 소프트웨어 GL
+    timeoutMs: 30000,
+    locale: 'ko-KR',
+  },
+  docker: {
+    image: 'mcr.microsoft.com/playwright:v1.47.2-jammy',
+    enabled: true,
+  },
+  // 콘솔·요청에서 무시할 것 (정규식 또는 문자열)
+  ignoreConsole: [/Failed to obtain terrain tile/, /Mesh buffer doesn't exist/, /favicon\.ico/],
+  ignoreRequests: [/favicon\.ico/],
+  // 실패로 볼 기준. null 이면 세지 않는다
+  thresholds: { consoleErrors: 0, pageErrors: 0, failedRequests: null },
+  scenarios: {},
+  // (ctx) => steps[]  - 버그 리포트 context.json 을 절차로 바꾼다 (앱마다 다르니 설정에서)
+  fromContext: null,
+  // 절차가 없을 때 기본
+  defaultSteps: [{ goto: '/' }, { waitFor: 2500 }, { screenshot: 'page' }],
+};
+
+/** front-check.config.mjs(ESM default export) 를 읽어 기본값과 합친다. 없으면 기본값만 */
+export async function loadConfig(file) {
+  const candidates = file ? [file] : ['front-check.config.mjs', 'front-check.config.js'];
+  let cfg = {};
+  let found = null;
+  for (const c of candidates) {
+    const abs = path.resolve(expandHome(c));
+    if (fs.existsSync(abs)) { cfg = (await import(pathToFileURL(abs).href)).default || {}; found = abs; break; }
+  }
+  if (file && !found) throw new Error(`설정 파일이 없습니다: ${file}`);
+  const merged = {
+    ...DEFAULTS, ...cfg,
+    login: { ...DEFAULTS.login, ...(cfg.login || {}) },
+    browser: { ...DEFAULTS.browser, ...(cfg.browser || {}) },
+    docker: { ...DEFAULTS.docker, ...(cfg.docker || {}) },
+    thresholds: { ...DEFAULTS.thresholds, ...(cfg.thresholds || {}) },
+    ignoreConsole: [...DEFAULTS.ignoreConsole, ...(cfg.ignoreConsole || [])],
+    ignoreRequests: [...DEFAULTS.ignoreRequests, ...(cfg.ignoreRequests || [])],
+    scenarios: cfg.scenarios || {},
+    file: found,
+    dir: found ? path.dirname(found) : process.cwd(),
+  };
+  if (merged.serve && !merged.serve.port) merged.serve.port = 4173;
+  return merged;
+}
+
+/** 계정 파일(첫 줄 아이디, 둘째 줄 비밀번호) 또는 환경변수 FC_USER/FC_PASS. 값은 로그·리포트에 절대 남기지 않는다 */
+export function readAccount(login) {
+  if (process.env.FC_USER && process.env.FC_PASS) return { user: process.env.FC_USER, pass: process.env.FC_PASS };
+  if (!login?.account) return null;
+  const f = expandHome(login.account);
+  if (!fs.existsSync(f)) return null;
+  const [user = '', pass = ''] = fs.readFileSync(f, 'utf8').split(/\r?\n/).map((s) => s.trim());
+  return user && pass ? { user, pass } : null;
+}
