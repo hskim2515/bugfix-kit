@@ -151,8 +151,9 @@ export class Runner {
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!changed) {
         const reason = await readIfExists(path.join(wt, '.bugfix/result.md'));
-        await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: `Claude 가 코드를 바꾸지 않았습니다. ${firstLine(reason, 200)}` });
-        await L(`✗ 변경 없음 - 결과: ${firstLine(reason, 500)}`);
+        const lib = /^#\s*라이브러리 문제/.test(reason.trim());
+        await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: lib ? `${firstLine(reason, 120)} - 이 저장소가 아니라 해당 패키지 저장소에서 고쳐야 합니다 (진행 로그의 결과 참고)` : `Claude 가 코드를 바꾸지 않았습니다. ${firstLine(reason, 200)}` });
+        await L(`✗ 변경 없음 - 결과:\n${reason.trim().slice(0, 1500)}`);
         return;
       }
       await L(`변경 파일:\n${changed}`);
@@ -472,6 +473,9 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
   1. summary.md 와 screenshot.png, 로그의 오류 항목을 보고 무엇이 잘못됐는지 한 문장으로 정리합니다.
   2. 로그의 오류 메시지 · URL · 컴포넌트 이름으로 원인 코드를 찾습니다. 추측으로 여러 곳을 고치지 말고 원인 하나를 확정하세요.
      원인을 확정할 수 없으면 코드를 고치지 말고 \`.bugfix/result.md\` 에 "원인 미확정" 과 조사 결과, 더 필요한 정보를 적고 끝내세요.
+     원인이 이 저장소 밖(\`node_modules\` 의 패키지 - 예: 버그 신고 창·뷰어 자체는 \`bugfix-kit\` 패키지)에 있으면 **아무 코드도 고치지 말고**
+     result.md 첫 줄을 \`# 라이브러리 문제: <패키지명>\` 으로 쓰고, 패키지 안의 파일·원인·고칠 방법을 적고 끝내세요. node_modules 를 고치거나
+     앱 쪽에 우회 코드를 덧대지 마세요 - 그 패키지의 저장소에서 고칩니다.
   3. 최소 범위로 고칩니다.
   4. 고친 모듈의 검증 명령이 통과해야 합니다. 통과하지 못하면 고치거나 되돌리세요. (바깥에서 한 번 더 검증합니다)
   5. 마지막에 \`.bugfix/result.md\` 를 아래 형식으로 씁니다. 첫 줄이 PR 제목이 됩니다(한 줄, 60자 이내, 한국어).

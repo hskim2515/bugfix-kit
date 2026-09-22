@@ -70,6 +70,18 @@ projects:
       - "Bash(node_modules/.bin/sass:*)"
       - "Bash(../../node_modules/.bin/sass:*)"
 
+  # 라이브러리(bugfix-kit) 자체의 버그는 앱 저장소에서 못 고친다 - 라이브러리도 프로젝트로 등록해 두면 같은 파이프라인으로 고친다
+  bugfix-kit:
+    repo: https://github.com/hskim2515/bugfix-kit.git
+    githubRepo: hskim2515/bugfix-kit
+    baseBranch: main
+    autoMerge: false          # 라이브러리는 PR 만 올리고 사람이 병합
+    description: "bugfix-kit 모노레포(Node 18 ESM): packages/server(리포트 API·자동 수정 파이프라인) · packages/client(브라우저 SDK, Vue 3 → Web Component) · packages/front-check(Playwright CLI)"
+    modules:
+      - { name: server, match: packages/server/, dir: packages/server, verify: [npm test] }
+      - { name: client, match: packages/client/, dir: packages/client, nodeModulesCache: false, verify: [npm run build] }
+      - { name: front-check, match: packages/front-check/, dir: packages/front-check, verify: [npm test] }
+
   # 두 번째 프로젝트는 이 블록만 추가하면 된다
   # tnc:
   #   repo: https://github.com/Gaia3D/tnc.git
