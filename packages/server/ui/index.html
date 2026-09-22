@@ -60,7 +60,8 @@
   .checklist li { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; }
   .checklist li .ic { width: 18px; text-align: center; flex-shrink: 0; }
   .checklist li a { color: var(--accent); text-decoration: none; }
-  .checklist .done { color: var(--dim); text-decoration: line-through; }
+  .checklist .done { color: var(--dim); }
+  .checklist .ic.ok { color: var(--ok); } .checklist .ic.todo { color: var(--dim); }
   .steps { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--dim); margin: 2px 0 12px; }
   .steps span.s { background: rgba(110,160,255,0.12); border: 1px solid rgba(110,160,255,0.3); border-radius: 20px; padding: 3px 10px; color: var(--text); }
   .steps span.ar { color: #55617a; }
@@ -91,12 +92,12 @@
   <h1>bugfix-kit</h1>
   <span class="sub" id="meta">관리</span>
   <nav class="tabs" id="tabs">
-    <button data-t="reports" class="on">📋 리포트</button>
-    <button data-t="projects">📁 프로젝트</button>
-    <button data-t="secrets">🔑 키·계정</button>
-    <button data-t="server">⚙️ 서버</button>
-    <button data-t="checks">🩺 점검</button>
-    <button data-t="logs">🧾 로그</button>
+    <button data-t="reports" class="on">리포트</button>
+    <button data-t="projects">프로젝트</button>
+    <button data-t="secrets">키·계정</button>
+    <button data-t="server">서버</button>
+    <button data-t="checks">점검</button>
+    <button data-t="logs">로그</button>
   </nav>
   <div class="right">
     <span class="dim" id="tick"></span>
@@ -108,7 +109,7 @@
   <section id="login" hidden>
     <div class="card">
       <h3>운영자 키</h3>
-      <p class="dim">서버의 <code>~/.config/bugfix-kit/default.env</code> 에 적힌 <code>ADMIN_KEY</code> 입니다. 이 브라우저에만 저장됩니다.</p>
+      <p class="dim"><code>~/.config/bugfix-kit/default.env</code> 의 <code>ADMIN_KEY</code></p>
       <input type="password" id="key" placeholder="ADMIN_KEY" autofocus>
       <button class="btn primary" id="enter">들어가기</button>
       <div class="err" id="loginErr"></div>
@@ -118,7 +119,6 @@
   <section id="app" hidden>
     <!-- 리포트 -->
     <div data-tab="reports">
-      <p class="intro"><b>사용자가 앱에서 Shift+F9 로 신고한 것</b>이 여기 모입니다. 행을 누르면 그 리포트를 열어 AI 에게 수정을 시키거나 질문할 수 있어요.</p>
       <div class="card checklist" id="checklist" hidden></div>
       <div class="cards" id="cards"></div>
       <div class="toolbar">
@@ -135,27 +135,25 @@
 
     <!-- 프로젝트 -->
     <div data-tab="projects" hidden>
-      <p class="intro"><b>AI 가 고칠 저장소를 등록하는 곳.</b> 어디서 코드를 받아오고(저장소·브랜치), 고친 뒤 뭘로 확인할지(검증 명령)를 적습니다. 저장하면 바로 적용됩니다.</p>
-      <div class="steps"><span class="s">1 저장소 주소</span><span class="ar">→</span><span class="s">2 브랜치</span><span class="ar">→</span><span class="s">3 앱 주소</span><span class="ar">→</span><span class="s">4 모듈 = 어느 폴더를 어떤 명령으로 검증할지</span><span class="ar">→</span><span class="s">저장</span></div>
       <div class="plist" id="plist"></div>
       <div class="card">
         <div class="form" id="pform">
-          <label>이름 <small>영문·숫자·-_ · 앱 SDK 의 project 와 같아야 함</small></label><input id="p_name" placeholder="myapp">
+          <label>이름 <small>SDK 의 project 값</small></label><input id="p_name" placeholder="myapp">
           <label>저장소 URL</label><input id="p_repo" placeholder="https://github.com/org/myapp.git">
           <label>GitHub owner/repo</label><input id="p_githubRepo" placeholder="org/myapp">
           <label>기준 브랜치</label><input id="p_baseBranch" placeholder="develop">
-          <label>자동 병합 <small>끄면 PR 만 올리고 사람이 병합</small></label><div class="inline"><input type="checkbox" id="p_autoMerge"></div>
-          <label>앱 주소(CORS) <small>쉼표 구분. 첫 항목은 점검·front-check 에도 씀</small></label><input id="p_cors" placeholder="https://dev.myapp.com, http://localhost:3000">
-          <label>API 키 <small>앱 프론트에 넣는 공개 키. 비우면 검사 안 함</small></label><input id="p_apiKey" placeholder="(선택)">
-          <label>설명 <small>Claude 프롬프트 첫 줄 - 스택·구조</small></label><input id="p_description" placeholder="MyApp (Vue 3 프론트 web/, Spring Boot 백엔드 api/)">
-          <label>규약 <small>프롬프트에 그대로 들어감</small></label><textarea id="p_conventions" placeholder="- 주석은 한국어&#10;- SCSS 는 web/src/styles 를 고친다"></textarea>
-          <label>모듈 <small>바뀐 파일 경로(match)로 고르고 dir 에서 verify 를 순서대로. nm = node_modules 캐시</small></label>
+          <label>자동 병합 <small>끄면 PR 만</small></label><div class="inline"><input type="checkbox" id="p_autoMerge"></div>
+          <label>앱 주소 <small>쉼표 구분</small></label><input id="p_cors" placeholder="https://dev.myapp.com, http://localhost:3000">
+          <label>API 키 <small>프론트에 넣는 공개 키</small></label><input id="p_apiKey" placeholder="(선택)">
+          <label>설명 <small>스택·구조 한 줄</small></label><input id="p_description" placeholder="MyApp (Vue 3 프론트 web/, Spring Boot 백엔드 api/)">
+          <label>규약</label><textarea id="p_conventions" placeholder="- 주석은 한국어&#10;- SCSS 는 web/src/styles 를 고친다"></textarea>
+          <label>모듈 <small>경로별 검증 명령</small></label>
           <div class="mods" id="mods"></div>
           <label></label><div><button class="btn" id="addMod">+ 모듈</button></div>
-          <label>화면 확인 <small>검증 뒤 front-check. when = 모듈 이름(쉼표)</small></label>
+          <label>화면 확인 <small>front-check</small></label>
           <div class="inline"><input id="p_fc_cwd" placeholder="cwd (예: web)" style="width:140px"><input id="p_fc_cmd" placeholder="npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json" style="flex:1;min-width:320px"><input id="p_fc_when" placeholder="when: front" style="width:120px"></div>
-          <label>추가 허용 도구 <small>줄마다 하나. 예: Bash(./gradlew:*)</small></label><textarea id="p_allowedTools" style="min-height:50px"></textarea>
-          <label>실행 환경변수 <small>KEY=VALUE 줄마다 (비밀 아님)</small></label><textarea id="p_env" style="min-height:44px" placeholder="NODE_OPTIONS=--openssl-legacy-provider"></textarea>
+          <label>허용 도구 <small>줄마다 하나</small></label><textarea id="p_allowedTools" style="min-height:50px"></textarea>
+          <label>환경변수 <small>KEY=VALUE</small></label><textarea id="p_env" style="min-height:44px" placeholder="NODE_OPTIONS=--openssl-legacy-provider"></textarea>
         </div>
         <div class="actions">
           <button class="btn primary" id="saveProject">저장</button>
@@ -168,30 +166,28 @@
 
     <!-- 키·계정 -->
     <div data-tab="secrets" hidden>
-      <p class="intro"><b>비밀번호·토큰은 여기에만.</b> 서버 컴퓨터 안(<code>~/.config/bugfix-kit/</code>)에 저장되고 저장소에는 절대 안 들어갑니다. 저장하면 값은 다시 보이지 않고 "설정됨"만 표시돼요.</p>
-      <h2>모든 프로젝트 공통</h2>
+      <h2>공통</h2>
       <div class="card" id="gsec"></div>
-      <h2>프로젝트마다 다르게 <small>여기 값이 공통보다 우선</small></h2>
+      <h2>프로젝트별 <small>공통보다 우선</small></h2>
       <div class="plist" id="splist"></div>
       <div class="card" id="psec"></div>
     </div>
 
     <!-- 서버 설정 -->
     <div data-tab="server" hidden>
-      <p class="intro"><b>보통은 건드릴 일이 없는 설정.</b> AI 가 한 번에 얼마나 오래·많이 일할지, 프로그램 경로 같은 것들입니다. 포트만 바꾸면 재시작이 필요해요.</p>
       <h2>서버 설정</h2>
       <div class="card">
         <div class="form" id="sform">
           <label>포트</label><input id="s_port">
           <label>Claude 실행 파일</label><input id="s_claudeBin" placeholder="claude 또는 /home/user/.local/bin/claude">
-          <label>PATH 앞에 붙일 경로 <small>node·claude·jdk 등, ':' 구분</small></label><input id="s_pathExtra">
+          <label>PATH 추가 <small>':' 구분</small></label><input id="s_pathExtra">
           <label>JAVA_HOME</label><input id="s_javaHome">
-          <label>Claude 모델 <small>비우면 계정 기본</small></label><input id="s_model" placeholder="(선택) claude-sonnet-4-5">
+          <label>Claude 모델</label><input id="s_model" placeholder="(선택) claude-sonnet-4-5">
           <label>최대 턴</label><input id="s_maxTurns" type="number">
           <label>Claude 시간 제한(분)</label><input id="s_timeoutMinutes" type="number">
           <label>검증 명령 시간 제한(분)</label><input id="s_verifyTimeoutMinutes" type="number">
-          <label>작업 디렉터리 <small>저장소 사본·worktree·캐시</small></label><input id="s_workDir">
-          <label>데이터 디렉터리 <small>리포트 JSON</small></label><input id="s_dataDir">
+          <label>작업 디렉터리</label><input id="s_workDir">
+          <label>데이터 디렉터리</label><input id="s_dataDir">
         </div>
         <div class="actions"><button class="btn primary" id="saveServer">저장</button><span class="msg" id="smsg"></span></div>
       </div>
@@ -201,20 +197,18 @@
 
     <!-- 점검 -->
     <div data-tab="checks" hidden>
-      <p class="intro"><b>잘 붙었는지 버튼으로 확인.</b> 뭔가 안 되면 여기부터 눌러 보세요. ✓ 면 정상, ✗ 면 그 줄에 이유가 나옵니다.</p>
-      <h2>연결 점검</h2>
+      <h2>점검</h2>
       <div class="cards checks">
-        <div class="card"><div class="body"><h3>GitHub 토큰 · 저장소 권한</h3><div id="c_github" class="dim">토큰으로 GitHub 사용자를 확인하고 프로젝트마다 저장소 접근 권한을 봅니다</div></div><button class="btn" data-check="github">검사</button></div>
-        <div class="card"><div class="body"><h3>Claude Code</h3><div id="c_claude" class="dim">실행 파일·버전·로그인 흔적</div></div><button class="btn" data-check="claude">검사</button></div>
-        <div class="card"><div class="body"><h3>Docker · 헤드리스 브라우저 이미지</h3><div id="c_docker" class="dim">front-check 폴백용</div></div><button class="btn" data-check="docker">검사</button></div>
-        <div class="card"><div class="body"><h3>저장소 접근 (git ls-remote)</h3><div id="c_repo" class="dim">프로젝트별 기준 브랜치가 보이는지</div></div><span class="seg" id="c_repo_btns"></span></div>
-        <div class="card"><div class="body"><h3>앱 화면 열기 (front-check)</h3><div id="c_front" class="dim">프로젝트 cors 첫 주소를 헤드리스로 열어 콘솔 오류를 봅니다 (1~2분)</div></div><span class="seg" id="c_front_btns"></span></div>
+        <div class="card"><div class="body"><h3>GitHub 토큰 · 저장소 권한</h3><div id="c_github" class="dim"></div></div><button class="btn" data-check="github">검사</button></div>
+        <div class="card"><div class="body"><h3>Claude Code</h3><div id="c_claude" class="dim"></div></div><button class="btn" data-check="claude">검사</button></div>
+        <div class="card"><div class="body"><h3>Docker · 브라우저 이미지</h3><div id="c_docker" class="dim"></div></div><button class="btn" data-check="docker">검사</button></div>
+        <div class="card"><div class="body"><h3>저장소 접근</h3><div id="c_repo" class="dim"></div></div><span class="seg" id="c_repo_btns"></span></div>
+        <div class="card"><div class="body"><h3>앱 화면 열기</h3><div id="c_front" class="dim">1~2분</div></div><span class="seg" id="c_front_btns"></span></div>
       </div>
     </div>
 
     <!-- 로그 -->
     <div data-tab="logs" hidden>
-      <p class="intro"><b>서버가 남긴 기록.</b> 리포트 진행 로그는 리포트 탭에 있고, 여기는 서버 자체의 로그입니다.</p>
       <h2>서버 로그 <small id="logsrc"></small></h2>
       <div class="toolbar"><button class="btn" id="loadLogs">다시 읽기</button><label class="dim"><input type="checkbox" id="autoLogs"> 5초마다</label></div>
       <pre class="log tall" id="logs">(다시 읽기를 누르세요)</pre>
@@ -270,18 +264,18 @@
       const anyAccount = !!st.global.FC_USER || st.projects.some((p) => p.secrets.FC_USER);
       const anyReport = st.projects.some((p) => p.reports > 0);
       const items = [
-        { ok: !!st.global.GITHUB_TOKEN, text: 'GitHub 토큰 넣기', go: 'secrets' },
-        { ok: !!quick.claude?.loggedIn, text: 'Claude 로그인 (서버 터미널에서 claude login)', go: 'checks' },
-        { ok: !!quick.docker?.imagePresent, text: '헤드리스 브라우저 이미지 (docker pull)', go: 'checks' },
+        { ok: !!st.global.GITHUB_TOKEN, text: 'GitHub 토큰', go: 'secrets' },
+        { ok: !!quick.claude?.loggedIn, text: 'Claude 로그인 (서버에서 claude login)', go: 'checks' },
+        { ok: !!quick.docker?.imagePresent, text: '브라우저 이미지 (docker pull)', go: 'checks' },
         { ok: st.projects.length > 0, text: '프로젝트 등록', go: 'projects' },
-        { ok: anyAccount, text: '테스트 계정 넣기 (로그인 뒤 화면 확인용)', go: 'secrets' },
-        { ok: anyReport, text: '앱에 SDK 붙이고 첫 신고 받기', go: null },
+        { ok: anyAccount, text: '테스트 계정', go: 'secrets' },
+        { ok: anyReport, text: '앱 SDK 연결 (첫 신고)', go: null },
       ];
       const done = items.filter((i) => i.ok).length;
       const el = $('#checklist');
       if (done === items.length) { el.hidden = true; return; }
       el.hidden = false;
-      el.innerHTML = `<h3>🚀 시작 체크리스트 <span class="dim">${done}/${items.length} 완료</span></h3><ol>${items.map((i) => `<li><span class="ic">${i.ok ? '✅' : '⬜'}</span><span class="${i.ok ? 'done' : ''}">${esc(i.text)}${!i.ok && i.go ? ` <a href="#" data-go="${i.go}">→ 가기</a>` : ''}</span></li>`).join('')}</ol>`;
+      el.innerHTML = `<h3>설정 ${done}/${items.length}</h3><ol>${items.map((i) => `<li><span class="ic ${i.ok ? 'ok' : 'todo'}">${i.ok ? '✓' : '·'}</span><span class="${i.ok ? 'done' : ''}">${esc(i.text)}${!i.ok && i.go ? ` <a href="#" data-go="${i.go}">설정</a>` : ''}</span></li>`).join('')}</ol>`;
     } catch { /* 설정 API 실패는 무시 */ }
   }
 
@@ -354,20 +348,20 @@
   }
   function renderSecrets() {
     const g = settings.global;
-    $('#gsec').innerHTML = secretRow('global', 'GITHUB_TOKEN', 'GitHub 토큰 (공용)', g.GITHUB_TOKEN, 'ghp_… classic PAT, repo 권한. 전용 봇 계정 권장', true)
-      + secretRow('global', 'ADMIN_KEY', '운영자 키 (이 화면)', g.ADMIN_KEY, '바꾸면 다시 로그인', true)
-      + secretRow('global', 'FC_USER', '테스트 계정 아이디 (모든 프로젝트 공통)', g.FC_USER, '프로젝트별 값이 있으면 그게 우선', false)
-      + secretRow('global', 'FC_PASS', '테스트 계정 비밀번호 (공통)', g.FC_PASS, '', true)
+    $('#gsec').innerHTML = secretRow('global', 'GITHUB_TOKEN', 'GitHub 토큰', g.GITHUB_TOKEN, 'classic PAT (repo)', true)
+      + secretRow('global', 'ADMIN_KEY', '운영자 키', g.ADMIN_KEY, '', true)
+      + secretRow('global', 'FC_USER', '테스트 계정 아이디', g.FC_USER, '', false)
+      + secretRow('global', 'FC_PASS', '테스트 계정 비밀번호', g.FC_PASS, '', true)
       + (g.extra?.length ? `<div class="dim">그 밖의 키: ${g.extra.map(esc).join(', ')}</div>` : '')
       + `<div class="secret"><label>새 키 추가</label><input data-scope="global" data-k="__new" placeholder="KEY=VALUE"><div><button class="btn" data-save="__new" data-scope="global">저장</button></div></div>`;
     $('#splist').innerHTML = settings.projects.map((p) => `<button data-sp="${esc(p.name)}" class="${secretProject === p.name ? 'on' : ''}"><div class="n">${esc(p.name)}</div><div class="d">API 키 ${p.secrets.BUGFIX_API_KEY || p.apiKeySet ? '✓' : '–'} · GitHub ${p.secrets.GITHUB_TOKEN ? '전용' : '공용'} · 계정 ${p.secrets.FC_USER ? esc(p.secrets.FC_USER) : (g.FC_USER ? '공용' : '–')}</div></button>`).join('');
     if (!secretProject || !settings.projects.some((p) => p.name === secretProject)) secretProject = settings.projects[0]?.name || '';
     const p = settings.projects.find((x) => x.name === secretProject);
     $('#psec').innerHTML = p ? `<h3 style="margin:0 0 10px">${esc(p.name)} <span class="dim">~/.config/bugfix-kit/projects/${esc(p.name)}.env</span></h3>`
-      + secretRow(p.name, 'FC_USER', 'front-check 테스트 계정 아이디', p.secrets.FC_USER, '개발 서버 전용 테스트 계정만', false)
+      + secretRow(p.name, 'FC_USER', '테스트 계정 아이디', p.secrets.FC_USER, '', false)
       + secretRow(p.name, 'FC_PASS', '테스트 계정 비밀번호', p.secrets.FC_PASS, '', true)
-      + secretRow(p.name, 'BUGFIX_API_KEY', 'API 키 (env 로)', p.secrets.BUGFIX_API_KEY, 'yml 의 apiKey 대신 env 로 두려면', false)
-      + secretRow(p.name, 'GITHUB_TOKEN', 'GitHub 토큰 (이 프로젝트 전용)', p.secrets.GITHUB_TOKEN, '비우면 공용 토큰', true)
+      + secretRow(p.name, 'BUGFIX_API_KEY', 'API 키', p.secrets.BUGFIX_API_KEY, '', false)
+      + secretRow(p.name, 'GITHUB_TOKEN', 'GitHub 토큰 (전용)', p.secrets.GITHUB_TOKEN, '', true)
       + (p.secrets.extra?.length ? `<div class="dim">그 밖의 키: ${p.secrets.extra.map(esc).join(', ')}</div>` : '')
       + `<div class="secret"><label>새 키 추가</label><input data-scope="${esc(p.name)}" data-k="__new" placeholder="KEY=VALUE"><div><button class="btn" data-save="__new" data-scope="${esc(p.name)}">저장</button></div></div>` : '';
   }
