@@ -13,7 +13,7 @@
             <span v-if="hotkey" class="brv-shortcut">{{ hotkey }}</span>
           </span>
           <span v-if="projects.length > 1" class="brv-projects">
-            <button v-for="p in projects" :key="p.key" :class="['brv-fix-btn', 'brv-fix-btn--ghost', { 'brv-projects__on': project === p.key }]" @click="switchProject(p.key)">{{ p.label }}</button>
+            <button v-for="p in projects" :key="p.key" :class="{ 'brv-projects__on': project === p.key }" @click="switchProject(p.key)">{{ p.label }}</button>
           </span>
           <button class="brv-close" @click="close">✕</button>
         </div>
@@ -85,69 +85,69 @@
                 <div class="brv-row"><span>일시</span><span class="brv-selectable">{{ formatDate(detail.insertDate) }}</span></div>
               </div>
 
-              <!-- AI 자동 수정 -->
-              <div class="brv-section">
-                <div class="brv-label">AI 자동 수정</div>
-                <div class="brv-row">
-                  <span>상태</span>
-                  <span>
-                    <span v-if="fixBusy || fixInProgress" class="brv-spin brv-spin--sm"></span>
-                    <span :class="['brv-fix', `brv-fix--${(detail.fixStatus || 'none').toLowerCase()}`]">{{ fixLabel(detail.fixStatus) }}</span>
-                    <span v-if="fixInProgress && fixElapsed" class="brv-fix-elapsed">{{ fixElapsed }} 경과</span>
-                    <span v-else-if="deployPending" class="brv-fix-elapsed"><span class="brv-spin brv-spin--sm"></span> 배포 진행 중…</span>
+              <!-- AI 자동 수정: 머리줄(제목·상태·경과·도구) → 요청 전이면 큰 버튼 하나, 아니면 PR·요약 → 진행 로그 → 추천 개선 → 대화 -->
+              <div class="brv-section brv-ai">
+                <div class="brv-ai__head">
+                  <span class="brv-label brv-ai__title">AI 자동 수정</span>
+                  <span :class="['brv-fix', `brv-fix--${(detail.fixStatus || 'none').toLowerCase()}`]">{{ fixLabel(detail.fixStatus) }}</span>
+                  <span v-if="fixBusy || fixInProgress" class="brv-spin brv-spin--sm"></span>
+                  <span v-if="fixInProgress && fixElapsed" class="brv-fix-elapsed">{{ fixElapsed }}</span>
+                  <span v-else-if="deployPending" class="brv-fix-elapsed"><span class="brv-spin brv-spin--sm"></span> 배포 중</span>
+                  <span v-if="detail.fixStatus" class="brv-ai__tools">
+                    <button class="brv-ai__tool" :disabled="fixBusy" @click="refreshDetail" title="상태·로그 다시 읽기 (PR 이 열려 있으면 GitHub 와 맞춤)">새로고침</button>
+                    <button class="brv-ai__tool" :disabled="fixBusy || fixInProgress" @click="requestFix" title="앞선 대화·수정을 잇지 않고 원인 조사부터 새로 고칩니다">처음부터 다시</button>
                   </span>
                 </div>
-                <div class="brv-row" v-if="detail.fixBranch">
-                  <span>브랜치</span>
-                  <span class="brv-selectable">{{ detail.fixBranch }}</span>
-                </div>
-                <div class="brv-row" v-if="detail.fixPrUrl">
-                  <span>PR</span>
-                  <a class="brv-link" :href="detail.fixPrUrl" target="_blank" rel="noopener">{{ detail.fixPrUrl.replace(/^https?:\/\/github\.com\//, '') }}</a>
-                </div>
-                <div v-if="detail.fixSummary" class="brv-text brv-selectable brv-fix-summary">{{ detail.fixSummary }}</div>
 
-                <!-- AI 가 남긴 추천 개선: 누르면 그 내용을 그대로 '수정 요청' 으로 보낸다 -->
-                <div v-if="fixSuggestions.length" class="brv-suggest">
-                  <div class="brv-suggest__title">추천 개선 <span class="brv-suggest__hint">눌러서 바로 수정 요청</span></div>
-                  <div v-for="(s, i) in fixSuggestions" :key="i" class="brv-suggest__item">
-                    <span class="brv-suggest__text brv-selectable">{{ s }}</span>
-                    <button class="brv-fix-btn brv-suggest__run" :disabled="fixBusy || fixInProgress" @click="runSuggestion(s)"
-                            title="이 추천을 AI 에게 수정 요청으로 보냅니다 (고친 뒤 검증 → PR → 병합)">실행</button>
-                  </div>
+                <!-- 요청 전 -->
+                <div v-if="!detail.fixStatus" class="brv-ai__start">
+                  <button class="brv-fix-btn brv-fix-btn--lg" :disabled="fixBusy" @click="requestFix">AI 에게 수정 요청</button>
+                  <span class="brv-ai__hint">서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.</span>
                 </div>
-                <details v-if="detail.fixLog" class="brv-fix-log" :open="fixInProgress">
-                  <summary>진행 로그</summary>
-                  <pre ref="fixLogPre" class="brv-selectable">{{ detail.fixLog }}</pre>
-                </details>
 
-                <!-- 이어서 대화: 질문(코드 변경 없음) · 추가 요청(수정 → 검증 → PR/병합) -->
-                <div v-if="detail.fixStatus" class="brv-chat">
-                  <div v-for="(m, i) in fixChat" :key="i" :class="['brv-chat__msg', `brv-chat__msg--${m.role}`]">
-                    <span class="brv-chat__who">{{ m.role === 'user' ? '나' : 'AI' }}</span>
-                    <div class="brv-chat__text brv-selectable">{{ m.text }}</div>
+                <template v-else>
+                  <div v-if="detail.fixPrUrl || detail.fixBranch" class="brv-ai__meta">
+                    <a v-if="detail.fixPrUrl" class="brv-link brv-ai__pr" :href="detail.fixPrUrl" target="_blank" rel="noopener">PR #{{ prNumber }}</a>
+                    <span v-if="detail.fixBranch" class="brv-ai__branch brv-selectable">{{ detail.fixBranch }}</span>
                   </div>
-                  <div v-if="fixInProgress && fixChat.length && fixChat[fixChat.length - 1].role === 'user'" class="brv-chat__msg brv-chat__msg--assistant">
-                    <span class="brv-chat__who">AI</span>
-                    <div class="brv-chat__text"><span class="brv-spin brv-spin--sm"></span> 생각 중…</div>
+                  <div v-if="detail.fixSummary" class="brv-ai__summary brv-selectable">{{ detail.fixSummary }}</div>
+
+                  <details v-if="detail.fixLog" class="brv-fix-log" :open="fixInProgress || deployPending">
+                    <summary>진행 로그 <span class="brv-ai__count">{{ logLineCount }}줄</span></summary>
+                    <pre ref="fixLogPre" class="brv-selectable">{{ detail.fixLog }}</pre>
+                  </details>
+
+                  <!-- AI 가 남긴 추천 개선: 누르면 그 내용을 그대로 '수정 요청' 으로 보낸다 -->
+                  <div v-if="fixSuggestions.length" class="brv-suggest">
+                    <div class="brv-suggest__title">추천 개선 <span class="brv-suggest__hint">실행을 누르면 그 내용으로 이어서 고칩니다</span></div>
+                    <div v-for="(s, i) in fixSuggestions" :key="i" class="brv-suggest__item">
+                      <span class="brv-suggest__text brv-selectable">{{ s }}</span>
+                      <button class="brv-fix-btn brv-fix-btn--ghost brv-suggest__run" :disabled="fixBusy || fixInProgress" @click="runSuggestion(s)">실행</button>
+                    </div>
                   </div>
-                  <textarea v-model="chatInput" class="brv-chat__input" rows="2" :disabled="fixBusy || fixInProgress"
-                            placeholder="예) 왜 이렇게 고쳤어?  /  라이트 테마에서도 맞는지 확인해서 같이 고쳐줘"
-                            @keydown.ctrl.enter.prevent="sendChat('ask')" @keydown.meta.enter.prevent="sendChat('ask')"></textarea>
-                  <div class="brv-fix-actions">
-                    <button class="brv-fix-btn brv-fix-btn--ghost" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('ask')" title="코드는 바꾸지 않고 답만 합니다">질문</button>
-                    <button class="brv-fix-btn" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('change')" title="앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지">수정 요청</button>
+
+                  <!-- 이어서 대화: 질문(코드 변경 없음) · 수정 요청(수정 → 검증 → PR/병합) -->
+                  <div class="brv-chat">
+                    <div v-for="(m, i) in fixChat" :key="i" :class="['brv-chat__msg', `brv-chat__msg--${m.role}`]">
+                      <span class="brv-chat__who">{{ m.role === 'user' ? '나' : 'AI' }}</span>
+                      <div class="brv-chat__text brv-selectable">{{ m.text }}</div>
+                    </div>
+                    <div v-if="fixInProgress && fixChat.length && fixChat[fixChat.length - 1].role === 'user'" class="brv-chat__msg brv-chat__msg--assistant">
+                      <span class="brv-chat__who">AI</span>
+                      <div class="brv-chat__text"><span class="brv-spin brv-spin--sm"></span> 생각 중…</div>
+                    </div>
+                    <div class="brv-chat__compose">
+                      <textarea v-model="chatInput" class="brv-chat__input" rows="2" :disabled="fixBusy || fixInProgress"
+                                placeholder="질문: 왜 이렇게 고쳤어?   수정 요청: 라이트 테마에서도 맞게 고쳐줘"
+                                @keydown.ctrl.enter.prevent="sendChat('ask')" @keydown.meta.enter.prevent="sendChat('ask')"></textarea>
+                      <div class="brv-chat__btns">
+                        <button class="brv-fix-btn brv-fix-btn--ghost" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('ask')" title="코드는 바꾸지 않고 답만 합니다 (Ctrl+Enter)">질문</button>
+                        <button class="brv-fix-btn" :disabled="fixBusy || fixInProgress || !chatInput.trim()" @click="sendChat('change')" title="앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지">수정 요청</button>
+                      </div>
+                    </div>
+                    <div class="brv-ai__hint">질문은 코드를 바꾸지 않고 답만, 수정 요청은 이어서 고쳐 검증·PR·병합까지 진행합니다.</div>
                   </div>
-                </div>
-                <!-- 첫 요청은 큰 버튼, 이후 이어서 고치기는 위 대화창에서 하고 여기서는 '처음부터 다시' 만 둔다 -->
-                <div class="brv-fix-actions">
-                  <button v-if="!detail.fixStatus || fixInProgress" class="brv-fix-btn" :disabled="fixBusy || fixInProgress" @click="requestFix">
-                    {{ fixInProgress ? 'AI 가 고치는 중…' : 'AI 에게 수정 요청' }}
-                  </button>
-                  <button v-else class="brv-fix-btn brv-fix-btn--ghost" :disabled="fixBusy" @click="requestFix" title="앞선 대화·수정을 잇지 않고 원인 조사부터 새로 고칩니다">처음부터 다시</button>
-                  <button v-if="detail.fixStatus" class="brv-fix-btn brv-fix-btn--ghost" :disabled="fixBusy" @click="refreshDetail">새로고침</button>
-                </div>
-                <div class="brv-hint">서버의 AI 가 원인을 찾아 고치고, 검증(lint·build)이 통과하면 PR 을 올린 뒤 <b>바로 병합</b>합니다. 그사이 다른 변경과 충돌하면 AI 가 풀고 다시 검증합니다. 병합되지 않으면 PR 이 열린 채 남습니다.<template v-if="detail.fixStatus"><br>고친 뒤에는 위 입력창에서 <b>질문</b>(코드 변경 없음)이나 <b>수정 요청</b>(이어서 고침)을 보낼 수 있습니다.</template></div>
+                </template>
               </div>
 
               <!-- 문제 상황 -->
@@ -375,6 +375,8 @@ export default {
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.viewer || ''; },
     projects() { return this.kit?.projects || []; },
+    prNumber() { return this.detail?.fixPrNumber || (this.detail?.fixPrUrl || '').split('/').pop(); },
+    logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
     // 병합 뒤 배포(GitHub Actions) 추적이 아직 진행 중인가 - 로그에 끝났다는 줄이 없고 갱신이 최근(35분 안)이면
     deployPending() {
@@ -659,8 +661,31 @@ export default {
 </script>
 
 <style scoped>
-.brv-projects { margin-left: auto; margin-right: 10px; display: inline-flex; gap: 4px; }
-.brv-projects__on { background: rgba(136,170,255,0.25) !important; color: #fff !important; }
+.brv-projects { margin-left: auto; margin-right: 12px; display: inline-flex; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; overflow: hidden; }
+.brv-projects button { border: 0; padding: 4px 11px; font-size: 11px; background: transparent; color: #aab; cursor: pointer; }
+.brv-projects button + button { border-left: 1px solid rgba(255,255,255,0.18); }
+.brv-projects__on { background: rgba(136,170,255,0.28); color: #fff; }
+.brv-ai__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.brv-ai__title { margin: 0 !important; }
+.brv-ai__tools { margin-left: auto; display: inline-flex; gap: 6px; }
+.brv-ai__tool { font-size: 11px; padding: 3px 9px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: #aab; cursor: pointer; }
+.brv-ai__tool:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: #fff; }
+.brv-ai__tool:disabled { opacity: 0.4; cursor: default; }
+.brv-ai__start { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 6px 0 2px; }
+.brv-fix-btn--lg { padding: 9px 18px; font-size: 13px; }
+.brv-ai__hint { font-size: 11px; color: #8898aa; line-height: 1.5; margin-top: 6px; }
+.brv-ai__meta { display: flex; gap: 10px; align-items: center; font-size: 12px; margin-bottom: 6px; }
+.brv-ai__pr { font-weight: 600; }
+.brv-ai__branch { color: #8898aa; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; }
+.brv-ai__summary { font-size: 12px; line-height: 1.55; padding: 8px 10px; background: rgba(255,255,255,0.05); border-radius: 6px; margin-bottom: 8px; }
+.brv-ai__count { font-weight: 400; color: #778; margin-left: 4px; font-size: 11px; }
+.brv-chat__compose { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
+.brv-chat__compose .brv-chat__input { flex: 1; margin: 0; }
+.brv-chat__btns { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.brv-chat__btns .brv-fix-btn { white-space: nowrap; }
+.brv-chat__input { font-family: inherit; }
+.brv-chat__text { color: #d0d6de; }
+.brv-chat__msg--user .brv-chat__text { color: #e6ebf2; }
 .brv-notice { margin: 0 16px; padding: 8px 12px; border-radius: 6px; font-size: 12px; background: #eef4ff; color: #1e3a8a; }
 .brv-notice--error { background: #fdecec; color: #8a1c1c; }
 .brv-notice--success { background: #e9f8ee; color: #14532d; }
@@ -787,7 +812,7 @@ export default {
 .brv-suggest__hint { margin-left: 6px; font-size: 11px; font-weight: 400; color: #778; }
 .brv-suggest__item { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: 12px; line-height: 1.5; }
 .brv-suggest__item + .brv-suggest__item { border-top: 1px solid #eef1f4; }
-.brv-suggest__text { flex: 1; }
+.brv-suggest__text { flex: 1; color: #d0d6de; }
 .brv-suggest__run { flex-shrink: 0; padding: 3px 10px; font-size: 11px; }
 .brv-chat { margin-top: 10px; border-top: 1px dashed #c9d0d8; padding-top: 8px; }
 .brv-chat__msg { margin: 6px 0; font-size: 12px; }

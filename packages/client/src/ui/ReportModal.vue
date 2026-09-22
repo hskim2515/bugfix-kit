@@ -25,6 +25,10 @@
         <!-- 헤더 -->
         <div class="bug-report-header">
           <span class="bug-report-title">버그 신고 <span v-if="hotkey" class="bug-report-shortcut">{{ hotkey }}</span></span>
+          <!-- 신고 대상 (앱 / 버그 신고 도구 자체 등 여러 프로젝트가 등록된 경우) -->
+          <span v-if="projects.length > 1" class="bug-target" title="어디에 대한 신고인지">
+            <button v-for="p in projects" :key="p.key" :class="{ 'bug-target__on': project === p.key }" @click="setProject(p.key)">{{ p.label }}</button>
+          </span>
           <button class="bug-report-close" @click="close">✕</button>
         </div>
 
@@ -61,14 +65,6 @@
                 <div v-else class="screenshot-placeholder">캡처 중...</div>
               </div>
               <div class="screenshot-hint">이미지를 붙여넣기(Ctrl+V)해도 캡처 대신 쓸 수 있습니다.</div>
-            </div>
-
-            <!-- 신고 대상 (앱 / 버그 신고 도구 자체 등 여러 프로젝트가 등록된 경우) -->
-            <div v-if="projects.length > 1" class="bug-report-section">
-              <div class="bug-report-label">신고 대상</div>
-              <div class="severity-group">
-                <button v-for="p in projects" :key="p.key" :class="['severity-btn', { active: project === p.key }]" @click="setProject(p.key)">{{ p.label }}</button>
-              </div>
             </div>
 
             <!-- 심각도 -->
@@ -748,6 +744,11 @@ export default {
 </script>
 
 <style scoped>
+.bug-target { margin-left: auto; margin-right: 12px; display: inline-flex; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; overflow: hidden; }
+.bug-target button { border: 0; padding: 4px 11px; font-size: 11px; background: transparent; color: #aab; cursor: pointer; }
+.bug-target button + button { border-left: 1px solid rgba(255,255,255,0.18); }
+.bug-target__on { background: rgba(136,170,255,0.28); color: #fff; }
+.screenshot-hint { margin-top: 4px; font-size: 11px !important; color: #7f8a99 !important; }
 /* lhdt public/scss/components/_bug-report.scss 를 컴파일해 옮긴 것 - Web Component 안(shadow DOM)에서는 전역 CSS 가 닿지 않는다 */
 .bug-report-overlay {
   position: fixed;
