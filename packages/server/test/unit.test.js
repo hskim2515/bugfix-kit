@@ -9,6 +9,7 @@ import { progressLine, claudeSummary, sessionIdOf, resultTextOf } from '../src/c
 import { FileStore } from '../src/store.js';
 import { describe as describeCmd } from '../src/exec.js';
 import { parseSuggestions } from '../src/runner.js';
+import { Insights } from '../src/insights.js';
 
 test('parseResult: 첫 줄이 제목, 나머지가 본문', () => {
   assert.deepEqual(parseResult('# 제목\n## 원인\n내용'), { title: '제목', body: '## 원인\n내용' });
@@ -98,4 +99,24 @@ test('parseSuggestions: 추천 개선 절의 한 줄 항목만', () => {
   const body = '## 원인\n- 아님\n## 추천 개선\n- **첫째** 항목\n  - 들여쓴 건 무시\n2. 둘째\n## 검증\n- 아님';
   assert.deepEqual(parseSuggestions(body), ['첫째 항목', '둘째']);
   assert.deepEqual(parseSuggestions(''), []);
+});
+
+test('Insights 예약: 매 tick 현재 설정을 읽고, 시각이 지났고 오늘 안 돌았으면 한 번만', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bk-ins-'));
+  const cfg = { server: { dataDir: dir, insightsSchedule: '03:00' }, projects: { a: { name: 'a', baseBranch: 'main' } } };
+  const ins = new Insights(cfg, null, null, { info() {}, warn() {} });
+  const ran = [];
+  ins.enqueue = async (p) => { ran.push(`${p.name}@${p.baseBranch}`); };
+  await ins.tickSchedules(new Date(2026, 8, 22, 2, 59));
+  assert.deepEqual(ran, []);
+  // reload 처럼 객체 교체 + 프로젝트 추가
+  cfg.projects.a = { name: 'a', baseBranch: 'dev' };
+  cfg.projects.b = { name: 'b', baseBranch: 'main' };
+  await ins.tickSchedules(new Date(2026, 8, 22, 7, 30)); // 정각을 놓쳐도 실행
+  await ins.tickSchedules(new Date(2026, 8, 22, 7, 31)); // 같은 날 중복 없음
+  assert.deepEqual(ran, ['a@dev', 'b@main']);
+  delete cfg.projects.b; // 삭제된 프로젝트는 더 이상 실행 안 함
+  await ins.tickSchedules(new Date(2026, 8, 23, 3, 0));
+  assert.deepEqual(ran, ['a@dev', 'b@main', 'a@dev']);
+  assert.equal((await ins.state('a')).lastScheduledDate, '2026-09-23');
 });
