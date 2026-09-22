@@ -523,7 +523,7 @@
     }
     kg3d.width(el.clientWidth).height(el.clientHeight);
     kgRecompute();
-    if (force) { kgFitPending = true; kg3d.graphData(kMerged); }
+    if (force) { kgFitPending = true; kg3d.graphData(kMerged); setTimeout(() => kg3d.zoomToFit(600, 60, (n) => kShown.has(n.id)), 2500); }
     else kgRefresh();
   }
   function kgRefresh() { if (!kg3d) return; kg3d.nodeColor(kg3d.nodeColor()).nodeThreeObject(kg3d.nodeThreeObject()).linkColor(kg3d.linkColor()).linkDirectionalParticles(kg3d.linkDirectionalParticles()).nodeVisibility(kg3d.nodeVisibility()).linkVisibility(kg3d.linkVisibility()); }
