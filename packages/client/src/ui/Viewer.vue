@@ -378,8 +378,8 @@ export default {
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.viewer || ''; },
     projects() { return this.kit?.projects || []; },
-    // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)에서는 전부
-    viewProjects() { return this.kit?.options?.adminKey ? this.projects : this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
+    // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)은 목록을 한데 모아 보여 주고 프로젝트를 골라 열므로 전환 탭이 없다
+    viewProjects() { return this.kit?.options?.adminKey ? [] : this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
     prNumber() { return this.detail?.fixPrNumber || (this.detail?.fixPrUrl || '').split('/').pop(); },
     logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },

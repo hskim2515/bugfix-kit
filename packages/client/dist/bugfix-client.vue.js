@@ -6420,10 +6420,10 @@ const SQ = /* @__PURE__ */ Hr(xc, [["render", cw], ["__scopeId", "data-v-eb1adf0
       var e;
       return ((e = this.kit) == null ? void 0 : e.projects) || [];
     },
-    // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)에서는 전부
+    // 앱 사용자에게는 고칠 수 있는(canFix) 프로젝트만 보인다. 관리 콘솔(adminKey)은 목록을 한데 모아 보여 주고 프로젝트를 골라 열므로 전환 탭이 없다
     viewProjects() {
       var e, A;
-      return (A = (e = this.kit) == null ? void 0 : e.options) != null && A.adminKey ? this.projects : this.projects.filter((t) => {
+      return (A = (e = this.kit) == null ? void 0 : e.options) != null && A.adminKey ? [] : this.projects.filter((t) => {
         var r;
         return ((r = this.info[t.key]) == null ? void 0 : r.canFix) !== !1;
       });
@@ -7360,7 +7360,7 @@ function bQ(e, A, t, r, s, n) {
     ], 32)) : p("", !0)
   ]);
 }
-const DQ = /* @__PURE__ */ Hr(ww, [["render", bQ], ["__scopeId", "data-v-5f718cb4"]]);
+const DQ = /* @__PURE__ */ Hr(ww, [["render", bQ], ["__scopeId", "data-v-d9691c69"]]);
 export {
   SQ as ReportModal,
   DQ as Viewer,

@@ -123,27 +123,25 @@
       <div class="card checklist" id="checklist" hidden></div>
       <div class="cards" id="cards"></div>
       <div class="toolbar">
-        <span class="seg" id="projSeg"></span>
         <span class="seg" id="filterSeg">
           <button data-f="all" class="on">전체</button><button data-f="active">진행 중</button><button data-f="FAILED">실패</button>
           <button data-f="PR_OPENED">PR 열림</button><button data-f="MERGED">병합됨</button><button data-f="NONE">요청 전</button>
         </span>
         <input type="search" id="q" placeholder="문제·보고자 검색">
       </div>
-      <table><thead><tr><th>#</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead><tbody id="rows"></tbody></table>
+      <table><thead><tr><th>#</th><th class="pcol">프로젝트</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead><tbody id="rows"></tbody></table>
       <div class="empty" id="empty" hidden>리포트가 없습니다</div>
     </div>
 
     <!-- 제안 -->
     <div data-tab="insights" hidden>
       <div class="toolbar">
-        <span class="seg" id="iProjSeg"></span>
         <input type="search" id="iFocus" placeholder="특히 볼 것 (선택)" style="min-width:320px">
         <button class="btn primary" id="iRun">분석 실행</button>
         <span class="dim" id="iState"></span>
       </div>
       <details class="card" id="iLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="iLog"></pre></details>
-      <table><thead><tr><th style="width:70px">심각도</th><th>제안</th><th style="width:220px">파일</th><th style="width:60px">확신</th><th style="width:200px"></th></tr></thead><tbody id="iRows"></tbody></table>
+      <table><thead><tr><th style="width:70px">심각도</th><th class="pcol">프로젝트</th><th>제안</th><th style="width:220px">파일</th><th style="width:60px">확신</th><th style="width:200px"></th></tr></thead><tbody id="iRows"></tbody></table>
       <div class="empty" id="iEmpty">분석 실행을 누르면 AI 가 최근 리포트·커밋·코드를 읽고 고칠 점을 찾습니다 (5분 안팎, Claude 비용 발생)</div>
     </div>
 
@@ -240,7 +238,7 @@
   const $ = (s) => document.querySelector(s);
   const KEY = 'bugfix-admin-key';
   let key = localStorage.getItem(KEY) || '';
-  let data = null, settings = null, project = localStorage.getItem('bugfix-admin-project') || '', filter = 'all', q = '', kit = null, tab = 'reports', editing = null, secretProject = '';
+  let data = null, settings = null, filter = 'all', q = '', kit = null, tab = 'reports', editing = null, secretProject = '';
 
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
@@ -260,7 +258,6 @@
     if (!key) return showLogin();
     try {
       data = await api('GET', '/admin/overview');
-      if (!project || !data.projects.some((p) => p.name === project)) project = data.projects[0]?.name || '';
       ensureKit(); renderReports();
       $('#login').hidden = true; $('#app').hidden = false;
       if (!quick) loadChecklist();
@@ -296,7 +293,8 @@
   }
 
   function renderReports() {
-    const cur = data.projects.find((p) => p.name === project);
+    const multi = data.projects.length > 1;
+    document.querySelectorAll('.pcol').forEach((el) => { el.hidden = !multi; });
     const total = data.projects.reduce((n, p) => n + p.reports.length, 0);
     const running = data.running;
     $('#meta').textContent = `프로젝트 ${data.projects.length} · 리포트 ${total} · 큐 ${data.queue}`;
@@ -307,34 +305,40 @@
       </div>`).join('') + (running ? `
       <div class="card running"><h3>지금 진행 중 · ${esc(running.project)} #${running.bugReportId} <span class="pill p-${running.fixStatus}">${fixLabel[running.fixStatus]}</span> <span class="dim">${running.fixRequestedAt ? '요청 ' + ago(running.fixRequestedAt) : ''}</span></h3>
         <div>${esc((running.problem || '').slice(0, 160))}</div><pre class="log">${esc(running.logTail || '(로그 없음)')}</pre></div>` : '');
-    $('#projSeg').innerHTML = data.projects.map((p) => `<button data-p="${esc(p.name)}" class="${p.name === project ? 'on' : ''}">${esc(p.name)}</button>`).join('');
-    const rows = (cur?.reports || []).filter((r) => {
+    const rows = data.projects.flatMap((p) => p.reports.map((r) => ({ ...r, project: p.name }))).filter((r) => {
       const st = r.fixStatus || 'NONE';
       if (filter === 'active' && !['QUEUED', 'RUNNING'].includes(st)) return false;
       if (filter !== 'all' && filter !== 'active' && st !== filter) return false;
-      return !q || `${r.problem} ${r.reporter} ${r.fixSummary || ''}`.toLowerCase().includes(q.toLowerCase());
+      return !q || `${r.problem} ${r.reporter} ${r.project} ${r.fixSummary || ''}`.toLowerCase().includes(q.toLowerCase());
     }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
     $('#rows').innerHTML = rows.map((r) => { const st = r.fixStatus || 'NONE';
       const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
-      return `<tr class="r" data-id="${r.bugReportId}"><td>${r.bugReportId}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span></td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
+      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span></td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
     $('#empty').hidden = rows.length > 0;
   }
 
   // ── 제안 ──
-  let iProject = '', iTimer = null;
+  let iTimer = null;
   const sevPill = (s) => `<span class="pill ${s === 'HIGH' ? 'p-FAILED' : s === 'MEDIUM' ? 'p-PR_OPENED' : 'p-MERGED'}">${s}</span>`;
   async function loadInsights() {
     if (!data) return;
-    if (!iProject || !data.projects.some((p) => p.name === iProject)) iProject = project || data.projects[0]?.name || '';
-    $('#iProjSeg').innerHTML = data.projects.map((p) => `<button data-ip="${esc(p.name)}" class="${p.name === iProject ? 'on' : ''}">${esc(p.name)}</button>`).join('');
-    let st; try { st = await api('GET', `/admin/insights/${iProject}`); } catch (e) { $('#iState').textContent = e.message; return; }
-    const busy = ['QUEUED', 'RUNNING'].includes(st.status);
-    $('#iRun').disabled = busy;
-    $('#iState').textContent = busy ? `${st.status === 'QUEUED' ? '대기 중' : '분석 중'}…` : st.ranAt ? `마지막 분석 ${ago(st.ranAt)} · ${esc(st.head || '')}` : '';
-    $('#iLog').textContent = st.log || ''; $('#iLogWrap').open = busy; if (busy) $('#iLog').scrollTop = $('#iLog').scrollHeight;
-    const items = st.items || [];
+    const multi = data.projects.length > 1;
+    document.querySelectorAll('.pcol').forEach((el) => { el.hidden = !multi; });
+    // 프로젝트마다 따로 저장된 분석을 한 목록으로 - 상태·로그는 프로젝트 이름을 앞에 붙여 합친다
+    let states;
+    try { states = await Promise.all(data.projects.map(async (p) => ({ name: p.name, st: await api('GET', `/admin/insights/${p.name}`) }))); }
+    catch (e) { $('#iState').textContent = e.message; return; }
+    const isBusy = (st) => ['QUEUED', 'RUNNING'].includes(st.status);
+    const busy = states.some(({ st }) => isBusy(st));
+    $('#iRun').disabled = states.every(({ st }) => isBusy(st));
+    $('#iState').textContent = states.map(({ name, st }) => `${multi ? name + ': ' : ''}${isBusy(st) ? (st.status === 'QUEUED' ? '대기 중…' : '분석 중…') : st.ranAt ? `마지막 분석 ${ago(st.ranAt)}` : '분석 전'}`).join(' · ');
+    $('#iLog').textContent = states.filter(({ st }) => st.log).map(({ name, st }) => (multi ? `── ${name} ──\n` : '') + st.log).join('\n');
+    $('#iLogWrap').open = busy; if (busy) $('#iLog').scrollTop = $('#iLog').scrollHeight;
+    const items = states.flatMap(({ name, st }) => (st.items || []).map((it) => ({ ...it, project: name })));
+    const order = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    items.sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
     $('#iEmpty').hidden = items.length > 0 || busy;
-    $('#iRows').innerHTML = items.map((it) => `<tr><td>${sevPill(it.severity)}<div class="dim">${esc(it.kind)}</div></td>
+    $('#iRows').innerHTML = items.map((it) => `<tr data-ip="${esc(it.project)}"><td>${sevPill(it.severity)}<div class="dim">${esc(it.kind)}</div></td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(it.project)}</td>
       <td><div>${esc(it.title)}</div><div class="dim" style="white-space:pre-wrap;margin-top:4px">${esc(it.evidence)}</div><div style="margin-top:4px;color:#b9c3d0">→ ${esc(it.proposal)}</div></td>
       <td class="dim" style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all">${it.files.map(esc).join('<br>')}</td>
       <td class="dim">${Math.round((it.confidence || 0) * 100)}%</td>
@@ -442,12 +446,10 @@
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
     const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); return; }
-    const ip = e.target.closest('#iProjSeg button'); if (ip) { iProject = ip.dataset.ip; loadInsights(); return; }
-    const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
-    const op = e.target.closest('[data-open]'); if (op && kit) { kit.setProject(iProject); kit.openViewer(Number(op.dataset.open)); return; }
-    const pb = e.target.closest('#projSeg button'); if (pb) { project = pb.dataset.p; localStorage.setItem('bugfix-admin-project', project); renderReports(); return; }
+    const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
+    const op = e.target.closest('[data-open]'); if (op && kit) { kit.setProject(op.closest('tr')?.dataset.ip); kit.openViewer(Number(op.dataset.open)); return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
-    const tr = e.target.closest('tr.r'); if (tr && kit) { kit.setProject(project); kit.openViewer(Number(tr.dataset.id)); return; }
+    const tr = e.target.closest('tr.r'); if (tr && kit) { kit.setProject(tr.dataset.p); kit.openViewer(Number(tr.dataset.id)); return; }
     const pl = e.target.closest('#plist button'); if (pl) { editing = pl.dataset.p; renderProjects(); return; }
     const sp = e.target.closest('#splist button'); if (sp) { secretProject = sp.dataset.sp; renderSecrets(); return; }
     const sv = e.target.closest('[data-save]'); if (sv) {
@@ -469,7 +471,14 @@
   $('#delProject').onclick = async () => { if (!editing || !confirm(`${editing} 프로젝트 설정을 지울까요? (리포트 데이터는 남습니다)`)) return; try { await api('DELETE', `/admin/projects/${editing}`); editing = null; await loadSettings(); await load(); } catch (e) { alert(e.message); } };
   $('#saveServer').onclick = async () => { const b = {}; for (const k of ['port', 'claudeBin', 'pathExtra', 'javaHome', 'model', 'maxTurns', 'timeoutMinutes', 'verifyTimeoutMinutes', 'workDir', 'dataDir']) b[k] = $(`#s_${k}`).value; $('#smsg').textContent = '저장 중…'; try { const r = await api('PUT', '/admin/server', b); $('#smsg').textContent = r.restartNeeded ? '저장됨 - 포트는 재시작 뒤 적용' : '저장됨 - 바로 적용'; } catch (e) { $('#smsg').textContent = e.message; } };
   $('#loadLogs').onclick = loadLogs;
-  $('#iRun').onclick = async () => { if (!confirm(`${iProject} 을 분석할까요? (5분 안팎, Claude 비용 발생)`)) return; try { await api('POST', `/admin/insights/${iProject}`, { focus: $('#iFocus').value }); await loadInsights(); } catch (e) { alert(e.message); } };
+  $('#iRun').onclick = async () => {
+    const names = data.projects.map((p) => p.name);
+    if (!confirm(`${names.join(', ')} 을 분석할까요? (프로젝트마다 5분 안팎, Claude 비용 발생)`)) return;
+    const errs = [];
+    for (const name of names) { try { await api('POST', `/admin/insights/${name}`, { focus: $('#iFocus').value }); } catch (e) { errs.push(`${name}: ${e.message}`); } }
+    await loadInsights();
+    if (errs.length) alert(errs.join('\n'));
+  };
   $('#q').addEventListener('input', (e) => { q = e.target.value; renderReports(); });
   $('#refresh').addEventListener('click', () => { load(); if (settings) loadSettings(); });
   $('#logout').addEventListener('click', () => { localStorage.removeItem(KEY); key = ''; showLogin(); });
