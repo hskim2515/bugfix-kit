@@ -44,7 +44,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
-  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending }));
+  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy }));
 
   // ── 운영자 대시보드: /api/ui/ (nginx 가 /bugfix/ → /api/ 이면 https://…/bugfix/ui/) ──
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -174,6 +174,13 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     await runner.appendChat(p, r.bugReportId, 'user', message.trim());
     await runner.enqueueFollowUp(p, r.bugReportId, message.trim(), mode === 'change' ? 'change' : 'ask');
     return FileStore.fixState(await store.get(p.name, r.bugReportId));
+  }));
+
+  /** 열린 PR 을 정식 경로로 병합 (관리 콘솔·자동 병합 프로젝트용) */
+  pr.post('/reports/:id/merge', fixGuard, wrap(async (req) => {
+    const r = await load(req);
+    await runner.enqueueMerge(req.project, r.bugReportId);
+    return FileStore.fixState(await store.get(req.project.name, r.bugReportId));
   }));
 
   pr.post('/reports/:id/fix-sync', wrap(async (req) => {
