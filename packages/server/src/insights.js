@@ -13,7 +13,7 @@ const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)
 export class Insights {
   constructor(cfg, store, runner, log = console) {
     this.cfg = cfg; this.store = store; this.runner = runner; this.log = log;
-    this.timers = new Map();
+    this.timer = null;
     this.locks = new Map();
   }
 
@@ -176,20 +176,46 @@ ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
     return saved.bugReportId;
   }
 
-  /** 매일 정해진 시각(HH:MM)에 자동 실행 - server.insightsSchedule 또는 project.insights.schedule */
+  /**
+   * 매일 정해진 시각(HH:MM)에 자동 실행 - server.insightsSchedule 또는 project.insights.schedule.
+   * 전역 타이머 하나가 매 tick 마다 this.cfg.projects 를 새로 읽는다(콘솔 저장 → reload 의 수정·추가·삭제 반영).
+   * '예정 시각이 지났고 오늘 아직 안 돌았으면' 실행하고 날짜를 insights.json 의 lastScheduledDate 에 남겨 건너뜀·중복을 막는다.
+   */
   startSchedules() {
+    if (this.timer) return;
     for (const p of Object.values(this.cfg.projects)) {
-      const at = p.insights?.schedule || this.cfg.server.insightsSchedule;
-      if (!at || !/^\d{1,2}:\d{2}$/.test(at)) continue;
-      const tick = async () => {
-        const now = new Date();
+      const at = this.scheduleOf(p);
+      if (at) this.log.info(`[insights ${p.name}] 매일 ${at} 자동 분석`);
+    }
+    this.timer = setInterval(() => { this.tickSchedules().catch((e) => this.log.warn(`[insights] 예약 확인 실패: ${e.message}`)); }, 60_000);
+  }
+
+  stopSchedules() { clearInterval(this.timer); this.timer = null; }
+
+  scheduleOf(p) {
+    const at = p.insights?.schedule || this.cfg.server.insightsSchedule;
+    return at && /^\d{1,2}:\d{2}$/.test(at) ? at : null;
+  }
+
+  async tickSchedules(now = new Date()) {
+    if (this.ticking) return;
+    this.ticking = true;
+    try {
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const mins = now.getHours() * 60 + now.getMinutes();
+      for (const name of Object.keys(this.cfg.projects)) {
+        const p = this.cfg.projects[name]; // reload 뒤의 현재 객체
+        if (!p) continue;
+        const at = this.scheduleOf(p);
+        if (!at) continue;
         const [h, m] = at.split(':').map(Number);
-        if (now.getHours() === h && now.getMinutes() === m) {
-          try { await this.enqueue(p); } catch (e) { this.log.warn(`[insights ${p.name}] 예약 실행 실패: ${e.message}`); }
-        }
-      };
-      this.timers.set(p.name, setInterval(tick, 60_000));
-      this.log.info(`[insights ${p.name}] 매일 ${at} 자동 분석`);
+        if (mins < h * 60 + m) continue;
+        if ((await this.state(p.name)).lastScheduledDate === today) continue;
+        await this.save(p.name, { lastScheduledDate: today }); // 먼저 기록 - 실패(진행 중 등)해도 오늘은 다시 시도하지 않음
+        try { await this.enqueue(p); } catch (e) { this.log.warn(`[insights ${p.name}] 예약 실행 실패: ${e.message}`); }
+      }
+    } finally {
+      this.ticking = false;
     }
   }
 }
