@@ -28,6 +28,27 @@
 </script>
 ```
 
+## React 앱에서 쓰기
+
+Web Component 빌드를 그대로 쓴다(React 버전·상태 라이브러리 무관). `main.tsx` 에서 한 번 만들고 `mount()`.
+
+```tsx
+import { createBugfix, reduxMiddleware } from 'bugfix-kit/client';   // ESM (Vue 런타임 포함, ~115KB gzip)
+
+const mw = reduxMiddleware();                                       // Redux 면 (Zustand 는 zustandSource(useStore))
+export const store = configureStore({ reducer, middleware: (g) => g().concat(mw) });
+
+export const kit = createBugfix({
+  endpoint: import.meta.env.VITE_BUGFIX_ENDPOINT, project: 'myapp', apiKey: import.meta.env.VITE_BUGFIX_KEY,
+  user: () => auth.user?.id,
+  context: () => ({ route: window.location.pathname, selection: store.getState().selection }),
+  capture: { canvases: () => [document.querySelector('canvas')!] },            // WebGL 캔버스가 있으면 (preserveDrawingBuffer)
+  interceptors: { console: true, network: { fetch: true, xhr: true }, router: true, mutation: mw.source },   // router: true = history API 패치(react-router 포함)
+  projects: [{ key: 'myapp', label: '앱' }, { key: 'bugfix-kit', label: '버그 신고 도구' }],
+}).mount();                                                          // <bugfix-report-modal>·<bugfix-viewer> 를 body 에 붙임
+```
+어디서든 `kit.openReport()` / `kit.openViewer()` (또는 Shift+F9 / Shift+F10). 타입은 `types/index.d.ts` 로 제공.
+
 ## Vue 3 앱에서 쓰기
 
 ```js

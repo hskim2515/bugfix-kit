@@ -168,3 +168,34 @@ export function installEvents(emitter, { max = 80, skip = [] } = {}) {
   emitter.emit = (type, payload) => { if (!skipSet.has(type)) evs.push({ time: localTime(), type }); return orig(type, payload); };
   return evs.get;
 }
+
+// ── Redux / Zustand 등 "액션·상태 변화" 어댑터 ──────────────────────────────
+/**
+ * Redux 미들웨어 - 디스패치된 액션을 mutation 로그로 모은다.
+ *   const mw = reduxMiddleware();
+ *   const store = configureStore({ reducer, middleware: (g) => g().concat(mw) });
+ *   createBugfix({ interceptors: { mutation: mw.source } });
+ */
+export function reduxMiddleware() {
+  const listeners = new Set();
+  const mw = () => (next) => (action) => {
+    const type = typeof action === 'function' ? '(thunk)' : String(action?.type ?? '(unknown)');
+    for (const fn of listeners) { try { fn({ type, payload: typeof action === 'object' ? action.payload : undefined }); } catch { /* 무시 */ } }
+    return next(action);
+  };
+  mw.source = { subscribe: (fn) => { listeners.add(fn); return () => listeners.delete(fn); } };
+  return mw;
+}
+
+/**
+ * Zustand 스토어 - 상태 변화를 mutation 로그로 (바뀐 최상위 키만 기록).
+ *   createBugfix({ interceptors: { mutation: zustandSource(useStore) } });
+ */
+export function zustandSource(useStore) {
+  return {
+    subscribe: (fn) => useStore.subscribe((state, prev) => {
+      const changed = Object.keys(state).filter((k) => state[k] !== prev?.[k]);
+      fn({ type: `set(${changed.join(',') || '?'})`, payload: Object.fromEntries(changed.slice(0, 5).map((k) => [k, state[k]])) });
+    }),
+  };
+}

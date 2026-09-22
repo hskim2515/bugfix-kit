@@ -1,21 +1,26 @@
 {
   "name": "@bugfix-kit/client",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "브라우저 SDK - 콘솔·네트워크·상태 변화·화면을 모아 버그 리포트를 보내고, Claude 자동 수정 진행을 보는 UI (Web Component)",
   "type": "module",
   "main": "dist/bugfix-client.js",
   "module": "dist/bugfix-client.js",
   "exports": {
     ".": {
+      "types": "./types/index.d.ts",
       "import": "./dist/bugfix-client.js",
       "default": "./dist/bugfix-client.iife.js"
     },
-    "./vue": "./dist/bugfix-client.vue.js",
+    "./vue": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/bugfix-client.vue.js"
+    },
     "./dist/*": "./dist/*"
   },
   "files": [
     "dist",
     "src",
+    "types",
     "README.md"
   ],
   "scripts": {
@@ -29,5 +34,6 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.1.4",
     "vite": "^5.4.8"
-  }
+  },
+  "types": "types/index.d.ts"
 }

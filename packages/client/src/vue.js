@@ -4,5 +4,6 @@
 //   <ReportModal :kit="kit" @open-viewer="viewer.open()" />  <Viewer ref="viewer" :kit="kit" />
 export { createBugfix } from './core/kit.js';
 export { captureScreen } from './core/capture.js';
+export { reduxMiddleware, zustandSource } from './core/interceptors.js';
 export { default as ReportModal } from './ui/ReportModal.vue';
 export { default as Viewer } from './ui/Viewer.vue';

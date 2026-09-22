@@ -5,6 +5,7 @@ import { createBugfix } from './core/kit.js';
 
 export { createBugfix };
 export { captureScreen } from './core/capture.js';
+export { reduxMiddleware, zustandSource } from './core/interceptors.js';
 
 /** Web Component 등록 - <bugfix-report-modal>, <bugfix-viewer>. 두 번 불러도 안전 */
 export function register() {
