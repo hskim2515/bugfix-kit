@@ -26,9 +26,13 @@
         <div class="bug-report-header">
           <span class="bug-report-title">버그 신고 <span v-if="hotkey" class="bug-report-shortcut">{{ hotkey }}</span></span>
           <!-- 신고 대상 (앱 / 버그 신고 도구 자체 등 여러 프로젝트가 등록된 경우) -->
-          <span v-if="projects.length > 1" class="bug-target" title="어디에 대한 신고인지">
-            <button v-for="p in projects" :key="p.key" :class="{ 'bug-target__on': project === p.key }" @click="setProject(p.key)">{{ p.label }}</button>
+          <span v-if="appProjects.length > 1" class="bug-target" title="어디에 대한 신고인지">
+            <button v-for="p in appProjects" :key="p.key" :class="{ 'bug-target__on': project === p.key }" @click="setProject(p.key)">{{ p.label }}</button>
           </span>
+          <!-- 운영자만 고치는 프로젝트(예: 버그 신고 도구 자체)는 체크박스로 - 앱 사용자는 신고만 한다 -->
+          <label v-if="toolProject" class="bug-target-tool" :title="`${toolProject.label} 쪽으로 신고합니다 (운영자가 처리)`">
+            <input type="checkbox" :checked="project === toolProject.key" @change="setProject($event.target.checked ? toolProject.key : appProjects[0]?.key)"> {{ toolProject.label }} 문제
+          </label>
           <button class="bug-report-close" @click="close">✕</button>
         </div>
 
@@ -476,11 +480,15 @@ export default {
       saveStatus: '서버 저장',
       severityOptions: SEVERITY_OPTIONS,
       project: null,
+      info: {},
     };
   },
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.report || ''; },
     projects() { return this.kit?.projects || []; },
+    // canFix=false(운영자 전용) 프로젝트는 '도구 문제' 체크박스로, 나머지는 신고 대상 선택으로
+    appProjects() { return this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
+    toolProject() { return this.projects.find((p) => this.info[p.key]?.canFix === false) || null; },
     serverEnabled() { return !!this.kit?.api?.enabled; },
 
     tabs() {
@@ -573,6 +581,7 @@ export default {
     async openReport() {
       if (this.isCapturing || this.isOpen) return;
       this.project = this.kit?.project || null;
+      if (this.kit?.projectInfo) this.kit.projectInfo().then((i) => { this.info = { ...i }; });
       this.problemDesc = '';
       this.reproSteps = '';
       this.expectedResult = '';
@@ -744,6 +753,8 @@ export default {
 </script>
 
 <style scoped>
+.bug-target-tool { margin-left: 10px; margin-right: 12px; font-size: 11px; color: #aab; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.bug-target-tool input { margin: 0; }
 .bug-target { margin-left: auto; margin-right: 12px; display: inline-flex; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; overflow: hidden; }
 .bug-target button { border: 0; padding: 4px 11px; font-size: 11px; background: transparent; color: #aab; cursor: pointer; }
 .bug-target button + button { border-left: 1px solid rgba(255,255,255,0.18); }
