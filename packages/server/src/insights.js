@@ -3,7 +3,7 @@ import path from 'node:path';
 import { runClaudeStream, claudeSummary } from './claude.js';
 import { firstLine, hhmmss, nowIso } from './util.js';
 
-const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(git blame:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)', 'Bash(find:*)', 'Bash(wc:*)', 'Write(.bugfix/insights.json)'];
+const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(git blame:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)','Bash(wc:*)', 'Write(.bugfix/insights.json)'];
 
 /**
  * 사람이 신고하기 전에 AI 가 고칠 점을 먼저 찾는다.
@@ -115,7 +115,7 @@ export class Insights {
       let out;
       try {
         out = await runClaudeStream(ex, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
-          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', '30', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
           (line) => { pending.push(this.logLine(name, `  ${line}`).catch((e) => this.log.warn(`[insights ${name}] 로그 기록 실패: ${e.message}`))); });
       } finally {
         await Promise.all(pending);
