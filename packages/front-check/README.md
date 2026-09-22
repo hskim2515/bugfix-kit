@@ -57,8 +57,24 @@ export default {
 };
 ```
 
-로그인 `type`: `none` · `form`(계정 파일 첫 줄 아이디, 둘째 줄 비밀번호 / `FC_USER`·`FC_PASS`) · `storage`(localStorage 주입).
-자격 값은 로그와 result.json 어디에도 남지 않는다.
+## 로그인
+
+앱마다 인증이 다르므로(폼·SSO·MFA·토큰) **로그인된 브라우저 상태 파일(storageState = 쿠키+localStorage)** 을 공통으로 쓴다.
+
+```bash
+npx front-check login              # 폼 자격이 있으면 자동, 없으면 창을 띄워 사람이 로그인(SSO·MFA) → 상태 파일 저장
+npx front-check check --scenario main   # login.type: 'state' 면 그 파일을 주입해 로그인된 채로 시작
+```
+
+| type | 설명 |
+|---|---|
+| `state` | 상태 파일 주입. `done` 선택자가 안 뜨면(만료) `form` 자격이 있을 때만 자동 갱신, 없으면 "다시 login" 으로 명확히 실패 |
+| `form` | 아이디·비밀번호 폼. 계정 파일(첫 줄 아이디, 둘째 줄 비밀번호, 600) 또는 `FC_USER`/`FC_PASS`. `saveState` 로 상태 파일도 저장 |
+| `storage` | localStorage 만 주입(토큰 방식 앱) |
+| `custom` | `run(page, { baseUrl, config })` 함수 - 서비스 계정으로 토큰 발급 등 앱이 직접 |
+| `none` | 로그인 없음 |
+
+상태 파일은 도메인에 묶이고 기계에는 묶이지 않으므로, 개발 PC 에서 만들어 서버로 복사해도 된다. 자격 값은 로그와 result.json 어디에도 남지 않는다.
 
 ## bugfix-server 와 함께
 

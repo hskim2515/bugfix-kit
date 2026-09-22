@@ -39,7 +39,8 @@ npx front-check check --steps '[{"goto":"/"},{"click":{"text":"레이어"}},{"wa
 
 ## 하지 말 것
 
-- 계정·토큰을 절차나 설정에 직접 쓰지 않는다. 로그인은 설정의 `login.account` 파일 / `FC_USER`·`FC_PASS` 로만.
+- 계정·토큰을 절차나 설정에 직접 쓰지 않는다. 로그인은 저장된 상태 파일(`login.type: 'state'`, `npx front-check login` 으로 생성) 또는 계정 파일 / `FC_USER`·`FC_PASS` 로만.
+- "로그인 상태 파일이 없습니다 / 세션이 만료됐습니다" 로 실패하면 코드 문제가 아니다 - 사람이 `npx front-check login` 을 다시 실행해야 한다고 결과에 적고, 로그인 없이 볼 수 있는 부분만 확인한다.
 - 결과 디렉터리(`.bugfix/before`, `.bugfix/after`)는 커밋하지 않는다(`.bugfix/` 는 이미 제외).
 - 헤드리스에서 WebGL 은 소프트웨어 렌더라 느리다 - `waitFor` 를 넉넉히(2~4초) 준다. 지형·타일이 다 안 그려졌다고 버그로 보지 않는다.
 - 스크린샷이 전부 검거나 비어 있으면 로그인 실패나 서빙 주소 문제다 - `result.json` 의 `login`·`fatal`·`failedRequests` 를 먼저 본다.

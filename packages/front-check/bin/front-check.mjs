@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { check, compareDirs } from '../src/index.js';
+import { check, compareDirs, recordLogin } from '../src/index.js';
 import { summarize } from '../src/report.js';
 
 const HELP = `front-check - 헤드리스 브라우저로 프론트 화면을 확인한다
@@ -19,6 +19,8 @@ const HELP = `front-check - 헤드리스 브라우저로 프론트 화면을 확
     --headed                          브라우저 창을 보이게
     --no-serve                        설정의 serve 를 무시
     --no-docker                       docker 폴백 금지
+  front-check login [--url base] [--out stateFile] [--wait sec] [--headed]
+                                      로그인 상태 파일(쿠키+localStorage) 만들기 - 폼 자격이 있으면 자동, 없으면 창을 띄워 사람이 로그인(SSO·MFA)
   front-check compare <before> <after> [--out dir]
   front-check init                    설정 템플릿 + Claude 스킬(.claude/skills/frontend-check) 복사
 
@@ -48,6 +50,11 @@ try {
     if (flags.json) console.log(JSON.stringify({ ok: r.ok, outDir: r.outDir, ...r.result }, null, 2));
     else console.log(r.text);
     process.exit(r.ok ? 0 : 1);
+  }
+  if (cmd === 'login') {
+    const file = await recordLogin({ config: flags.config, url: flags.url, out: flags.out, wait: flags.wait ? Number(flags.wait) : undefined, headed: !!flags.headed, noDocker: flags.docker === false, log });
+    console.log(`로그인 상태 저장: ${file}\n검사에서 쓰려면 설정에 login: { type: 'state', file: '${file}', done: '<로그인 뒤 보이는 선택자>' }`);
+    process.exit(0);
   }
   if (cmd === 'compare') {
     const [before, after] = rest;

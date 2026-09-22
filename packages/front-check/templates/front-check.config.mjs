@@ -5,15 +5,19 @@ export default {
   baseUrl: process.env.FC_BASE_URL || '',
   serve: { dir: 'dist', port: 4173, spa: true, proxy: { /* '/api': 'https://dev.example.com' */ } },
 
-  // 로그인: none | form | storage
+  // 로그인: none | state | form | storage | custom  (앱마다 인증이 달라 "로그인된 브라우저 상태 파일" 을 공통으로 쓴다)
+  //  - state : `npx front-check login` 으로 만든 상태 파일(쿠키+localStorage)을 주입해 시작. SSO·MFA 도 한 번 사람이 로그인해 저장하면 됨.
+  //            done 선택자가 안 뜨면(만료) form 자격이 있을 때만 자동 갱신, 없으면 명확히 실패
+  //  - form  : 아이디·비밀번호 폼 (계정 파일 첫 줄 아이디, 둘째 줄 비밀번호 / FC_USER·FC_PASS). state 를 만드는 수단으로도 쓴다
+  //  - custom: run(page, { baseUrl }) 함수로 앱이 직접 (서비스 계정 토큰 발급 → localStorage 주입 등)
   login: {
-    type: 'form',
-    url: '/login',
-    user: '#username',
-    pass: '#password',
-    submit: 'button[type=submit]',
-    done: '#app .main',                    // 로그인 뒤 나타나는 요소
-    account: '~/.config/myapp/e2e-account', // 첫 줄 아이디, 둘째 줄 비밀번호 (chmod 600). 또는 FC_USER/FC_PASS
+    type: 'state',
+    file: '~/.config/myapp/front-check-state.json',
+    done: '#app .main',                    // 로그인된 화면에만 있는 요소
+    form: {                                // 있으면 login 명령·만료 갱신에 쓴다 (없으면 창을 띄워 사람이 로그인)
+      url: '/login', user: '#username', pass: '#password', submit: 'button[type=submit]',
+      account: '~/.config/myapp/e2e-account',
+    },
   },
 
   browser: { viewport: [1440, 900], webgl: 'swiftshader', timeoutMs: 30000 },

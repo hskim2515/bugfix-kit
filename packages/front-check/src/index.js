@@ -3,7 +3,7 @@ import path from 'node:path';
 import { loadConfig } from './config.js';
 import { launchBrowser } from './browser.js';
 import { startServer } from './serve.js';
-import { login } from './login.js';
+import { login, stateFileFor, saveState } from './login.js';
 import { runSteps } from './steps.js';
 import { attachCollectors } from './collect.js';
 import { writeReport } from './report.js';
@@ -55,7 +55,12 @@ export async function check(opt = {}) {
   const data = { baseUrl, scenario: scenarioName, steps: [], failures: [], screenshots: [], collected: {}, console: [], pageErrors: [], failedRequests: [], login: null, fatal: null };
   try {
     browser = await launchBrowser(cfg, { noDocker: opt.noDocker, headed: opt.headed, log });
-    const context = await browser.newContext({ viewport: { width: cfg.browser.viewport[0], height: cfg.browser.viewport[1] }, locale: cfg.browser.locale, ignoreHTTPSErrors: true });
+    const stateFile = stateFileFor(cfg);
+    const context = await browser.newContext({
+      viewport: { width: cfg.browser.viewport[0], height: cfg.browser.viewport[1] }, locale: cfg.browser.locale, ignoreHTTPSErrors: true,
+      // 저장된 로그인 상태(쿠키+localStorage)가 있으면 로그인된 채로 시작
+      ...(stateFile && fs.existsSync(stateFile) ? { storageState: stateFile } : {}),
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(cfg.browser.timeoutMs);
     const col = attachCollectors(page, cfg);
@@ -80,4 +85,37 @@ export async function check(opt = {}) {
   if (opt.compare) data.compare = compareDirs(path.resolve(opt.compare), outDir, outDir);
   const rep = writeReport(outDir, data, cfg.thresholds);
   return { ...rep, result: data, outDir };
+}
+
+/**
+ * `front-check login`: 로그인 상태 파일을 만든다.
+ *  - form 자격(계정 파일/FC_USER·FC_PASS)이 있으면 헤드리스로 폼 로그인 → 저장
+ *  - 없으면 창을 띄워 사람이 로그인(SSO·MFA 포함) → done 선택자가 뜨면(또는 --wait 초 뒤) 저장
+ */
+export async function recordLogin(opt = {}) {
+  const log = opt.log || console;
+  const cfg = await loadConfig(opt.config);
+  const l = cfg.login || {};
+  const file = path.resolve(opt.out || stateFileFor({ ...cfg, login: { ...l, type: 'state' } }) || path.join(cfg.dir, '.front-check-state.json'));
+  const baseUrl = opt.url || cfg.baseUrl || (cfg.serve ? `http://127.0.0.1:${cfg.serve.port}` : '');
+  if (!baseUrl) throw new Error('대상 주소가 없습니다: --url 또는 설정 baseUrl');
+  const form = { ...(l.form || {}), ...Object.fromEntries(['url', 'user', 'pass', 'submit', 'done', 'account', 'timeoutMs'].filter((k) => l[k] !== undefined).map((k) => [k, l[k]])) };
+  const { readAccount } = await import('./config.js');
+  const canForm = !!(form.user && form.pass && readAccount(form));
+  const browser = await launchBrowser(cfg, { noDocker: opt.noDocker, headed: !canForm || opt.headed, log });
+  try {
+    const context = await browser.newContext({ viewport: { width: cfg.browser.viewport[0], height: cfg.browser.viewport[1] }, locale: cfg.browser.locale, ignoreHTTPSErrors: true });
+    const page = await context.newPage();
+    if (canForm) {
+      await login(page, { ...cfg, login: { ...form, type: 'form' } }, baseUrl, log);
+    } else {
+      log.info(`[front-check] 브라우저 창에서 로그인하세요 → ${new URL(form.url || '/', baseUrl).href}`);
+      await page.goto(new URL(form.url || '/', baseUrl).href, { waitUntil: 'domcontentloaded' });
+      if (form.done) await page.waitForSelector(form.done, { timeout: (opt.wait || 300) * 1000 });
+      else await page.waitForTimeout((opt.wait || 120) * 1000);
+    }
+    await saveState(page, file, log);
+    await context.close();
+  } finally { await browser.close().catch(() => {}); }
+  return file;
 }
