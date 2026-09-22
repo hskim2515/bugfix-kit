@@ -196,7 +196,7 @@ export function adminRouter(cfg, store, runner, log = console) {
   r.get('/logs', wrap(async (req) => {
     const n = Math.min(500, Number(req.query.n) || 200);
     const j = spawnSync('journalctl', ['--user', '-u', 'bugfix-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { encoding: 'utf8', timeout: 20000 });
-    if (j.status === 0 && j.stdout.trim()) return { source: 'journalctl', text: j.stdout };
+    if (j.status === 0 && j.stdout.trim() && !/^-- No entries --/.test(j.stdout.trim())) return { source: 'journalctl', text: j.stdout };
     const s = spawnSync('systemctl', ['--user', 'status', 'bugfix-server', '-n', String(n), '--no-pager'], { encoding: 'utf8', timeout: 20000 });
     return { source: 'systemctl', text: s.stdout || s.stderr || '(로그를 읽을 수 없습니다 - journald 사용자 로그가 꺼져 있을 수 있습니다)' };
   }));
