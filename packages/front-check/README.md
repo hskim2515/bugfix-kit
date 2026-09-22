@@ -52,6 +52,7 @@ export default {
   login: { type: 'form', url: '/login', user: '#username', pass: '#password', submit: 'button[type=submit]', done: '#app .main', account: '~/.config/myapp/e2e-account' },
   browser: { viewport: [1440, 900], webgl: 'swiftshader', timeoutMs: 30000 },
   thresholds: { consoleErrors: 0, pageErrors: 0, failedRequests: null },
+  blockRequests: [/prod\.example\.com/],   // 운영 서버로 나가는 요청은 브라우저에서 차단 (잘못 빌드된 dist 사고 방지)
   scenarios: { main: [{ goto: '/' }, { waitFor: 2000 }, { screenshot: 'main' }] },
   fromContext: (ctx) => [{ goto: new URL(ctx.url).pathname }, { waitFor: 2500 }, { screenshot: 'context' }],
 };

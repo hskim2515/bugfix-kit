@@ -48,7 +48,7 @@ projects:
             run: ../../node_modules/.bin/sass main.scss ../css/ko/main.css --style=compressed --no-source-map
         verify:
           - npx vue-cli-service lint --no-fix
-          - npm run build
+          - npm run build-develop   # 어떤 모드로 빌드하는지 확인 - 검증·화면 확인이 운영 서버를 보게 하면 안 된다
       - name: back
         match: lhdt-rest/
         dir: .

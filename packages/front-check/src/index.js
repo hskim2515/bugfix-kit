@@ -67,6 +67,16 @@ export async function check(opt = {}) {
     });
     const page = await context.newPage();
     page.setDefaultTimeout(cfg.browser.timeoutMs);
+    // 운영 서버 등 절대 건드리면 안 되는 곳으로 가는 요청은 브라우저에서 끊는다 (잘못된 모드로 빌드된 dist 가 운영을 보는 사고 방지)
+    if (cfg.blockRequests?.length) {
+      const blocked = [];
+      await page.route('**/*', (route) => {
+        const u = route.request().url();
+        if (cfg.blockRequests.some((p) => (p instanceof RegExp ? p.test(u) : u.includes(p)))) { blocked.push(u); return route.abort('blockedbyclient'); }
+        return route.continue();
+      });
+      data.blocked = blocked;
+    }
     const col = attachCollectors(page, cfg);
     try {
       data.login = await login(page, cfg, baseUrl, log);

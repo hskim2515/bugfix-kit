@@ -24,6 +24,7 @@ export function summarize(r, outDir) {
   for (const m of (r.console || []).filter((m) => m.type === 'error').slice(0, 5)) lines.push(`    ✗ ${m.text.split('\n')[0].slice(0, 160)}${m.at ? `  (${m.at})` : ''}`);
   for (const e of (r.pageErrors || []).slice(0, 3)) lines.push(`    ✗ ${e.message.split('\n')[0].slice(0, 160)}`);
   for (const q of (r.failedRequests || []).slice(0, 5)) lines.push(`    ✗ ${q.status} ${q.method} ${q.url.slice(0, 120)}`);
+  if (r.blocked?.length) lines.push(`  ⚠ 차단된 요청 ${r.blocked.length}건 (blockRequests): ${r.blocked[0].slice(0, 100)} …`);
   for (const f of r.failures || []) lines.push(`  절차 실패: ${f}`);
   for (const st of (r.steps || []).filter((x) => x.box || x.value !== undefined)) {
     if (x_has(st, 'box')) lines.push(`  measure ${JSON.stringify(st.step.measure)}: ${st.box ? `${Math.round(st.box.width)}×${Math.round(st.box.height)} @${Math.round(st.box.x)},${Math.round(st.box.y)}` : '없음'} ${st.css ? `display=${st.css.display} overflowY=${st.css.overflowY} height=${st.css.height} scroll=${st.css.scrollHeight}/${st.css.clientHeight}` : ''}`);

@@ -28,6 +28,8 @@ const DEFAULTS = {
   // 콘솔·요청에서 무시할 것 (정규식 또는 문자열)
   ignoreConsole: [/Failed to obtain terrain tile/, /Mesh buffer doesn't exist/, /favicon\.ico/],
   ignoreRequests: [/favicon\.ico/],
+  // 절대 나가면 안 되는 요청(운영 서버 등) - 브라우저 단에서 차단한다. 정규식 또는 문자열
+  blockRequests: [],
   // 실패로 볼 기준. null 이면 세지 않는다
   thresholds: { consoleErrors: 0, pageErrors: 0, failedRequests: null },
   scenarios: {},
@@ -55,6 +57,7 @@ export async function loadConfig(file) {
     thresholds: { ...DEFAULTS.thresholds, ...(cfg.thresholds || {}) },
     ignoreConsole: [...DEFAULTS.ignoreConsole, ...(cfg.ignoreConsole || [])],
     ignoreRequests: [...DEFAULTS.ignoreRequests, ...(cfg.ignoreRequests || [])],
+    blockRequests: [...DEFAULTS.blockRequests, ...(cfg.blockRequests || [])],
     scenarios: cfg.scenarios || {},
     file: found,
     dir: found ? path.dirname(found) : process.cwd(),
