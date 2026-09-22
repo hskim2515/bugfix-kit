@@ -171,8 +171,7 @@
         </div>
         <div class="actions">
           <button class="btn primary" id="saveProject">저장</button>
-          <button class="btn" id="newProject">새 프로젝트</button>
-          <button class="btn danger" id="delProject">삭제</button>
+          <button class="btn danger" id="delProject" hidden>삭제</button>
           <span class="msg" id="pmsg"></span>
         </div>
       </div>
@@ -355,7 +354,10 @@
   const csv = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
 
   // ── 프로젝트 ──
+  // 서버 하나에 앱 하나가 기본 - 프로젝트가 여럿(예: 프론트/백엔드 저장소 분리)일 때만 목록·삭제를 보인다. 첫 프로젝트는 빈 폼으로 만든다
   function renderProjects() {
+    const multi = settings.projects.length > 1;
+    $('#plist').hidden = !multi; $('#delProject').hidden = !multi;
     $('#plist').innerHTML = settings.projects.map((p) => `<button data-p="${esc(p.name)}" class="${editing === p.name ? 'on' : ''}"><div class="n">${esc(p.name)}</div><div class="d">${esc(p.githubRepo)} · ${esc(p.baseBranch || 'main')} · 리포트 ${p.reports}</div></button>`).join('');
     if (editing && !settings.projects.some((p) => p.name === editing)) editing = null;
     if (!editing && settings.projects.length) editing = settings.projects[0].name;
@@ -400,6 +402,7 @@
       + secretRow('global', 'FC_PASS', '테스트 계정 비밀번호', g.FC_PASS, '', true)
       + (g.extra?.length ? `<div class="dim">그 밖의 키: ${g.extra.map(esc).join(', ')}</div>` : '')
       + `<div class="secret"><label>새 키 추가</label><input data-scope="global" data-k="__new" placeholder="KEY=VALUE"><div><button class="btn" data-save="__new" data-scope="global">저장</button></div></div>`;
+    $('#splist').hidden = settings.projects.length < 2;
     $('#splist').innerHTML = settings.projects.map((p) => `<button data-sp="${esc(p.name)}" class="${secretProject === p.name ? 'on' : ''}"><div class="n">${esc(p.name)}</div><div class="d">API 키 ${p.secrets.BUGFIX_API_KEY || p.apiKeySet ? '✓' : '–'} · GitHub ${p.secrets.GITHUB_TOKEN ? '전용' : '공용'} · 계정 ${p.secrets.FC_USER ? esc(p.secrets.FC_USER) : (g.FC_USER ? '공용' : '–')}</div></button>`).join('');
     if (!secretProject || !settings.projects.some((p) => p.name === secretProject)) secretProject = settings.projects[0]?.name || '';
     const p = settings.projects.find((x) => x.name === secretProject);
@@ -469,7 +472,6 @@
     const fr = e.target.closest('[data-front]'); if (fr) { runCheck('front', fr.dataset.front, '#c_front'); return; }
   });
   $('#addMod').onclick = () => $('#mods').appendChild(modRow());
-  $('#newProject').onclick = () => { editing = null; fillProject(null); document.querySelectorAll('#plist button').forEach((b) => b.classList.remove('on')); };
   $('#saveProject').onclick = async () => { const p = readProject(); if (!p.name) return alert('이름을 입력하세요'); $('#pmsg').textContent = '저장 중…'; try { await api('PUT', `/admin/projects/${p.name}`, p); editing = p.name; settings = null; await loadSettings(); data = null; await load(); $('#pmsg').textContent = '저장됨 - 바로 적용'; } catch (e) { $('#pmsg').textContent = e.message; } };
   $('#delProject').onclick = async () => { if (!editing || !confirm(`${editing} 프로젝트 설정을 지울까요? (리포트 데이터는 남습니다)`)) return; try { await api('DELETE', `/admin/projects/${editing}`); editing = null; await loadSettings(); await load(); } catch (e) { alert(e.message); } };
   $('#saveServer').onclick = async () => { const b = {}; for (const k of ['port', 'claudeBin', 'pathExtra', 'javaHome', 'model', 'maxTurns', 'timeoutMinutes', 'verifyTimeoutMinutes', 'workDir', 'dataDir']) b[k] = $(`#s_${k}`).value; $('#smsg').textContent = '저장 중…'; try { const r = await api('PUT', '/admin/server', b); $('#smsg').textContent = r.restartNeeded ? '저장됨 - 포트는 재시작 뒤 적용' : '저장됨 - 바로 적용'; } catch (e) { $('#smsg').textContent = e.message; } };
