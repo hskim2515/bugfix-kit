@@ -58,13 +58,18 @@ export class GitHub {
     return { state: String(r.state), merged: r.merged === true, mergeable: r.mergeable == null ? null : r.mergeable === true, mergeableState: String(r.mergeable_state), headSha: r.head?.sha || '' };
   }
 
-  /** 푸시 직후 GitHub 가 병합 가능 여부를 계산할 때까지(최대 waitSec) 기다린다 - 바로 병합하면 405 */
-  async waitMergeable(number, waitSec) {
+  /**
+   * 푸시 직후 GitHub 가 병합 가능 여부를 계산할 때까지(최대 waitSec) 기다린다 - 바로 병합하면 405.
+   * headSha 를 주면 PR head 가 그 커밋이 된 뒤에 계산된 값만 돌려준다(푸시 전 값이 잠깐 남아 있다).
+   */
+  async waitMergeable(number, waitSec, headSha = null) {
     const until = Date.now() + waitSec * 1000;
     let st;
     do {
       st = await this.getPullRequest(number);
-      if (st.merged || (st.mergeable != null && st.mergeableState !== 'unknown')) return st;
+      if (st.merged) return st;
+      const headOk = !headSha || st.headSha === headSha;
+      if (headOk && st.mergeable != null && st.mergeableState !== 'unknown') return st;
       await sleep(3000);
     } while (Date.now() < until);
     return st;

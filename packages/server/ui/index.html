@@ -167,6 +167,7 @@
           <label></label><div><button class="btn" id="addMod">+ 모듈</button></div>
           <label>화면 확인 <small>front-check</small></label>
           <div class="inline"><input id="p_fc_cwd" placeholder="cwd (예: web)" style="width:140px"><input id="p_fc_cmd" placeholder="npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json" style="flex:1;min-width:320px"><input id="p_fc_when" placeholder="when: front" style="width:120px"></div>
+          <label>보호 경로 <small>AI 가 바꾸면 되돌림. 줄마다 하나</small></label><textarea id="p_protectedPaths" style="min-height:44px" placeholder="web/src/utils/bugfixKit.js&#10;.github/workflows/"></textarea>
           <label>허용 도구 <small>줄마다 하나</small></label><textarea id="p_allowedTools" style="min-height:50px"></textarea>
           <label>환경변수 <small>KEY=VALUE</small></label><textarea id="p_env" style="min-height:44px" placeholder="NODE_OPTIONS=--openssl-legacy-provider"></textarea>
         </div>
@@ -369,7 +370,7 @@
     v('#p_description', p?.description); v('#p_conventions', p?.conventions);
     const mods = $('#mods'); mods.innerHTML = ''; for (const m of (p?.modules || [])) mods.appendChild(modRow(m));
     v('#p_fc_cwd', p?.frontCheck?.cwd); v('#p_fc_cmd', p?.frontCheck?.command); v('#p_fc_when', (p?.frontCheck?.when || []).join(', '));
-    v('#p_allowedTools', (p?.allowedTools || []).join('\n')); v('#p_env', Object.entries(p?.env || {}).map(([k, x]) => `${k}=${x}`).join('\n'));
+    v('#p_allowedTools', (p?.allowedTools || []).join('\n')); v('#p_protectedPaths', (p?.protectedPaths || []).join('\n')); v('#p_env', Object.entries(p?.env || {}).map(([k, x]) => `${k}=${x}`).join('\n'));
     $('#delProject').disabled = !p; $('#pmsg').textContent = '';
   }
   function readProject() {
@@ -377,7 +378,7 @@
     const env = Object.fromEntries(lines($('#p_env').value).map((l) => l.split('=')).filter((a) => a.length >= 2).map(([k, ...r]) => [k.trim(), r.join('=').trim()]));
     const fc = $('#p_fc_cmd').value.trim() ? { cwd: $('#p_fc_cwd').value.trim() || '.', command: $('#p_fc_cmd').value.trim(), when: csv($('#p_fc_when').value) } : null;
     return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', autoMerge: $('#p_autoMerge').checked, fixFrom: $('#p_fixFrom').value,
-      cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), env };
+      cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), protectedPaths: lines($('#p_protectedPaths').value), env };
   }
 
   // ── 키·계정 ──
@@ -442,7 +443,7 @@
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
     const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (tab !== 'reports' && !settings) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); return; }
     const ip = e.target.closest('#iProjSeg button'); if (ip) { iProject = ip.dataset.ip; loadInsights(); return; }
-    const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } return; }
+    const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
     const op = e.target.closest('[data-open]'); if (op && kit) { kit.setProject(iProject); kit.openViewer(Number(op.dataset.open)); return; }
     const pb = e.target.closest('#projSeg button'); if (pb) { project = pb.dataset.p; localStorage.setItem('bugfix-admin-project', project); renderReports(); return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
