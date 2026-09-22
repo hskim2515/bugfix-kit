@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>bugfix-kit client smoke</title>
+<style>
+  body { font-family: sans-serif; margin: 0; }
+  #app { padding: 24px; }
+  canvas { border: 1px solid #ccc; }
+  button { margin-right: 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>bugfix-kit client smoke</h1>
+  <p>Shift+F9 신고 · Shift+F10 목록</p>
+  <button id="btn-report">신고 열기</button>
+  <button id="btn-viewer">목록 열기</button>
+  <button id="btn-err">console.error 만들기</button>
+  <button id="btn-net">실패 요청 만들기</button>
+  <canvas id="gl" width="400" height="200"></canvas>
+</div>
+<script src="../dist/bugfix-client.iife.js"></script>
+<script>
+  // WebGL 캔버스 흉내 - 2D 로 그려 두면 toDataURL 로 합성 확인 가능
+  const c = document.getElementById('gl'); const g = c.getContext('2d');
+  g.fillStyle = '#3b6ea5'; g.fillRect(0, 0, 400, 200); g.fillStyle = '#fff'; g.font = '20px sans-serif'; g.fillText('canvas layer', 20, 40);
+  const kit = BugfixKit.createBugfix({
+    endpoint: 'http://localhost:8791/api',
+    project: 'demo',
+    apiKey: 'k1',
+    user: () => 'smoke-user',
+    context: () => ({ appState: { page: 'smoke' }, camera: { lon: 127, lat: 37 } }),
+    capture: { canvases: () => [c] },
+    interceptors: { console: true, network: { fetch: true }, router: true },
+  }).mount();
+  window.kit = kit;
+  document.getElementById('btn-report').onclick = () => kit.openReport();
+  document.getElementById('btn-viewer').onclick = () => kit.openViewer();
+  document.getElementById('btn-err').onclick = () => console.error('smoke error', { a: 1 });
+  document.getElementById('btn-net').onclick = () => fetch('http://localhost:8791/api/nope').catch(() => {});
+
+  // ?auto=1 : 헤드리스 점검 - 신고 모달 열기(캡처 포함) → 서버 저장 → 뷰어 열기 → 결과를 console 로
+  if (location.search.includes('auto=1')) (async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const out = {};
+    try {
+      console.error('smoke error before report');
+      await fetch('http://localhost:8791/api/nope').catch(() => {});
+      kit.openReport();
+      await sleep(2500);
+      const m = kit._els.modal.shadowRoot;
+      out.modalOpen = !!m.querySelector('.bug-report-modal');
+      out.screenshot = !!m.querySelector('img.screenshot-img')?.src?.startsWith('data:image/png');
+      out.tabs = [...m.querySelectorAll('.bug-tab')].map((b) => b.textContent.trim().replace(/\s+/g, ' '));
+      out.logsCaptured = kit.getLogs().length;
+      out.netCaptured = kit.getNetwork().length;
+      out.contextKeys = Object.keys(kit.captureContext());
+      const saved = await kit.api.save({ severity: 'LOW', problem: 'auto smoke', screenshot: m.querySelector('img.screenshot-img')?.src, contextJson: JSON.stringify(kit.captureContext()), frontendLogs: JSON.stringify(kit.getLogs()), networkLogs: JSON.stringify(kit.getNetwork()) });
+      out.savedId = saved.bugReportId;
+      kit._els.modal.close();
+      kit.openViewer();
+      await sleep(1200);
+      const v = kit._els.viewer.shadowRoot;
+      out.viewerOpen = !!v.querySelector('.brv-modal');
+      const items = v.querySelectorAll('.brv-item, .brv-list-item, [class*="brv-item"]');
+      out.listRows = items.length;
+      out.empty = !!v.querySelector('.brv-empty');
+      if (items[0]) {
+        items[0].click();
+        await sleep(1200);
+        out.detailOpen = !!v.querySelector('.brv-fix');
+        out.detailProblem = v.querySelector('.brv-text, .brv-field')?.textContent?.trim().slice(0, 40);
+        const btn = [...v.querySelectorAll('button')].find((b) => /수정 요청/.test(b.textContent));
+        if (btn) { btn.click(); await sleep(1500); out.requestFixNotice = v.querySelector('.brv-notice')?.textContent?.replace(/\s+/g, ' ').trim(); }
+      }
+    } catch (e) { out.error = String(e && e.stack || e); }
+    console.log('SMOKE_RESULT ' + JSON.stringify(out));
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,737 @@
+<template>
+  <div class="bugfix-root">
+    <!-- 캡처 중 스피너 (모달 열리기 전 즉시 표시) -->
+    <div v-if="isCapturing && !isOpen" class="bug-capture-overlay">
+      <div class="bug-capture-spinner">
+        <span class="bug-capture-spin"></span>
+        화면 캡처 중...
+      </div>
+    </div>
+
+    <div v-if="isOpen" class="bug-report-overlay" @click.self="close">
+      <div class="bug-report-modal">
+
+        <!-- 헤더 -->
+        <div class="bug-report-header">
+          <span class="bug-report-title">버그 신고 <span v-if="hotkey" class="bug-report-shortcut">{{ hotkey }}</span></span>
+          <button class="bug-report-close" @click="close">✕</button>
+        </div>
+
+        <!-- 탭 -->
+        <div class="bug-report-tabs">
+          <button
+            v-for="tab in tabs" :key="tab.id"
+            :class="['bug-tab', { active: activeTab === tab.id }]"
+            @click="activeTab = tab.id"
+          >
+            {{ tab.label }}
+            <span v-if="tab.badge" class="bug-tab-badge">{{ tab.badge }}</span>
+          </button>
+        </div>
+
+        <div class="bug-report-body">
+
+          <!-- ── 탭 1: 기본 ── -->
+          <template v-if="activeTab === 'basic'">
+            <!-- 스크린샷 -->
+            <div class="bug-report-section">
+              <div class="bug-report-label">
+                화면 캡처
+                <button class="bug-btn-sm" @click="recapture" :disabled="isCapturing">
+                  {{ isCapturing ? '캡처 중...' : '다시 찍기' }}
+                </button>
+              </div>
+              <div class="screenshot-wrap">
+                <img v-if="screenshotUrl" :src="screenshotUrl" class="screenshot-img" alt="screenshot" />
+                <div v-else class="screenshot-placeholder">캡처 중...</div>
+              </div>
+            </div>
+
+            <!-- 심각도 -->
+            <div class="bug-report-section">
+              <div class="bug-report-label">심각도</div>
+              <div class="severity-group">
+                <button
+                  v-for="s in severityOptions" :key="s.value"
+                  :class="['severity-btn', `severity-btn--${s.value.toLowerCase()}`, { active: severity === s.value }]"
+                  @click="severity = s.value"
+                >
+                  {{ s.label }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 구조화된 재현 폼 -->
+            <div class="bug-report-section">
+              <div class="bug-report-label">문제 상황</div>
+              <textarea
+                v-model="problemDesc"
+                class="bug-report-textarea"
+                placeholder="어떤 문제가 발생했나요?"
+                rows="2"
+              />
+            </div>
+            <div class="bug-report-section">
+              <div class="bug-report-label">재현 단계</div>
+              <textarea
+                v-model="reproSteps"
+                class="bug-report-textarea"
+                placeholder="1. …&#10;2. …&#10;3. …"
+                rows="3"
+              />
+            </div>
+            <div class="bug-report-section">
+              <div class="bug-report-label">기대 결과</div>
+              <textarea
+                v-model="expectedResult"
+                class="bug-report-textarea"
+                placeholder="어떻게 동작해야 하나요?"
+                rows="2"
+              />
+            </div>
+
+            <!-- 포함 정보 요약 -->
+            <div class="bug-report-section">
+              <div class="bug-report-label">다운로드에 포함되는 정보</div>
+              <div class="included-chips">
+                <span class="chip">📸 스크린샷</span>
+                <span class="chip">🌐 환경 정보</span>
+                <span class="chip">📡 네트워크 요청 ({{ networkLogs.length }}건)</span>
+                <span class="chip">📋 프론트 로그 ({{ allLogs.length }}건)</span>
+                <span class="chip" :class="backendLogsState === 'ok' ? 'chip--ok' : backendLogsState === 'error' ? 'chip--err' : ''">
+                  🖥 백엔드 로그 ({{
+                    backendLogsState === 'ok'      ? backendLogs.length + '건' :
+                    backendLogsState === 'loading' ? '로딩 중' :
+                    backendLogsState === 'skipped' ? '프론트 에러로 판단, 미수집' :
+                    backendLogsState === 'error'   ? '조회 실패' : '대기'
+                  }})
+                </span>
+                <span class="chip" v-if="context?.camera">📍 카메라 위치</span>
+                <span class="chip">🗂 앱 상태</span>
+                <span class="chip" v-if="context?.user">👤 {{ context.user.username }}</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── 탭 2: 로그 ── -->
+          <template v-if="activeTab === 'logs'">
+            <!-- 프론트 / 백엔드 토글 -->
+            <div class="log-source-toggle">
+              <button :class="['log-src-btn', { active: logSource === 'front' }]" @click="logSource = 'front'">
+                프론트엔드
+              </button>
+              <button :class="['log-src-btn', { active: logSource === 'backend' }]" @click="logSource = 'backend'">
+                백엔드
+                <span v-if="backendLogsState === 'loading'" class="log-src-spin">⟳</span>
+                <span v-else-if="backendLogsState === 'error'" class="log-src-err">!</span>
+              </button>
+            </div>
+
+            <!-- 프론트엔드 로그 -->
+            <div class="bug-report-section" v-if="logSource === 'front'">
+              <div class="bug-report-label">
+                프론트엔드 콘솔 로그
+                <div class="log-filter-group">
+                  <label class="log-filter-chip error"><input type="checkbox" v-model="showError"> 오류 ({{ countByLevel('error') }})</label>
+                  <label class="log-filter-chip warn"><input type="checkbox" v-model="showWarn"> 경고 ({{ countByLevel('warn') }})</label>
+                  <label class="log-filter-chip log"><input type="checkbox" v-model="showLog"> 로그 ({{ countByLevel('log') }})</label>
+                </div>
+              </div>
+              <div class="log-list">
+                <div v-for="(entry, i) in filteredLogs" :key="i" :class="['log-item', `log-item--${entry.level}`]">
+                  <span class="log-time">{{ entry.time.slice(11) }}</span>
+                  <span class="log-badge-lv">{{ entry.level }}</span>
+                  <span class="log-msg">{{ entry.message }}</span>
+                </div>
+                <div v-if="filteredLogs.length === 0" class="log-empty">표시할 로그가 없습니다</div>
+              </div>
+            </div>
+
+            <!-- 백엔드 로그 -->
+            <div class="bug-report-section" v-if="logSource === 'backend'">
+              <div class="bug-report-label">
+                백엔드 서버 로그
+                <div class="log-filter-group">
+                  <label class="log-filter-chip error"><input type="checkbox" v-model="showBEError"> ERROR ({{ countBackendByLevel('ERROR') }})</label>
+                  <label class="log-filter-chip warn"><input type="checkbox" v-model="showBEWarn"> WARN ({{ countBackendByLevel('WARN') }})</label>
+                  <label class="log-filter-chip log"><input type="checkbox" v-model="showBEInfo"> INFO ({{ countBackendByLevel('INFO') }})</label>
+                </div>
+              </div>
+              <div v-if="backendLogsState === 'loading'" class="log-empty">백엔드 로그 가져오는 중...</div>
+              <div v-else-if="backendLogsState === 'skipped'" class="log-empty">
+                네트워크 오류 없음 — 프론트엔드 에러로 판단하여 미수집
+                <button class="bug-btn-sm" style="margin-top:8px" @click="fetchBackendLogs">그래도 가져오기</button>
+              </div>
+              <div v-else-if="backendLogsState === 'error'" class="log-empty log-empty--error">백엔드 로그 조회 실패 (인증 확인)</div>
+              <div v-else class="log-list">
+                <div v-for="(entry, i) in filteredBackendLogs" :key="i" :class="['log-item', `log-item--${entry.level.toLowerCase()}`]">
+                  <span class="log-time">{{ entry.time.slice(11) }}</span>
+                  <span class="log-badge-lv">{{ entry.level }}</span>
+                  <span class="log-logger">{{ entry.logger }}</span>
+                  <span class="log-msg">{{ entry.message }}</span>
+                </div>
+                <div v-if="filteredBackendLogs.length === 0" class="log-empty">표시할 로그가 없습니다</div>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── 탭 3: 네트워크 ── -->
+          <template v-if="activeTab === 'network'">
+            <div class="bug-report-section">
+              <div class="bug-report-label">최근 API 요청 (최대 50건, 최신순)</div>
+              <div class="net-list">
+                <template v-for="(req, i) in reversedNetwork" :key="i">
+                  <div
+                    :class="['net-item', req.error || req.status >= 400 ? 'net-item--error' : '']"
+                    @click="toggleNetDetail(i)"
+                  >
+                    <span :class="['net-status', statusClass(req.status)]">{{ req.status }}</span>
+                    <span class="net-method">{{ req.method }}</span>
+                    <span class="net-url">{{ req.url }}</span>
+                    <span class="net-dur">{{ req.duration }}ms</span>
+                    <span class="net-time">{{ req.time?.slice(11, 19) }}</span>
+                  </div>
+                  <div v-if="expandedNet === i" class="net-detail">
+                    <div v-if="req.params"><b>Params:</b> <code>{{ req.params }}</code></div>
+                    <div v-if="req.requestBody"><b>Request:</b> <code>{{ req.requestBody }}</code></div>
+                    <div v-if="req.responseBody"><b>Response:</b> <code>{{ req.responseBody }}</code></div>
+                    <div v-if="req.error" class="net-error-msg"><b>Error:</b> {{ req.error }}</div>
+                  </div>
+                </template>
+                <div v-if="networkLogs.length === 0" class="log-empty">기록된 요청이 없습니다</div>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── 탭 4: 상태 ── -->
+          <template v-if="activeTab === 'state'">
+            <!-- Vuex Mutation 이력 -->
+            <div class="bug-report-section">
+              <div class="bug-report-label">Vuex Mutation 이력 (최신순, 최대 100건)</div>
+              <div class="log-list">
+                <div v-for="(m, i) in context?.mutationLog || []" :key="i" class="log-item">
+                  <span class="log-time">{{ m.time }}</span>
+                  <span class="mutation-type">{{ m.type }}</span>
+                  <span class="log-msg mutation-payload" v-if="m.payload !== null">{{ formatPayload(m.payload) }}</span>
+                </div>
+                <div v-if="!context?.mutationLog?.length" class="log-empty">기록된 mutation이 없습니다</div>
+              </div>
+            </div>
+
+            <!-- 라우터 이력 -->
+            <div class="bug-report-section">
+              <div class="bug-report-label">라우터 이력</div>
+              <div class="route-list">
+                <div v-for="(r, i) in context?.routeHistory || []" :key="i" class="route-item">
+                  <span class="log-time">{{ r.time }}</span>
+                  <span class="route-from">{{ r.from }}</span>
+                  <span class="route-arrow">→</span>
+                  <span class="route-to">{{ r.to }}</span>
+                </div>
+                <div v-if="!context?.routeHistory?.length" class="log-empty">기록된 라우터 이력이 없습니다</div>
+              </div>
+            </div>
+
+            <!-- localStorage -->
+            <div class="bug-report-section" v-if="context?.storage && Object.keys(context.storage).length">
+              <div class="bug-report-label">localStorage (민감 키 제외)</div>
+              <div class="env-group">
+                <div v-for="(val, key) in context.storage" :key="key" class="env-row">
+                  <span>{{ key }}</span>
+                  <span>{{ val }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cesium 성능 -->
+            <div class="bug-report-section" v-if="context?.cesiumPerf">
+              <div class="bug-report-label">Cesium 성능 지표</div>
+              <div class="env-group">
+                <div class="env-row"><span>Primitives</span><span>{{ context.cesiumPerf.primitives }}</span></div>
+                <div class="env-row"><span>Tiles Loaded</span><span>{{ context.cesiumPerf.tilesLoaded }}</span></div>
+                <div class="env-row"><span>Max Screen Space Error</span><span>{{ context.cesiumPerf.maximumScreenSpaceError }}</span></div>
+                <div class="env-row"><span>Shadows</span><span>{{ context.cesiumPerf.shadowsEnabled ? '활성' : '비활성' }}</span></div>
+                <div class="env-row"><span>MSAA Samples</span><span>{{ context.cesiumPerf.msaaSamples }}</span></div>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── 탭 5: 컨텍스트 ── -->
+          <template v-if="activeTab === 'env'">
+            <div class="bug-report-section" v-if="!context">
+              <div class="log-empty log-empty--error">컨텍스트 수집에 실패했습니다 (콘솔 확인)</div>
+            </div>
+            <div class="bug-report-section" v-else>
+
+              <!-- 사용자 정보 -->
+              <div class="env-group" v-if="context.user">
+                <div class="env-group-title">사용자</div>
+                <div class="env-row"><span>아이디</span><span>{{ context.user.username }}</span></div>
+                <div class="env-row" v-if="context.user.roles.length">
+                  <span>권한</span><span>{{ context.user.roles.join(', ') }}</span>
+                </div>
+                <div class="env-row" v-if="context.user.exp">
+                  <span>토큰 만료</span><span>{{ context.user.exp }}</span>
+                </div>
+              </div>
+
+              <!-- 메뉴 상태 -->
+              <div class="env-group">
+                <div class="env-group-title">메뉴 상태</div>
+                <div class="env-row"><span>상단 탭</span><span>{{ context.menus.headerName }}</span></div>
+                <div class="env-row"><span>하위 메뉴</span><span>{{ context.menus.subMenuName }}</span></div>
+                <div class="env-row">
+                  <span>좌측 메뉴</span>
+                  <span>{{ joinOrNone(context.menus.leftMenus) }}</span>
+                </div>
+                <div class="env-row">
+                  <span>열린 패널</span>
+                  <span>{{ joinOrNone(context.menus.openPanels) }}</span>
+                </div>
+                <div class="env-row">
+                  <span>활성 도구</span>
+                  <span>{{ joinOrNone(context.menus.activeTools) }}</span>
+                </div>
+              </div>
+
+              <!-- 활성 데이터 -->
+              <div class="env-group">
+                <div class="env-group-title">표시 중인 데이터</div>
+                <div class="env-row"><span>지도 타입</span><span>{{ context.activeData.mapType }}</span></div>
+                <div class="env-row"><span>지형</span><span>{{ context.activeData.terrain || '기본' }}</span></div>
+                <div class="env-row">
+                  <span>데이터셋 ({{ context.activeData.datasets.length }})</span>
+                  <span class="env-list">
+                    <span v-if="!context.activeData.datasets.length">없음</span>
+                    <span v-for="d in context.activeData.datasets" :key="d.layerId" class="env-tag">{{ d._displayName }}</span>
+                  </span>
+                </div>
+                <div class="env-row">
+                  <span>3D 타일 ({{ context.activeData.threeDTiles.length }})</span>
+                  <span class="env-list">
+                    <span v-if="!context.activeData.threeDTiles.length">없음</span>
+                    <span v-for="t in context.activeData.threeDTiles" :key="t.threeDTilesId || t.sourceId" class="env-tag">{{ t._displayName }}</span>
+                  </span>
+                </div>
+                <div class="env-row" v-if="context.activeData.autoPlacement.length">
+                  <span>배치안 ({{ context.activeData.autoPlacement.length }})</span>
+                  <span class="env-list">
+                    <span v-for="ap in context.activeData.autoPlacement" :key="ap.sourceId" class="env-tag">{{ ap._displayName }}</span>
+                  </span>
+                </div>
+                <div class="env-row" v-if="context.activeData.topicMaps.length">
+                  <span>주제도 ({{ context.activeData.topicMaps.length }})</span>
+                  <span class="env-list">
+                    <span v-for="tm in context.activeData.topicMaps" :key="tm.key" class="env-tag">{{ tm._displayName }}</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- 최근 이벤트 -->
+              <div class="env-group">
+                <div class="env-group-title">최근 이벤트 (최신순)</div>
+                <div class="event-list">
+                  <div v-for="(ev, i) in context.recentEvents.slice(0, 30)" :key="i" class="event-item">
+                    <span class="event-time">{{ ev.time }}</span>
+                    <span class="event-type">{{ ev.type }}</span>
+                  </div>
+                  <div v-if="!context.recentEvents.length" class="log-empty">기록된 이벤트 없음</div>
+                </div>
+              </div>
+
+              <!-- 카메라 -->
+              <div class="env-group" v-if="context.camera">
+                <div class="env-group-title">카메라 위치</div>
+                <div class="env-row"><span>경도</span><span>{{ context.camera.longitude }}</span></div>
+                <div class="env-row"><span>위도</span><span>{{ context.camera.latitude }}</span></div>
+                <div class="env-row"><span>높이 (m)</span><span>{{ context.camera.height }}</span></div>
+                <div class="env-row"><span>Heading / Pitch</span><span>{{ context.camera.heading }}° / {{ context.camera.pitch }}°</span></div>
+              </div>
+
+              <!-- 브라우저/환경 -->
+              <div class="env-group">
+                <div class="env-group-title">브라우저 / 화면</div>
+                <div class="env-row"><span>일시</span><span>{{ context.datetime }}</span></div>
+                <div class="env-row"><span>해상도</span><span>{{ context.screen.resolution }} · 뷰포트 {{ context.screen.viewport }}</span></div>
+                <div class="env-row" v-if="context.memory"><span>JS 힙 메모리</span><span>{{ context.memory.usedMB }}MB / {{ context.memory.limitMB }}MB</span></div>
+                <div class="env-row" v-if="context.connection"><span>네트워크</span><span>{{ context.connection.effectiveType }} · {{ context.connection.downlink }}Mbps</span></div>
+                <div class="env-row"><span>언어</span><span>{{ context.browser.language }}</span></div>
+              </div>
+
+            </div>
+          </template>
+
+        </div>
+
+        <!-- 푸터 -->
+        <div class="bug-report-footer">
+          <button v-if="serverEnabled" class="bug-btn-list" @click="openViewer">저장 목록</button>
+          <button class="bug-btn-cancel" @click="close">취소</button>
+          <button class="bug-btn-copy" @click="copyToClipboard" :disabled="!screenshotUrl" :title="copyStatus">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            {{ copyStatus }}
+          </button>
+          <button v-if="serverEnabled" class="bug-btn-save" @click="saveToServer" :disabled="isSaving || !screenshotUrl">
+            <span v-if="isSaving" class="bug-capture-spin" style="width:11px;height:11px;border-width:2px;"></span>
+            {{ saveStatus }}
+          </button>
+          <button class="bug-btn-download" @click="download" :disabled="!screenshotUrl">
+            다운로드
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+const SEVERITY_OPTIONS = [
+  { value: 'CRITICAL', label: '치명적' },
+  { value: 'HIGH',     label: '높음' },
+  { value: 'MEDIUM',   label: '보통' },
+  { value: 'LOW',      label: '낮음' },
+];
+
+export default {
+  name: 'BugfixReportModal',
+  // kit: createBugfix() 결과. Web Component 로 쓸 때는 엘리먼트 프로퍼티(el.kit = kit)로 들어온다
+  props: { kit: { type: Object, default: null } },
+  emits: ['open-viewer'],
+  expose: ['open', 'close'],
+  mounted() {
+    this._onKeydown = (e) => { if (e.key === 'Escape' && this.isOpen) this.close(); };
+    window.addEventListener('keydown', this._onKeydown);
+  },
+  beforeUnmount() {
+    window.removeEventListener('keydown', this._onKeydown);
+  },
+  data() {
+    return {
+      isOpen: false,
+      isCapturing: false,
+      activeTab: 'basic',
+      screenshotUrl: null,
+      severity: 'MEDIUM',
+      problemDesc: '',
+      reproSteps: '',
+      expectedResult: '',
+      allLogs: [],
+      networkLogs: [],
+      backendLogs: [],
+      backendLogsState: 'idle',
+      context: null,
+      logSource: 'front',
+      showError: true,
+      showWarn: true,
+      showLog: false,
+      showBEError: true,
+      showBEWarn: true,
+      showBEInfo: false,
+      expandedNet: null,
+      copyStatus: '복사',
+      isSaving: false,
+      saveStatus: '서버 저장',
+      severityOptions: SEVERITY_OPTIONS,
+    };
+  },
+  computed: {
+    hotkey() { return this.kit?.options?.hotkeys?.report || ''; },
+    serverEnabled() { return !!this.kit?.api?.enabled; },
+
+    tabs() {
+      const beErrCount = this.backendLogsState === 'ok'
+        ? this.backendLogs.filter(e => e.level === 'ERROR').length : 0;
+      const logBadge = (this.countByLevel('error') + beErrCount) || null;
+      const mutCount = this.context?.mutationLog?.length || null;
+      return [
+        { id: 'basic',   label: '기본' },
+        { id: 'logs',    label: '로그',     badge: logBadge },
+        { id: 'network', label: '네트워크', badge: this.networkLogs.filter(r => r.error || r.status >= 400).length || null },
+        { id: 'state',   label: '상태',     badge: mutCount },
+        { id: 'env',     label: '컨텍스트' },
+      ];
+    },
+
+    filteredLogs() {
+      return this.allLogs.filter(e => {
+        if (e.level === 'error') return this.showError;
+        if (e.level === 'warn')  return this.showWarn;
+        return this.showLog;
+      }).slice(-100).reverse();
+    },
+
+    filteredBackendLogs() {
+      return this.backendLogs.filter(e => {
+        if (e.level === 'ERROR') return this.showBEError;
+        if (e.level === 'WARN')  return this.showBEWarn;
+        return this.showBEInfo;
+      });
+    },
+
+    reversedNetwork() {
+      return [...this.networkLogs].reverse();
+    },
+  },
+  methods: {
+    countByLevel(level) {
+      return this.allLogs.filter(e => e.level === level).length;
+    },
+
+    countBackendByLevel(level) {
+      return this.backendLogs.filter(e => e.level === level).length;
+    },
+
+    statusClass(status) {
+      if (!status || status === 'ERR') return 'status-err';
+      if (status >= 500) return 'status-5xx';
+      if (status >= 400) return 'status-4xx';
+      if (status >= 300) return 'status-3xx';
+      return 'status-2xx';
+    },
+
+    toggleNetDetail(i) {
+      this.expandedNet = this.expandedNet === i ? null : i;
+    },
+
+    joinOrNone(values) {
+      return values && values.length ? values.join(', ') : '없음';
+    },
+
+    formatPayload(payload) {
+      if (payload === null || payload === undefined) return '';
+      if (typeof payload === 'string') return payload.length > 120 ? payload.slice(0, 120) + '…' : payload;
+      try {
+        const s = JSON.stringify(payload);
+        return s.length > 120 ? s.slice(0, 120) + '…' : s;
+      } catch {
+        return String(payload);
+      }
+    },
+
+    async fetchBackendLogs() {
+      if (!this.kit?.options?.backendLogs) { this.backendLogsState = 'skipped'; return; }
+      this.backendLogsState = 'loading';
+      try {
+        this.backendLogs = (await this.kit.fetchBackendLogs()) ?? [];
+        this.backendLogsState = 'ok';
+      } catch {
+        this.backendLogsState = 'error';
+      }
+    },
+
+    hasNetworkError() {
+      return this.networkLogs.some(r => r.error || (r.status && r.status >= 400));
+    },
+
+    open() { return this.openReport(); },
+    async openReport() {
+      if (this.isCapturing || this.isOpen) return;
+      this.problemDesc = '';
+      this.reproSteps = '';
+      this.expectedResult = '';
+      this.severity = 'MEDIUM';
+      this.screenshotUrl = null;
+      this.activeTab = 'basic';
+      this.expandedNet = null;
+      this.logSource = 'front';
+      this.allLogs = this.kit?.getLogs() ?? [];
+      this.networkLogs = this.kit?.getNetwork() ?? [];
+      this.backendLogs = [];
+      this.backendLogsState = 'idle';
+      this.isCapturing = true;
+      await this.$nextTick();
+
+      const tasks = [this.kit ? this.kit.captureScreen() : Promise.reject(new Error('kit 없음'))];
+      if (this.hasNetworkError()) tasks.push(this.fetchBackendLogs());
+      else this.backendLogsState = 'skipped';
+
+      const [screenshot] = await Promise.allSettled(tasks);
+      if (screenshot.status === 'fulfilled') this.screenshotUrl = screenshot.value;
+      else console.warn('[BugReport] 캡처 실패:', screenshot.reason);
+      this.context = this.safeCaptureContext();
+      this.isCapturing = false;
+      this.isOpen = true;
+    },
+
+    // 컨텍스트 수집이 실패해도 모달은 열려야 한다
+    // (예외가 나면 isCapturing이 true로 남아 캡처 오버레이에서 멈춘다)
+    safeCaptureContext() {
+      try {
+        return this.kit?.captureContext() ?? null;
+      } catch (e) {
+        console.error('[BugReport] 컨텍스트 수집 실패:', e);
+        return null;
+      }
+    },
+
+    async recapture() {
+      this.isCapturing = true;
+      this.isOpen = false;
+      await this.$nextTick();
+      try {
+        this.screenshotUrl = await this.kit.captureScreen();
+      } catch (e) {
+        console.warn('[BugReport] 캡처 실패:', e);
+      }
+      this.context = this.safeCaptureContext();
+      this.isCapturing = false;
+      this.isOpen = true;
+    },
+
+    close() {
+      this.isOpen = false;
+      this.screenshotUrl = null;
+    },
+    // 저장 목록: Vue 앱은 open-viewer 이벤트로, Web Component 는 kit 이 붙여 둔 뷰어를 직접 연다
+    openViewer() {
+      this.$emit('open-viewer');
+      this.close();
+      this.kit?.openViewer?.();
+    },
+
+    buildReport() {
+      return {
+        severity: this.severity,
+        problem: this.problemDesc,
+        reproSteps: this.reproSteps,
+        expectedResult: this.expectedResult,
+        context: this.context,
+        frontendLogs: this.kit?.getLogs() ?? [],
+        backendLogs: this.backendLogs,
+        network: this.kit?.getNetwork() ?? [],
+        mutationLog: this.kit?.getMutations() ?? [],
+        routeHistory: this.kit?.getRoutes() ?? [],
+      };
+    },
+
+    async copyToClipboard() {
+      try {
+        const report = this.buildReport();
+        await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+        this.copyStatus = '복사됨 ✓';
+        setTimeout(() => { this.copyStatus = '복사'; }, 2000);
+      } catch {
+        this.copyStatus = '실패';
+        setTimeout(() => { this.copyStatus = '복사'; }, 2000);
+      }
+    },
+
+    async saveToServer() {
+      this.isSaving = true;
+      this.saveStatus = '저장 중...';
+      try {
+        const report = this.buildReport();
+        const payload = {
+          severity:       this.severity,
+          problem:        this.problemDesc,
+          reproSteps:     this.reproSteps,
+          expectedResult: this.expectedResult,
+          screenshot:     this.screenshotUrl,
+          contextJson:    JSON.stringify(report.context),
+          frontendLogs:   JSON.stringify(report.frontendLogs),
+          backendLogs:    JSON.stringify(report.backendLogs),
+          networkLogs:    JSON.stringify(report.network),
+          mutationLog:    JSON.stringify(report.mutationLog),
+        };
+        await this.kit.api.save(payload);
+        this.saveStatus = '저장됨 ✓';
+        setTimeout(() => { this.saveStatus = '서버 저장'; }, 3000);
+      } catch (e) {
+        console.error('[BugReport] 서버 저장 실패:', e);
+        this.saveStatus = '저장 실패';
+        setTimeout(() => { this.saveStatus = '서버 저장'; }, 3000);
+      } finally {
+        this.isSaving = false;
+      }
+    },
+
+    download() {
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const severityTag = this.severity.toLowerCase();
+
+      const imgLink = document.createElement('a');
+      imgLink.href = this.screenshotUrl;
+      imgLink.download = `bug-screenshot_${severityTag}_${ts}.png`;
+      imgLink.click();
+
+      const report = this.buildReport();
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const jsonLink = document.createElement('a');
+      jsonLink.href = URL.createObjectURL(blob);
+      jsonLink.download = `bug-report_${severityTag}_${ts}.json`;
+      setTimeout(() => { jsonLink.click(); URL.revokeObjectURL(jsonLink.href); }, 300);
+
+      this.close();
+    },
+  },
+};
+</script>
+
+<style scoped>
+.bug-capture-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+}
+.bug-capture-spinner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(20, 28, 40, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px 24px;
+  color: #a8c0d8;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+.bug-capture-spin {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(136, 170, 255, 0.3);
+  border-top-color: #88aaff;
+  border-radius: 50%;
+  animation: bug-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes bug-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 저장 목록 버튼은 BugReportModal global CSS에 있으므로 여기선 scoped 추가만 */
+.bug-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  background: rgba(46, 204, 113, 0.1);
+  color: #2ecc71;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .15s;
+  &:hover:not(:disabled) { background: rgba(46, 204, 113, 0.2); }
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+.bug-btn-list {
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #778899;
+  font-size: 11px;
+  cursor: pointer;
+  margin-right: auto;
+  &:hover { background: rgba(255,255,255,0.08); color: #aabbcc; }
+}
+</style>

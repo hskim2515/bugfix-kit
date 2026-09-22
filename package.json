@@ -11,5 +11,16 @@
   "scripts": {
     "server": "node packages/server/bin/bugfix-server.mjs",
     "test": "npm test --workspaces --if-present"
-  }
+  },
+  "exports": {
+    "./client": {
+      "import": "./packages/client/dist/bugfix-client.js",
+      "default": "./packages/client/dist/bugfix-client.iife.js"
+    },
+    "./client/vue": "./packages/client/dist/bugfix-client.vue.js",
+    "./client/style.css": "./packages/client/dist/style.css",
+    "./client/dist/*": "./packages/client/dist/*",
+    "./package.json": "./package.json"
+  },
+  "version": "0.1.0"
 }
