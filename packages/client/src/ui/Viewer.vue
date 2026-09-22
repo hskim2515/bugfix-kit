@@ -91,6 +91,7 @@
                     <span v-if="fixBusy || fixInProgress" class="brv-spin brv-spin--sm"></span>
                     <span :class="['brv-fix', `brv-fix--${(detail.fixStatus || 'none').toLowerCase()}`]">{{ fixLabel(detail.fixStatus) }}</span>
                     <span v-if="fixInProgress && fixElapsed" class="brv-fix-elapsed">{{ fixElapsed }} 경과</span>
+                    <span v-else-if="deployPending" class="brv-fix-elapsed"><span class="brv-spin brv-spin--sm"></span> 배포 진행 중…</span>
                   </span>
                 </div>
                 <div class="brv-row" v-if="detail.fixBranch">
@@ -370,6 +371,14 @@ export default {
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.viewer || ''; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
+    // 병합 뒤 배포(GitHub Actions) 추적이 아직 진행 중인가 - 로그에 끝났다는 줄이 없고 갱신이 최근(35분 안)이면
+    deployPending() {
+      if (this.detail?.fixStatus !== 'MERGED') return false;
+      const log = this.detail?.fixLog || '';
+      if (/배포 완료|배포 추적 종료|시작되지 않았습니다|실패한 워크플로/.test(log)) return false;
+      const t = new Date(this.detail?.fixUpdatedAt || 0).getTime();
+      return Date.now() - t < 35 * 60 * 1000;
+    },
     fixChat() { try { return this.detail?.fixChat ? JSON.parse(this.detail.fixChat) : []; } catch { return []; } },
     fixSuggestions() {
       try { const v = this.detail?.fixSuggestions ? JSON.parse(this.detail.fixSuggestions) : []; return Array.isArray(v) ? v : []; } catch { return []; }
@@ -480,7 +489,7 @@ export default {
       } finally {
         this.detailLoading = false;
       }
-      if (this.fixInProgress) this._startFixPolling(); else this._stopFixPolling();
+      if (this.fixInProgress || this.deployPending) this._startFixPolling(); else this._stopFixPolling();
     },
 
     // 앱의 알림 훅(kit.notify)이 있으면 그쪽으로, 없으면 뷰어 안에 잠깐 표시
@@ -538,7 +547,7 @@ export default {
         // 진행 중엔 스크린샷·로그 없이 fix_* 만 주는 가벼운 API 로 자주 읽는다
         const r = this.detail.fixPrUrl && ['PR_OPENED', 'FAILED'].includes(this.detail.fixStatus)
           ? await this.kit.api.fixSync(id)
-          : (this.fixInProgress ? await this.kit.api.fixState(id) : await this.kit.api.get(id));
+          : (this.fixInProgress || this.deployPending ? await this.kit.api.fixState(id) : await this.kit.api.get(id));
         if (r && this.detail?.bugReportId === id) { this.detail = { ...this.detail, ...r }; this._syncListFix(r); }
       } catch (_) { /* ignore */ }
     },
@@ -551,7 +560,7 @@ export default {
       this._stopFixPolling();
       this.now = Date.now();
       this._fixTimer = setInterval(async () => {
-        if (!this.detail || !this.fixInProgress) { this._stopFixPolling(); return; }
+        if (!this.detail || !(this.fixInProgress || this.deployPending)) { this._stopFixPolling(); return; }
         if (this._fixPolling) return;              // 앞 요청이 늦으면 겹치지 않게
         this._fixPolling = true;
         try { await this.refreshDetail(); } finally { this._fixPolling = false; }
