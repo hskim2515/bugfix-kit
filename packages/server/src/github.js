@@ -78,6 +78,12 @@ export class GitHub {
     return String(r.sha);
   }
 
+  /** 특정 커밋(head_sha)으로 시작된 워크플로 실행 목록 - 병합 뒤 배포 추적용 */
+  async listRuns(sha) {
+    const r = await this.call('GET', `/actions/runs?head_sha=${sha}&per_page=20`);
+    return (r?.workflow_runs || []).map((w) => ({ id: w.id, name: w.name, status: w.status, conclusion: w.conclusion, url: w.html_url }));
+  }
+
   /** 병합 뒤 작업 브랜치 정리 - 실패해도 치명적이지 않다 */
   async deleteBranch(branch) {
     try { await this.call('DELETE', `/git/refs/heads/${branch}`); }

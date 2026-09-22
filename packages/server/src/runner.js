@@ -331,13 +331,49 @@ export class Runner {
         throw new Error(`GitHub 는 병합됐다고 했지만 ${base} 에 이번 커밋이 없습니다(응답 sha ${sha.slice(0, 8)})`);
       }
       await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' });
-      await L(`✓ 병합 완료 ${base} @ ${sha.slice(0, 8)} - CI/CD 배포가 이어집니다`);
+      await L(`✓ 병합 완료 ${base} @ ${sha.slice(0, 8)}`);
       await gh.deleteBranch(branch);
+      // 배포(GitHub Actions)는 큐를 막지 않고 따로 지켜본다 - 사용자에게 "끝까지" 는 배포까지다
+      this.watchDeploy(project, gh, id, sha).catch((e) => this.log.warn(`[bugfix ${project.name}#${id}] 배포 추적 실패: ${e.message}`));
     } catch (e) {
       this.log.warn(`[bugfix ${project.name}#${id}] 자동 병합 실패`, e);
       await L(`✗ 자동 병합 실패 - PR 은 열려 있습니다: ${firstLine(e.message, 300)}`);
       await this.updateFix(project, id, { fixStatus: 'PR_OPENED' });
     }
+  }
+
+  /**
+   * 병합 커밋으로 시작된 워크플로(배포)를 완료될 때까지 지켜보고 진행 로그에 남긴다. 최대 waitMin 분.
+   * 워크플로가 하나도 안 잡히면(경로 필터 등) 그 사실도 남긴다. 큐와 무관하게 백그라운드로 돈다.
+   */
+  async watchDeploy(project, gh, id, sha, waitMin = 30) {
+    const L = (s) => this.logLine(project, id, s);
+    const until = Date.now() + waitMin * 60_000;
+    const seen = new Map();          // run id → 마지막으로 로그한 status
+    let anyRun = false;
+    await sleep(15_000);             // 워크플로가 만들어질 시간
+    while (Date.now() < until) {
+      const runs = await gh.listRuns(sha);
+      for (const r of runs) {
+        anyRun = true;
+        const key = `${r.status}:${r.conclusion || ''}`;
+        if (seen.get(r.id) === key) continue;
+        seen.set(r.id, key);
+        if (r.status === 'completed') await L(`${r.conclusion === 'success' ? '✓' : '✗'} 배포 ${r.name}: ${r.conclusion === 'success' ? '완료' : r.conclusion}${r.conclusion === 'success' ? '' : ` (${r.url})`}`);
+        else await L(`배포 ${r.name}: ${r.status === 'queued' ? '대기 중' : '진행 중'}…`);
+      }
+      if (anyRun && runs.every((r) => r.status === 'completed')) {
+        const ok = runs.every((r) => r.conclusion === 'success');
+        await L(ok ? '✓ 배포 완료 - 개발서버에 반영됐습니다' : '✗ 배포 중 실패한 워크플로가 있습니다 - GitHub Actions 를 확인하세요');
+        return;
+      }
+      if (!anyRun && Date.now() - (until - waitMin * 60_000) > 120_000) {
+        await L('배포 워크플로가 시작되지 않았습니다 - 바뀐 경로가 배포 대상(paths)에 없거나 워크플로가 없는 저장소입니다');
+        return;
+      }
+      await sleep(30_000);
+    }
+    await L(`배포 추적 종료(${waitMin}분 경과) - GitHub Actions 에서 확인하세요`);
   }
 
   /** GitHub 의 PR 상태와 리포트 상태를 맞춘다 (뷰어 '새로고침'). PR 이 열려 있으면 병합도 다시 시도 */
