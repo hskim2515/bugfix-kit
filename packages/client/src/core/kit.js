@@ -32,9 +32,20 @@ export function createBugfix(options = {}) {
   const getRoutes = ic.router ? installRouter(ic.router === true ? null : ic.router) : noop;
   const getEvents = ic.events ? installEvents(ic.events.emitter || ic.events, ic.events.emitter ? ic.events : {}) : noop;
 
+  // 신고 대상 프로젝트 목록: projects: [{ key, label, apiKey? }]. 없으면 project 하나. 첫 항목이 기본
+  const projects = (opt.projects?.length ? opt.projects : [{ key: opt.project, label: opt.project }]).map((p) => (typeof p === 'string' ? { key: p, label: p } : p));
   const kit = {
     options: opt,
-    api: createApi(opt),
+    projects,
+    project: projects[0].key,
+    api: createApi({ ...opt, project: projects[0].key, apiKey: projects[0].apiKey ?? opt.apiKey }),
+    /** 신고·조회 대상 프로젝트 바꾸기 (모달·뷰어의 선택 상자가 부른다) */
+    setProject(key) {
+      const p = projects.find((x) => x.key === key);
+      if (!p) return;
+      kit.project = p.key;
+      kit.api = createApi({ ...opt, project: p.key, apiKey: p.apiKey ?? opt.apiKey });
+    },
     getLogs, getNetwork, getMutations, getRoutes, getEvents,
     captureScreen: (extra = {}) => captureScreen({ ...(opt.capture || {}), ...extra, ignore: [...(opt.capture?.ignore || []), ...(extra.ignore || [])] }),
     captureContext: () => captureContext(kit),

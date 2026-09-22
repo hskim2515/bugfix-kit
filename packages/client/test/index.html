@@ -29,6 +29,7 @@
     endpoint: 'http://localhost:8791/api',
     project: 'demo',
     apiKey: 'k1',
+    projects: [{ key: 'demo', label: '데모 앱', apiKey: 'k1' }, { key: 'kit', label: '버그 신고 도구' }],
     user: () => 'smoke-user',
     context: () => ({ appState: { page: 'smoke' }, camera: { lon: 127, lat: 37 } }),
     capture: { canvases: () => [c] },
@@ -56,6 +57,14 @@
       out.logsCaptured = kit.getLogs().length;
       out.netCaptured = kit.getNetwork().length;
       out.contextKeys = Object.keys(kit.captureContext());
+      out.targetButtons = [...m.querySelectorAll('.severity-group .severity-btn')].map((b) => b.textContent.trim()).filter((t) => ['데모 앱', '버그 신고 도구'].includes(t));
+      // 대상을 '버그 신고 도구' 로 바꿔 저장하면 kit 프로젝트로 들어가야 한다
+      [...m.querySelectorAll('.severity-btn')].find((b) => b.textContent.trim() === '버그 신고 도구')?.click();
+      await sleep(100);
+      out.projectAfterSwitch = kit.project;
+      const savedKit = await kit.api.save({ severity: 'LOW', problem: 'kit smoke' });
+      out.savedKitId = savedKit.bugReportId;
+      kit.setProject('demo');
       const saved = await kit.api.save({ severity: 'LOW', problem: 'auto smoke', screenshot: m.querySelector('img.screenshot-img')?.src, contextJson: JSON.stringify(kit.captureContext()), frontendLogs: JSON.stringify(kit.getLogs()), networkLogs: JSON.stringify(kit.getNetwork()) });
       out.savedId = saved.bugReportId;
       kit._els.modal.close();
@@ -66,6 +75,12 @@
       const items = v.querySelectorAll('.brv-item, .brv-list-item, [class*="brv-item"]');
       out.listRows = items.length;
       out.empty = !!v.querySelector('.brv-empty');
+      out.viewerProjectButtons = v.querySelectorAll('.brv-projects button').length;
+      [...v.querySelectorAll('.brv-projects button')].find((b) => b.textContent.trim() === '버그 신고 도구')?.click();
+      await sleep(800);
+      out.kitListRows = v.querySelectorAll('.brv-item').length;
+      [...v.querySelectorAll('.brv-projects button')].find((b) => b.textContent.trim() === '데모 앱')?.click();
+      await sleep(800);
       if (items[0]) {
         items[0].click();
         await sleep(1200);

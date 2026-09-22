@@ -12,6 +12,9 @@
             저장된 버그 리포트
             <span v-if="hotkey" class="brv-shortcut">{{ hotkey }}</span>
           </span>
+          <span v-if="projects.length > 1" class="brv-projects">
+            <button v-for="p in projects" :key="p.key" :class="['brv-fix-btn', 'brv-fix-btn--ghost', { 'brv-projects__on': project === p.key }]" @click="switchProject(p.key)">{{ p.label }}</button>
+          </span>
           <button class="brv-close" @click="close">✕</button>
         </div>
         <div v-if="notice" :class="['brv-notice', `brv-notice--${notice.type}`]"><b>{{ notice.title }}</b> {{ notice.message }}</div>
@@ -361,6 +364,7 @@ export default {
       chatInput: '',
       now: Date.now(),
       notice: null,
+      project: null,
       logTab: 'front',
       expanded: new Set(),
       showFE: { error: true, warn: true, log: false },
@@ -370,6 +374,7 @@ export default {
   },
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.viewer || ''; },
+    projects() { return this.kit?.projects || []; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
     // 병합 뒤 배포(GitHub Actions) 추적이 아직 진행 중인가 - 로그에 끝났다는 줄이 없고 갱신이 최근(35분 안)이면
     deployPending() {
@@ -453,6 +458,14 @@ export default {
       this.selected = null;
       this.detail = null;
       this.expanded = new Set();
+      this.project = this.kit?.project || null;
+      await this.fetchList();
+    },
+    async switchProject(key) {
+      if (key === this.project) return;
+      this.kit?.setProject(key);
+      this.project = key;
+      this.selected = null; this.detail = null; this._stopFixPolling();
       await this.fetchList();
     },
     close() { this.isOpen = false; this._stopFixPolling(); },
@@ -646,6 +659,8 @@ export default {
 </script>
 
 <style scoped>
+.brv-projects { margin-left: auto; margin-right: 10px; display: inline-flex; gap: 4px; }
+.brv-projects__on { background: rgba(136,170,255,0.25) !important; color: #fff !important; }
 .brv-notice { margin: 0 16px; padding: 8px 12px; border-radius: 6px; font-size: 12px; background: #eef4ff; color: #1e3a8a; }
 .brv-notice--error { background: #fdecec; color: #8a1c1c; }
 .brv-notice--success { background: #e9f8ee; color: #14532d; }

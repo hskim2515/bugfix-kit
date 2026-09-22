@@ -63,6 +63,14 @@
               <div class="screenshot-hint">이미지를 붙여넣기(Ctrl+V)해도 캡처 대신 쓸 수 있습니다.</div>
             </div>
 
+            <!-- 신고 대상 (앱 / 버그 신고 도구 자체 등 여러 프로젝트가 등록된 경우) -->
+            <div v-if="projects.length > 1" class="bug-report-section">
+              <div class="bug-report-label">신고 대상</div>
+              <div class="severity-group">
+                <button v-for="p in projects" :key="p.key" :class="['severity-btn', { active: project === p.key }]" @click="setProject(p.key)">{{ p.label }}</button>
+              </div>
+            </div>
+
             <!-- 심각도 -->
             <div class="bug-report-section">
               <div class="bug-report-label">심각도</div>
@@ -471,10 +479,12 @@ export default {
       isSaving: false,
       saveStatus: '서버 저장',
       severityOptions: SEVERITY_OPTIONS,
+      project: null,
     };
   },
   computed: {
     hotkey() { return this.kit?.options?.hotkeys?.report || ''; },
+    projects() { return this.kit?.projects || []; },
     serverEnabled() { return !!this.kit?.api?.enabled; },
 
     tabs() {
@@ -563,8 +573,10 @@ export default {
     },
 
     open() { return this.openReport(); },
+    setProject(key) { this.kit?.setProject(key); this.project = key; },
     async openReport() {
       if (this.isCapturing || this.isOpen) return;
+      this.project = this.kit?.project || null;
       this.problemDesc = '';
       this.reproSteps = '';
       this.expectedResult = '';

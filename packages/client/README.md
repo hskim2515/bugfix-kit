@@ -55,6 +55,7 @@ export const kit = createBugfix({
 |---|---|
 | `endpoint` | bugfix-server 주소(`…/api`). 비우면 서버 저장·목록 없이 복사·다운로드만 |
 | `project`, `apiKey`, `user` | 서버 설정의 프로젝트 이름·키, 보고자 표시명(문자열 또는 함수) |
+| `projects` | 신고 대상 여러 개: `[{ key: 'myapp', label: '앱', apiKey }, { key: 'bugfix-kit', label: '버그 신고 도구' }]` - 모달에 '신고 대상' 선택, 뷰어에 프로젝트 전환이 생긴다. 도구 자체의 버그를 같은 파이프라인으로 보내는 용도 |
 | `context()` | 앱 전용 컨텍스트. 공통 항목(브라우저·화면·메모리·연결·localStorage·최근 이벤트·상태 변화·경로)에 합쳐진다 |
 | `capture.canvases()` | 먼저 그릴 WebGL 캔버스(preserveDrawingBuffer 필요). `beforeCapture`, `ignore`(선택자) |
 | `backendLogs()` | 신고 시 백엔드 로그(네트워크 오류가 있을 때만 호출) |
