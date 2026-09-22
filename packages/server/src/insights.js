@@ -14,6 +14,7 @@ export class Insights {
   constructor(cfg, store, runner, log = console) {
     this.cfg = cfg; this.store = store; this.runner = runner; this.log = log;
     this.timers = new Map();
+    this.locks = new Map();
   }
 
   file(project) { return path.join(this.cfg.server.dataDir, project, 'insights.json'); }
@@ -22,16 +23,36 @@ export class Insights {
     try { return JSON.parse(await fs.readFile(this.file(project), 'utf8')); }
     catch { return { status: 'NONE', log: '', items: [], updatedAt: null }; }
   }
+  /** 프로젝트별 프로미스 체인 잠금 - insights.json 읽기→병합→쓰기가 겹치지 않게 (FileStore.withLock 과 같은 방식) */
+  async withLock(project, fn) {
+    const prev = this.locks.get(project) || Promise.resolve();
+    let release;
+    const cur = new Promise((r) => { release = r; });
+    const chain = prev.then(() => cur);
+    this.locks.set(project, chain);
+    await prev;
+    try { return await fn(); }
+    finally { release(); if (this.locks.get(project) === chain) this.locks.delete(project); }
+  }
+  /** tmp 에 쓰고 rename - 반쯤 쓴 파일을 읽지 않게 */
+  async writeAtomic(file, obj) {
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(obj), 'utf8');
+    await fs.rename(tmp, file);
+  }
+  /** patch 는 객체 또는 (현재값 → 바꿀 값) 함수. 잠금 안에서 최신 상태에 병합한다 */
   async save(project, patch) {
-    const cur = await this.state(project);
-    const next = { ...cur, ...patch, updatedAt: nowIso() };
-    await fs.mkdir(path.dirname(this.file(project)), { recursive: true });
-    await fs.writeFile(this.file(project), JSON.stringify(next), 'utf8');
-    return next;
+    return this.withLock(project, async () => {
+      const cur = await this.state(project);
+      const next = { ...cur, ...(typeof patch === 'function' ? patch(cur) : patch), updatedAt: nowIso() };
+      await this.writeAtomic(this.file(project), next);
+      return next;
+    });
   }
   async logLine(project, line) {
-    const cur = await this.state(project);
-    await this.save(project, { log: (cur.log || '') + `${hhmmss()}  ${line}\n` });
+    const stamped = `${hhmmss()}  ${line}\n`;
+    await this.save(project, (cur) => ({ log: (cur.log || '') + stamped }));
     this.log.info(`[insights ${project}] ${line}`);
   }
 
@@ -79,9 +100,16 @@ export class Insights {
       await L(`재료 준비: 리포트 ${reports.length}건 · 최근 커밋 30개`);
 
       await L('Claude 분석 중… (읽기 전용)');
-      const out = await runClaudeStream(ex, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
-        [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
-        (line) => this.logLine(name, `  ${line}`));
+      // onProgress 는 await 없이 불리므로 기록 프로미스를 모아 두었다가 DONE 저장 전에 모두 끝낸다
+      const pending = [];
+      let out;
+      try {
+        out = await runClaudeStream(ex, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
+          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+          (line) => { pending.push(this.logLine(name, `  ${line}`).catch((e) => this.log.warn(`[insights ${name}] 로그 기록 실패: ${e.message}`))); });
+      } finally {
+        await Promise.all(pending);
+      }
       await L(`Claude 종료 (${claudeSummary(out)})`);
 
       let items = [];
