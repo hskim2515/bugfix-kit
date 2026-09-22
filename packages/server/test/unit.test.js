@@ -83,9 +83,10 @@ test('FileStore: 저장·조회·목록·갱신·재시작 정리', async () => 
   await Promise.all([st.update('p', 1, (c) => ({ ...c, x: 1 })), st.update('p', 1, (c) => ({ ...c, y: 2 }))]);
   const r1 = await st.get('p', 1);
   assert.equal(r1.x, 1); assert.equal(r1.y, 2);
-  await st.resetInterrupted({ warn() {} });
-  assert.equal((await st.get('p', 1)).fixStatus, 'PR_OPENED');
-  assert.equal((await st.get('p', 2)).fixStatus, 'FAILED');
+  const redo = await st.resetInterrupted({ warn() {} });
+  assert.equal((await st.get('p', 1)).fixStatus, 'PR_OPENED');       // PR 있음 → 열린 채
+  assert.equal((await st.get('p', 2)).fixStatus, 'QUEUED');          // PR 없음 → 다시 큐
+  assert.deepEqual(redo, [{ project: 'p', id: 2, kind: 'fix' }]);
   assert.equal(FileStore.fixState(await st.get('p', 1)).screenshot, undefined);
   assert.equal(await st.delete('p', 2), true);
   assert.equal(await st.get('p', 2), null);

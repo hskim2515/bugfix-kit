@@ -27,9 +27,16 @@ const store = new FileStore(cfg.server.dataDir);
 const runner = new Runner(cfg, store, log);
 const insights = new Insights(cfg, store, runner, log);
 
-await store.resetInterrupted(log);
-await insights.resetInterrupted();
+const redo = await store.resetInterrupted(log);
+for (const r of redo) {
+  const project = cfg.projects[r.project];
+  if (!project) continue;
+  if (r.kind === 'followup') await runner.enqueueFollowUp(project, r.id, r.message, r.mode);
+  else await runner.enqueue(project, r.id);
+}
+if (redo.length) log.info(`[bugfix] 재시작으로 끊긴 작업 ${redo.length}건을 다시 큐에 넣었습니다`);
 const app = createApi(cfg, store, runner, log, insights);
+await insights.resetInterrupted();
 insights.startSchedules();
 app.listen(port, cfg.server.host, () => {
   log.info(`[bugfix] 서버 시작 http://${cfg.server.host}:${port}  프로젝트: ${Object.keys(cfg.projects).join(', ')}  data=${cfg.server.dataDir}  work=${cfg.server.workDir}`);
