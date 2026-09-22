@@ -316,7 +316,7 @@
     }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
     $('#rows').innerHTML = rows.map((r) => { const st = r.fixStatus || 'NONE';
       const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
-      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span></td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
+      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span></td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
     $('#empty').hidden = rows.length > 0;
   }
 

@@ -44,7 +44,6 @@ export const kit = createBugfix({
   context: () => ({ route: window.location.pathname, selection: store.getState().selection }),
   capture: { canvases: () => [document.querySelector('canvas')!] },            // WebGL 캔버스가 있으면 (preserveDrawingBuffer)
   interceptors: { console: true, network: { fetch: true, xhr: true }, router: true, mutation: mw.source },   // router: true = history API 패치(react-router 포함)
-  projects: [{ key: 'myapp', label: '앱' }, { key: 'bugfix-kit', label: '버그 신고 도구' }],
 }).mount();                                                          // <bugfix-report-modal>·<bugfix-viewer> 를 body 에 붙임
 ```
 어디서든 `kit.openReport()` / `kit.openViewer()` (또는 Shift+F9 / Shift+F10). 타입은 `types/index.d.ts` 로 제공.
@@ -76,7 +75,7 @@ export const kit = createBugfix({
 |---|---|
 | `endpoint` | bugfix-server 주소(`…/api`). 비우면 서버 저장·목록 없이 복사·다운로드만 |
 | `project`, `apiKey`, `user` | 서버 설정의 프로젝트 이름·키, 보고자 표시명(문자열 또는 함수) |
-| `projects` | 신고 대상 여러 개: `[{ key: 'myapp', label: '앱', apiKey }, { key: 'bugfix-kit', label: '버그 신고 도구' }]` - 모달에 '신고 대상' 선택, 뷰어에 프로젝트 전환이 생긴다. 도구 자체의 버그를 같은 파이프라인으로 보내는 용도 |
+| `projects` | 프론트/백엔드 저장소가 다른 앱처럼 신고 대상이 여럿일 때: `[{ key: 'web', label: '프론트', apiKey }, { key: 'api', label: '백엔드' }]` - 모달에 '신고 대상' 선택, 뷰어에 프로젝트 전환이 생긴다. 신고 도구 자체의 문제는 별도 프로젝트가 아니라 모달의 '버그 신고 도구 문제' 체크(같은 프로젝트에 `tool` 표시, AI 수정 대상 아님) |
 | `context()` | 앱 전용 컨텍스트. 공통 항목(브라우저·화면·메모리·연결·localStorage·최근 이벤트·상태 변화·경로)에 합쳐진다 |
 | `capture.canvases()` | 먼저 그릴 WebGL 캔버스(preserveDrawingBuffer 필요). `beforeCapture`, `ignore`(선택자) |
 | `backendLogs()` | 신고 시 백엔드 로그(네트워크 오류가 있을 때만 호출) |

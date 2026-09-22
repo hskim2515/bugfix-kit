@@ -25,13 +25,13 @@
         <!-- 헤더 -->
         <div class="bug-report-header">
           <span class="bug-report-title">버그 신고 <span v-if="hotkey" class="bug-report-shortcut">{{ hotkey }}</span></span>
-          <!-- 신고 대상 (앱 / 버그 신고 도구 자체 등 여러 프로젝트가 등록된 경우) -->
+          <!-- 신고 대상 (프론트/백엔드 저장소가 다른 앱처럼 프로젝트가 여럿 등록된 경우) -->
           <span v-if="appProjects.length > 1" class="bug-target" title="어디에 대한 신고인지">
             <button v-for="p in appProjects" :key="p.key" :class="{ 'bug-target__on': project === p.key }" @click="setProject(p.key)">{{ p.label }}</button>
           </span>
-          <!-- 운영자만 고치는 프로젝트(예: 버그 신고 도구 자체)는 체크박스로 - 앱 사용자는 신고만 한다 -->
-          <label v-if="toolProject" class="bug-target-tool" :title="`${toolProject.label} 쪽으로 신고합니다 (운영자가 처리)`">
-            <input type="checkbox" :checked="project === toolProject.key" @change="setProject($event.target.checked ? toolProject.key : appProjects[0]?.key)"> {{ toolProject.label }} 문제
+          <!-- 버그 신고 도구 자체의 문제 - 같은 프로젝트에 '도구' 표시로 저장되고 AI 수정 대상이 아니다(운영자가 도구 저장소에서 처리) -->
+          <label v-if="kit?.api?.enabled" class="bug-target-tool" title="신고 창·목록 등 이 도구 자체의 문제일 때 (앱 코드 수정 대상이 아니고 운영자가 처리)">
+            <input type="checkbox" v-model="tool"> 버그 신고 도구 문제
           </label>
           <button class="bug-report-close" @click="close">✕</button>
         </div>
@@ -453,6 +453,7 @@ export default {
   data() {
     return {
       isOpen: false,
+      tool: false,             // '버그 신고 도구 문제' 체크
       backdropPressed: false,
       isEditingShot: false,
       isCapturing: false,
@@ -488,7 +489,6 @@ export default {
     projects() { return this.kit?.projects || []; },
     // canFix=false(운영자 전용) 프로젝트는 '도구 문제' 체크박스로, 나머지는 신고 대상 선택으로
     appProjects() { return this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
-    toolProject() { return this.projects.find((p) => this.info[p.key]?.canFix === false) || null; },
     serverEnabled() { return !!this.kit?.api?.enabled; },
 
     tabs() {
@@ -585,6 +585,7 @@ export default {
       this.problemDesc = '';
       this.reproSteps = '';
       this.expectedResult = '';
+      this.tool = false;
       this.severity = 'MEDIUM';
       this.screenshotUrl = null;
       this.activeTab = 'basic';
@@ -709,6 +710,7 @@ export default {
         const payload = {
           severity:       this.severity,
           problem:        this.problemDesc,
+          tool:           this.tool,
           reproSteps:     this.reproSteps,
           expectedResult: this.expectedResult,
           screenshot:     this.screenshotUrl,

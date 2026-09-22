@@ -125,6 +125,8 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     const report = {};
     for (const k of REPORT_FIELDS) report[k] = b[k] == null ? null : (typeof b[k] === 'string' ? b[k] : JSON.stringify(b[k]));
     report.reporter = req.get('X-Bugfix-User') || b.reporter || 'anonymous';
+    // 버그 신고 도구 자체의 문제 - 같은 프로젝트에 '도구' 표시로 저장되고 AI 수정 대상이 아니다(운영자가 도구 저장소에서 처리)
+    report.tool = b.tool === true || b.tool === 'true';
     const saved = await store.save(req.project.name, report);
     log.info(`[bugfix ${req.project.name}] 리포트 #${saved.bugReportId} (${report.reporter})`);
     return { bugReportId: saved.bugReportId };
@@ -136,6 +138,13 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     const id = Number(req.params.id);
     const r = Number.isInteger(id) ? await store.get(req.project.name, id) : null;
     if (!r) throw new HttpError(404, `리포트가 없습니다: ${req.params.id}`);
+    return r;
+  };
+
+  // 도구 문제 리포트는 이 프로젝트의 코드와 무관하므로 수정 파이프라인에 넣지 않는다
+  const loadFixable = async (req) => {
+    const r = await load(req);
+    if (r.tool) throw new HttpError(409, '버그 신고 도구 문제로 접수된 리포트는 AI 수정 대상이 아닙니다(도구 저장소에서 처리)');
     return r;
   };
 
@@ -159,7 +168,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
   pr.post('/reports/:id/request-fix', fixGuard, wrap(async (req) => {
     const p = req.project;
     if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
-    const r = await load(req);
+    const r = await loadFixable(req);
     if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '이미 수정이 진행 중입니다.');
     await store.update(p.name, r.bugReportId, (c) => ({
       ...c,
@@ -175,7 +184,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
     const p = req.project;
     const { message, mode } = req.body || {};
     if (!notBlank(message)) throw new HttpError(400, '메시지가 비어 있습니다.');
-    const r = await load(req);
+    const r = await loadFixable(req);
     if (!r.fixStatus) throw new HttpError(409, "먼저 '수정 요청' 을 실행한 뒤에 이어서 대화할 수 있습니다.");
     if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '작업이 진행 중입니다. 끝난 뒤에 보내세요.');
     await runner.appendChat(p, r.bugReportId, 'user', message.trim());
@@ -185,7 +194,7 @@ export function createApi(cfg, store, runner, log = console, insights = null) {
 
   /** 열린 PR 을 정식 경로로 병합 (관리 콘솔·자동 병합 프로젝트용) */
   pr.post('/reports/:id/merge', fixGuard, wrap(async (req) => {
-    const r = await load(req);
+    const r = await loadFixable(req);
     await runner.enqueueMerge(req.project, r.bugReportId);
     return FileStore.fixState(await store.get(req.project.name, r.bugReportId));
   }));
