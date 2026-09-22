@@ -293,12 +293,18 @@ export function hintsFromReport(r) {
     if (ctx.route) { hints.add(String(ctx.route)); add(ctx.route); }
   }
   add(r.problem); add(r.reproSteps); add(r.expectedResult);
+  // 두 단어 묶음("지구 선택")은 한 단어보다 뜻이 분명하다 - 라벨에 그대로 들어 있는 경우가 많다
+  const pt = tokens(r.problem).slice(0, 40);
+  for (let i = 0; i + 1 < pt.length; i++) if (/^[가-힣]+$/.test(pt[i]) && /^[가-힣]+$/.test(pt[i + 1])) hints.add(`${pt[i]} ${pt[i + 1]}`);
+  // AI 가 실제로 고친 파일(진행 로그의 '변경 파일:' 블록)은 가장 확실한 단서
+  const m = String(r.fixLog || '').match(/변경 파일:\n([\s\S]*?)(?:\n\d{2}:\d{2}:\d{2}|$)/);
+  if (m) for (const l of m[1].split(/\r?\n/)) { const f = l.replace(/^\s*[MADRCU?!]{1,2}\s+/, '').trim().split(' -> ').pop(); if (f) hints.add(f); }
   for (const raw of [r.frontendLogs, r.networkLogs]) {
     const s = typeof raw === 'string' ? raw : (raw ? JSON.stringify(raw) : '');
     for (const m of s.matchAll(/([A-Za-z0-9_-]+\.(?:vue|jsx?|tsx?|java))/g)) hints.add(m[1]);
     for (const m of s.matchAll(/\/api\/[a-z0-9/_-]+/gi)) hints.add(m[0]);
   }
-  return [...hints].filter((h) => h.length >= 2).slice(0, 60);
+  return [...hints].filter((h) => h.length >= 2).slice(0, 80);
 }
 
 function tokens(s) {
@@ -314,18 +320,24 @@ const STOP = new Set(['the', 'and', 'that', 'this', 'with', 'from', 'null', 'und
 export const LAYER = { module: 0, screen: 1, menu: 2, feature: 3, component: 4, store: 4, util: 4, api: 5, service: 6, table: 7 };
 
 /** 단서와 맞는 노드 + 이웃을 부분 그래프 데이터로 (뷰어가 그림으로 그린다) */
-export function relevantGraph(g, hints, { max = 14 } = {}) {
+export function relevantGraph(g, hints, { max = 10 } = {}) {
   if (!g?.nodes?.length || !hints?.length) return { nodes: [], edges: [] };
-  const hs = hints.map((h) => String(h).toLowerCase());
+  const hay = new Map(g.nodes.map((n) => [n.id, `${n.label} ${n.route || ''} ${n.path || ''} ${n.desc || ''} ${n.id}`.toLowerCase()]));
+  // 너무 흔한 단서(그래프의 많은 노드에 걸리는 말, 예: "지구")는 버린다 - 문제 문장에서 나온 단어는 노드 몇 개만 집어야 뜻이 있다
+  const limit = Math.max(6, Math.round(g.nodes.length * 0.03));
+  const hs = [...new Set(hints.map((h) => String(h).toLowerCase()))].filter((h) => { let c = 0; for (const t of hay.values()) if (t.includes(h) && ++c > limit) return false; return c > 0; });
+  const strong = (h) => h.includes('/') || h.includes('.');
   const score = (n) => {
-    const hay = `${n.label} ${n.route || ''} ${n.path || ''} ${n.desc || ''} ${n.id}`.toLowerCase();
-    let s = 0;
+    const t = hay.get(n.id);
+    let s = 0, st = false;
     for (const h of hs) {
-      if (!hay.includes(h)) continue;
-      s += h.includes('/') || h.includes('.') ? 3 : 1;
+      if (!t.includes(h)) continue;
+      if (strong(h)) { s += 3; st = true; } else s += h.includes(' ') ? 2 : 1;
       if (n.label.toLowerCase() === h) s += 3;
     }
-    if (s && (n.type === 'menu' || n.type === 'screen' || n.type === 'feature')) s += 1;
+    // 흔한 단어 하나만 걸린 노드는 관련 없다고 본다 - 경로·파일명 일치이거나 단서가 둘 이상 겹쳐야 한다
+    if (!st && s < 2) return 0;
+    if (n.type === 'menu' || n.type === 'screen' || n.type === 'feature') s += 1;
     return s;
   };
   const scored = g.nodes.map((n) => ({ n, s: score(n) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, max);
@@ -334,34 +346,21 @@ export function relevantGraph(g, hints, { max = 14 } = {}) {
   const picked = new Map(scored.map((x) => [x.n.id, { ...x.n, hit: true, score: x.s }]));
   const adj = new Map();
   for (const e of g.edges) { (adj.get(e.from) || adj.set(e.from, []).get(e.from)).push(e); (adj.get(e.to) || adj.set(e.to, []).get(e.to)).push(e); }
-  for (const id of scored.slice(0, 6).map((x) => x.n.id)) for (const e of adj.get(id) || []) { const o = e.from === id ? e.to : e.from; if (byId.has(o) && !picked.has(o) && picked.size < max * 3) picked.set(o, { ...byId.get(o), hit: false }); }
+  // 이웃은 상위 4개에서 1홉만, 모듈 노드는 어디에나 이어져 있어 뺀다
+  for (const id of scored.slice(0, 4).map((x) => x.n.id)) for (const e of adj.get(id) || []) { const o = e.from === id ? e.to : e.from; const on = byId.get(o); if (on && on.type !== 'module' && !picked.has(o) && picked.size < 26) picked.set(o, { ...on, hit: false }); }
   const nodes = [...picked.values()].map((n) => ({ ...n, layer: LAYER[n.type] ?? 3 }));
   const edges = g.edges.filter((e) => picked.has(e.from) && picked.has(e.to));
   return { nodes, edges };
 }
 
 /** 단서와 맞는 노드를 고르고 1홉 이웃까지 넓혀 마크다운으로 */
-export function renderRelevant(g, hints, { max = 14 } = {}) {
-  if (!g?.nodes?.length || !hints?.length) return '';
-  const hs = hints.map((h) => String(h).toLowerCase());
-  const score = (n) => {
-    const hay = `${n.label} ${n.route || ''} ${n.path || ''} ${n.desc || ''} ${n.id}`.toLowerCase();
-    let s = 0;
-    for (const h of hs) {
-      if (!hay.includes(h)) continue;
-      s += h.includes('/') || h.includes('.') ? 3 : 1;      // 경로·파일명 일치는 강한 단서
-      if (n.label.toLowerCase() === h) s += 3;
-    }
-    if (s && (n.type === 'menu' || n.type === 'screen' || n.type === 'feature')) s += 1;
-    return s;
-  };
-  const scored = g.nodes.map((n) => ({ n, s: score(n) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).slice(0, max);
-  if (!scored.length) return '';
+export function renderRelevant(g, hints, opts = {}) {
+  const sub = relevantGraph(g, hints, opts);
+  if (!sub.nodes.length) return '';
   const byId = new Map(g.nodes.map((n) => [n.id, n]));
-  const picked = new Map(scored.map((x) => [x.n.id, x.n]));
+  const picked = new Map(sub.nodes.map((n) => [n.id, n]));
   const adj = new Map();
-  for (const e of g.edges) { (adj.get(e.from) || adj.set(e.from, []).get(e.from)).push(e); (adj.get(e.to) || adj.set(e.to, []).get(e.to)).push(e); }
-  for (const id of scored.slice(0, 6).map((x) => x.n.id)) for (const e of adj.get(id) || []) { const o = e.from === id ? e.to : e.from; if (byId.has(o) && picked.size < max * 3) picked.set(o, byId.get(o)); }
+  for (const e of sub.edges) { (adj.get(e.from) || adj.set(e.from, []).get(e.from)).push(e); (adj.get(e.to) || adj.set(e.to, []).get(e.to)).push(e); }
   const lines = [];
   const show = (n) => `${n.label}${n.route ? ` (${n.route})` : ''}${n.path ? ` \`${n.path}\`` : ''}${n.desc ? ` - ${n.desc}` : ''}`;
   const groups = [['menu', '메뉴·화면'], ['screen', null], ['feature', '기능'], ['component', '구현 파일'], ['store', null], ['util', null], ['api', 'API'], ['service', '백엔드'], ['table', null], ['module', null]];
@@ -371,7 +370,7 @@ export function renderRelevant(g, hints, { max = 14 } = {}) {
     if (!ns.length) continue;
     if (title) { cur = title; lines.push(`\n## ${title}`); } else if (!cur) { cur = t; lines.push(`\n## ${t}`); }
     for (const n of ns) {
-      lines.push(`- [${n.type}] ${show(n)}`);
+      lines.push(`- [${n.type}]${n.hit ? ' ★' : ''} ${show(n)}`);
       const rel = (adj.get(n.id) || []).filter((e) => e.from === n.id && picked.has(e.to)).slice(0, 8).map((e) => `${e.rel} → ${byId.get(e.to).label}`);
       if (rel.length) lines.push(`    ${rel.join(' · ')}`);
     }
