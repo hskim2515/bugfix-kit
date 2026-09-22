@@ -421,7 +421,7 @@
   async function kgLoadLibs() {
     if (kgLibs) return kgLibs;
     // 두 라이브러리가 같은 three.js 인스턴스를 써야 한다(다르면 Sprite 가 렌더러와 안 맞아 터진다) - esm.sh 의 deps 고정으로 하나로
-    const [fg, st] = await Promise.all([import('https://esm.sh/3d-force-graph@1.73.4?deps=three@0.169.0'), import('https://esm.sh/three-spritetext@1.8.2?deps=three@0.169.0')]);
+    const [fg, st] = await Promise.all([import('https://esm.sh/3d-force-graph@1.73.4?deps=three@0.180.0'), import('https://esm.sh/three-spritetext@1.8.2?deps=three@0.180.0')]);
     kgLibs = { ForceGraph3D: fg.default, SpriteText: st.default };
     return kgLibs;
   }
