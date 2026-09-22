@@ -91,6 +91,7 @@ export function claudeSummary(out) {
   let b = `턴 ${n.num_turns ?? 0}`;
   if (ms > 0) b += ` · ${Math.floor(ms / 60000)}분 ${Math.floor(ms / 1000) % 60}초`;
   if (n.total_cost_usd != null) b += ` · $${Number(n.total_cost_usd).toFixed(2)}`;
-  if (n.is_error) b += ` · 오류: ${firstLine(String(n.result || ''), 200)}`;
+  if (n.subtype === 'error_max_turns') b += ' · 턴 한도에 걸려 중단';
+  else if (n.is_error) b += ` · 오류: ${firstLine(String(n.result || n.subtype || ''), 200)}`;
   return b;
 }

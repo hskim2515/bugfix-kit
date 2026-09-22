@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { runClaudeStream, claudeSummary } from './claude.js';
+import { runClaudeStream, claudeSummary, sessionIdOf } from './claude.js';
 import { firstLine, hhmmss, nowIso } from './util.js';
 
 const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(git blame:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)','Bash(wc:*)', 'Write(.bugfix/insights.json)'];
@@ -117,16 +117,30 @@ export class Insights {
       let out;
       try {
         out = await runClaudeStream(ex, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
-          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+          [this.cfg.server.claudeBin || 'claude', '-p', this.prompt(project, focus), '--max-turns', String(Math.max(40, this.cfg.server.maxTurns)), '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
           (line) => { pending.push(this.logLine(name, `  ${line}`).catch((e) => this.log.warn(`[insights ${name}] 로그 기록 실패: ${e.message}`))); });
       } finally {
         await Promise.all(pending);
       }
       await L(`Claude 종료 (${claudeSummary(out)})`);
+      // 탐색하다 턴 한도에 걸리면 결과 파일이 없다 - 같은 세션을 이어 "지금까지 찾은 것" 만 쓰게 한다(코드 탐색 없이 정리만)
+      const resultFile = path.join(dir, 'insights.json');
+      const sid = sessionIdOf(out);
+      if (sid && !(await fs.access(resultFile).then(() => true, () => false))) {
+        await L('결과 파일이 없어 같은 세션에서 정리만 이어서 요청…');
+        const pend2 = [];
+        try {
+          const out2 = await runClaudeStream(ex, wt, 10,
+            [this.cfg.server.claudeBin || 'claude', '-p', '--resume', sid, '탐색은 여기서 멈추세요. 더 읽거나 검색하지 말고, 지금까지 확인한 것만으로 `.bugfix/insights.json` 을 정해진 형식의 JSON 배열로 지금 바로 쓰세요. 확신이 낮은 항목은 confidence 를 낮게 적으면 됩니다.', '--max-turns', '6', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+            (line) => { pend2.push(this.logLine(name, `  ${line}`).catch(() => {})); });
+          await Promise.all(pend2);
+          await L(`정리 종료 (${claudeSummary(out2)})`);
+        } catch (e) { await Promise.all(pend2); await L(`정리 요청 실패: ${firstLine(e.message, 120)}`); }
+      }
 
       let items = [];
       try {
-        const raw = await fs.readFile(path.join(dir, 'insights.json'), 'utf8');
+        const raw = await fs.readFile(resultFile, 'utf8');
         const j = JSON.parse(raw);
         items = (Array.isArray(j) ? j : j.items || []).map((x, i) => ({
           id: i + 1, title: String(x.title || '').slice(0, 160), severity: ['HIGH', 'MEDIUM', 'LOW'].includes(String(x.severity).toUpperCase()) ? String(x.severity).toUpperCase() : 'MEDIUM',
@@ -158,6 +172,7 @@ ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
 토큰을 아끼세요: 전체를 읽지 말고 Grep 으로 후보(\`catch {}\`, \`TODO|FIXME|HACK\`, \`console.error\`, \`any\`, \`!.\`, \`setTimeout(.*0)\`, 최근 커밋의 파일)를 찾아 그 부분만 읽으세요.
 추측을 적지 마세요 - 파일과 줄을 실제로 확인한 것만, 근거(evidence)에 파일:줄과 코드 한 줄을 인용하세요. 확신이 낮으면 confidence 를 낮게.
 
+턴이 제한돼 있으니 탐색은 20턴 안쪽에서 끊고, 남은 후보가 있어도 **반드시** 결과 파일부터 쓰세요(빈 배열이라도). 결과 파일이 없으면 이 분석은 통째로 버려집니다.
 마지막에 \`.bugfix/insights.json\` 을 이 형식의 JSON 배열로 쓰세요 (최대 12개, 중요한 것부터):
 [
   { "title": "한 줄 제목(한국어, 60자 이내)", "severity": "HIGH|MEDIUM|LOW", "kind": "bug|ux|risk|cleanup",
