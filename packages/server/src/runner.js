@@ -379,6 +379,49 @@ export class Runner {
     await L(`배포 추적 종료(${waitMin}분 경과) - GitHub Actions 에서 확인하세요`);
   }
 
+  /**
+   * 열려 있는 PR 을 정식 경로로 병합한다: base 와 합치고(충돌은 Claude) → 재검증 → 푸시 → 병합 → 실제 반영 확인.
+   * 새로고침(fix-sync)이 autoMerge 프로젝트의 열린 PR 에 대해 부르고, 큐에서 하나씩 돈다.
+   */
+  async enqueueMerge(project, id) {
+    const r = await this.store.get(project.name, id);
+    if (!r?.fixPrNumber || !notBlank(r.fixBranch)) throw Object.assign(new Error('병합할 PR 이 없습니다'), { status: 409 });
+    if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw Object.assign(new Error('작업이 진행 중입니다'), { status: 409 });
+    await this.updateFix(project, id, { fixStatus: 'QUEUED' });
+    const ahead = this.submit(project, id, () => this.runMerge(project, id), async (e) => {
+      await this.logLine(project, id, `✗ 병합 작업 실패: ${firstLine(e.message, 300)}`);
+      await this.updateFix(project, id, { fixStatus: 'PR_OPENED' });
+    });
+    await this.logLine(project, id, `▶ 병합 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
+  }
+
+  async runMerge(project, id) {
+    const r = await this.store.get(project.name, id);
+    const gh = this.gh(project);
+    const L = (s) => this.logLine(project, id, s);
+    const st = await gh.getPullRequest(r.fixPrNumber);
+    if (st.merged) { await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' }); await L('✓ 이미 병합됨'); return; }
+    if (st.state !== 'open') { await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: 'PR 이 병합되지 않고 닫혔습니다.' }); await L('✗ PR 이 닫힘'); return; }
+    await this.updateFix(project, id, { fixStatus: 'RUNNING' });
+    await L(`▶ PR #${r.fixPrNumber} 병합 시작`);
+    const ex = this.ex(project);
+    const base = project.baseBranch;
+    const auth = gh.gitAuthHeader();
+    const { repo, jobs, wt } = this.paths(project, id);
+    await this.prepareRepo(project, ex, auth, L);
+    await ex.exec(repo, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', '--prune', 'origin', base, r.fixBranch]);
+    await this.freshWorktree(ex, repo, jobs, wt, `origin/${r.fixBranch}`);
+    await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, `origin/${r.fixBranch}`]);
+    try {
+      const changed = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim();
+      const mods = this.changedModules(project, changed.split(/\r?\n/).map((f) => `M  ${f}`).join('\n'));
+      await this.prepareNodeModules(project, ex, wt, L, true);
+      await this.autoMerge(project, ex, gh, id, wt, r.fixBranch, auth, { number: r.fixPrNumber, url: r.fixPrUrl }, `fix: ${orDash(r.fixSummary)} (버그 #${id})`, mods);
+    } finally {
+      await this.removeWorktree(ex, repo, wt);
+    }
+  }
+
   /** GitHub 의 PR 상태와 리포트 상태를 맞춘다 (뷰어 '새로고침'). PR 이 열려 있으면 병합도 다시 시도 */
   async syncWithGitHub(project, id) {
     const r = await this.store.get(project.name, id);
@@ -396,11 +439,10 @@ export class Runner {
       } else if (st.state === 'closed') {
         await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: 'PR 이 병합되지 않고 닫혔습니다.' });
         await L('✗ PR 이 닫힘(미병합)');
-      } else if (project.autoMerge && st.mergeable === true) {
-        const sha = await gh.mergePullRequest(r.fixPrNumber, `fix: ${orDash(r.fixSummary)} (버그 #${id})`);
-        await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' });
-        await L(`✓ 병합 완료(새로고침에서 재시도) @ ${sha.slice(0, 8)}`);
-        if (notBlank(r.fixBranch)) await gh.deleteBranch(r.fixBranch);
+      } else if (project.autoMerge && notBlank(r.fixBranch)) {
+        // 바로 병합하지 않고 정식 경로(base 합치기 → 충돌 해결 → 재검증 → 병합)를 큐에 넣는다
+        await this.enqueueMerge(project, id);
+        return this.store.get(project.name, id);
       } else if (r.fixStatus === 'FAILED') {
         await this.updateFix(project, id, { fixStatus: 'PR_OPENED' });
       }

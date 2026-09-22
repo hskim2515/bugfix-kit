@@ -2,11 +2,23 @@ import express from 'express';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import YAML from 'yaml';
-import { readEnvFile } from './config.js';
+import { loadConfig, readEnvFile } from './config.js';
 import { GitHub } from './github.js';
 import { expandHome, HttpError, notBlank } from './util.js';
+
+const execFileP = promisify(execFile);
+// 이벤트 루프를 막지 않는 spawnSync 대용. 실패해도 throw 하지 않고 { status, stdout, stderr } 를 돌려줌
+async function run(cmd, args, opts = {}) {
+  try {
+    const { stdout, stderr } = await execFileP(cmd, args, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, ...opts });
+    return { status: 0, stdout, stderr };
+  } catch (e) {
+    return { status: typeof e.code === 'number' ? e.code : null, stdout: e.stdout || '', stderr: e.stderr || e.message || '' };
+  }
+}
 
 /**
  * 운영자 관리 API (X-Bugfix-Admin 키). 대시보드가 쓴다.
@@ -34,10 +46,17 @@ export function adminRouter(cfg, store, runner, log = console) {
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
   // ── yml 읽기/쓰기 (주석은 유지되지 않는다 - 저장 전 .bak 을 남긴다) ──
+  // 새 내용은 .tmp 에 써서 loadConfig 로 먼저 검증하고, 통과할 때만 교체한다 (깨진 yml 이 남으면 다음 재시작에 서버가 뜨지 않는다)
   const readYml = () => YAML.parse(fs.readFileSync(cfg.file, 'utf8')) || {};
   const writeYml = (doc) => {
+    const tmp = `${cfg.file}.tmp`;
+    fs.writeFileSync(tmp, YAML.stringify(doc, { lineWidth: 0 }), { encoding: 'utf8', mode: 0o600 });
+    try { loadConfig(tmp); } catch (e) {
+      try { fs.unlinkSync(tmp); } catch { /* 없음 */ }
+      throw new HttpError(400, `설정 검증 실패: ${e.message}`);
+    }
     try { fs.copyFileSync(cfg.file, `${cfg.file}.bak`); } catch { /* 첫 저장 */ }
-    fs.writeFileSync(cfg.file, YAML.stringify(doc, { lineWidth: 0 }), { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(tmp, cfg.file);
     cfg.reload();
   };
   const writeEnv = (file, patch) => {
@@ -75,7 +94,7 @@ export function adminRouter(cfg, store, runner, log = console) {
       global: { GITHUB_TOKEN: mask(readToken()), ADMIN_KEY: mask(cfg.server.adminKey), FC_USER: globalEnv.FC_USER || '', FC_PASS: mask(globalEnv.FC_PASS),
         extra: Object.keys(globalEnv).filter((k) => !['ADMIN_KEY', 'GITHUB_TOKEN', 'FC_USER', 'FC_PASS'].includes(k)), tokenFile: TOKEN_FILE, envFile: GLOBAL_ENV },
       projects,
-      status: envStatus(),
+      status: await envStatus(),
       queue: runner.pending,
     };
   }));
@@ -157,14 +176,14 @@ export function adminRouter(cfg, store, runner, log = console) {
     const p = cfg.projects[req.params.name];
     if (!p) throw new HttpError(404, '없는 프로젝트');
     const gh = new GitHub(p.githubRepo, () => cfg.githubToken(p), log);
-    const res = spawnSync('git', ['-c', `http.extraheader=${gh.gitAuthHeader()}`, 'ls-remote', '--heads', p.repo, p.baseBranch], { encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 30000 });
+    const res = await run('git', ['-c', `http.extraheader=${gh.gitAuthHeader()}`, 'ls-remote', '--heads', p.repo, p.baseBranch], { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 30000 });
     const ok = res.status === 0 && res.stdout.trim().length > 0;
     return { ok, message: ok ? `${p.baseBranch} @ ${res.stdout.trim().slice(0, 12)}` : (res.stderr || res.stdout || '').replace(/Authorization: Basic \S+/g, '***').trim().split('\n').slice(-2).join(' ') || `브랜치 ${p.baseBranch} 없음` };
   }));
 
   r.post('/check/claude', wrap(async () => {
     const bin = cfg.server.claudeBin || 'claude';
-    const v = spawnSync(bin, ['--version'], { encoding: 'utf8', timeout: 20000, env: { ...process.env, PATH: `${cfg.server.pathExtra ? cfg.server.pathExtra + ':' : ''}${process.env.PATH}` } });
+    const v = await run(bin, ['--version'], { timeout: 20000, env: { ...process.env, PATH: `${cfg.server.pathExtra ? cfg.server.pathExtra + ':' : ''}${process.env.PATH}` } });
     const home = os.homedir();
     const cred = ['.claude/.credentials.json', '.claude.json'].map((f) => path.join(home, f)).find((f) => fs.existsSync(f));
     let loggedIn = false;
@@ -174,9 +193,9 @@ export function adminRouter(cfg, store, runner, log = console) {
   }));
 
   r.post('/check/docker', wrap(async () => {
-    const d = spawnSync('docker', ['version', '--format', '{{.Server.Version}}'], { encoding: 'utf8', timeout: 20000 });
+    const d = await run('docker', ['version', '--format', '{{.Server.Version}}'], { timeout: 20000 });
     const img = 'mcr.microsoft.com/playwright:v1.47.2-jammy';
-    const i = d.status === 0 ? spawnSync('docker', ['image', 'inspect', img, '--format', '{{.Size}}'], { encoding: 'utf8', timeout: 20000 }) : null;
+    const i = d.status === 0 ? await run('docker', ['image', 'inspect', img, '--format', '{{.Size}}'], { timeout: 20000 }) : null;
     return { available: d.status === 0, version: (d.stdout || '').trim(), image: img, imagePresent: !!(i && i.status === 0), hint: d.status !== 0 ? 'docker 가 없으면 front-check 는 설치된 Chrome/Chromium 을 씁니다' : (i.status !== 0 ? `docker pull ${img}` : '') };
   }));
 
@@ -186,8 +205,8 @@ export function adminRouter(cfg, store, runner, log = console) {
     const url = (p.cors || [])[0];
     if (!url) throw new HttpError(400, '프로젝트 cors 에 앱 주소가 있어야 합니다');
     const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
-    const res = spawnSync('node', [bin, 'check', '--url', url, '--no-serve', '--out', path.join(os.tmpdir(), `fc-admin-${p.name}`), '--json', '--steps', JSON.stringify([{ goto: '/' }, { waitFor: 2500 }, { eval: 'document.title' }])],
-      { encoding: 'utf8', timeout: 180000, cwd: os.tmpdir(), env: { ...process.env, ...(readEnvFile(projEnv(p.name))) } });
+    const res = await run('node', [bin, 'check', '--url', url, '--no-serve', '--out', path.join(os.tmpdir(), `fc-admin-${p.name}`), '--json', '--steps', JSON.stringify([{ goto: '/' }, { waitFor: 2500 }, { eval: 'document.title' }])],
+      { timeout: 180000, cwd: os.tmpdir(), env: { ...process.env, ...(readEnvFile(projEnv(p.name))) } });
     const i = (res.stdout || '').indexOf('{');
     const j = i >= 0 ? JSON.parse(res.stdout.slice(i)) : null;
     return j ? { ok: j.ok, collected: j.collected, fatal: j.fatal, title: (j.steps || []).find((s) => s.value !== undefined)?.value } : { ok: false, message: (res.stderr || res.stdout || '').split('\n').filter(Boolean).slice(-3).join(' ') };
@@ -195,19 +214,29 @@ export function adminRouter(cfg, store, runner, log = console) {
 
   r.get('/logs', wrap(async (req) => {
     const n = Math.min(500, Number(req.query.n) || 200);
-    const j = spawnSync('journalctl', ['--user', '-u', 'bugfix-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { encoding: 'utf8', timeout: 20000 });
+    const j = await run('journalctl', ['--user', '-u', 'bugfix-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { timeout: 20000 });
     if (j.status === 0 && j.stdout.trim() && !/^-- No entries --/.test(j.stdout.trim())) return { source: 'journalctl', text: j.stdout };
-    const s = spawnSync('systemctl', ['--user', 'status', 'bugfix-server', '-n', String(n), '--no-pager'], { encoding: 'utf8', timeout: 20000 });
+    const s = await run('systemctl', ['--user', 'status', 'bugfix-server', '-n', String(n), '--no-pager'], { timeout: 20000 });
     return { source: 'systemctl', text: s.stdout || s.stderr || '(로그를 읽을 수 없습니다 - journald 사용자 로그가 꺼져 있을 수 있습니다)' };
   }));
 
   function readToken() { try { return fs.readFileSync(TOKEN_FILE, 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return process.env.BUGFIX_GITHUB_TOKEN || null; } }
-  function envStatus() {
-    const du = (d) => { try { const r = spawnSync('du', ['-sh', d], { encoding: 'utf8', timeout: 20000 }); return (r.stdout || '').split('\t')[0].trim(); } catch { return ''; } };
+  // du 는 디렉터리 크기에 비례해 오래 걸리므로 1분 캐시
+  const duCache = new Map();
+  async function du(d) {
+    const c = duCache.get(d);
+    if (c && Date.now() - c.at < 60000) return c.size;
+    const r = await run('du', ['-sh', d], { timeout: 20000 });
+    const size = (r.stdout || '').split('\t')[0].trim();
+    duCache.set(d, { at: Date.now(), size });
+    return size;
+  }
+  async function envStatus() {
+    const [workDirSize, dataDirSize, git] = await Promise.all([du(cfg.server.workDir), du(cfg.server.dataDir), run('git', ['--version'])]);
     return {
       node: process.version, platform: `${os.type()} ${os.release()}`, hostname: os.hostname(), user: os.userInfo().username,
-      uptimeSec: Math.round(process.uptime()), workDir: cfg.server.workDir, workDirSize: du(cfg.server.workDir), dataDir: cfg.server.dataDir, dataDirSize: du(cfg.server.dataDir),
-      git: (spawnSync('git', ['--version'], { encoding: 'utf8' }).stdout || '').trim(),
+      uptimeSec: Math.round(process.uptime()), workDir: cfg.server.workDir, workDirSize, dataDir: cfg.server.dataDir, dataDirSize,
+      git: (git.stdout || '').trim(),
     };
   }
   return r;
