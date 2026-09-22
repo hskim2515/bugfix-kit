@@ -54,8 +54,13 @@ function rerunInDocker(cfg) {
   const mountRo = (p) => { if (!p || seen.has(p) || [...seen].some((s) => p.startsWith(s + path.sep))) return; seen.add(p); mounts.push('-v', `${p}:${p}:ro`); };
   const bin = fs.realpathSync(path.resolve(process.argv[1]));
   mountRo(findPkgRoot(bin));
-  // 심볼릭 링크된 node_modules(작업 사본 캐시) 도 실제 경로로
-  try { const real = fs.realpathSync(path.join(cwd, 'node_modules')); mountRo(real); } catch { /* 없음 */ }
+  // 의존성이 호이스팅된 상위 node_modules 들(모노레포 루트 등)과 심볼릭 링크된 node_modules(작업 사본 캐시)의 실제 경로도
+  for (const start of [findPkgRoot(bin), cwd]) {
+    for (let d = start; d !== path.dirname(d); d = path.dirname(d)) {
+      const nm = path.join(d, 'node_modules');
+      try { if (fs.existsSync(nm)) mountRo(fs.realpathSync(nm)); } catch { /* 없음 */ }
+    }
+  }
   const acct = cfg.login?.account ? path.dirname(expandHome(cfg.login.account)) : null;
   if (acct && fs.existsSync(acct)) mountRo(acct);
   const env = ['-e', `FC_USER=${process.env.FC_USER || ''}`, '-e', `FC_PASS=${process.env.FC_PASS || ''}`, '-e', `HOME=${os.homedir()}`];
