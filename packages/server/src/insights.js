@@ -56,6 +56,14 @@ export class Insights {
     this.log.info(`[insights ${project}] ${line}`);
   }
 
+  /** 서버 재시작 뒤: 돌던 분석은 실패로 정리 (다시 누르면 됨) */
+  async resetInterrupted() {
+    for (const p of Object.values(this.cfg.projects)) {
+      const st = await this.state(p.name);
+      if (['QUEUED', 'RUNNING'].includes(st.status)) await this.save(p.name, { status: 'FAILED', log: (st.log || '') + `${hhmmss()}  ✗ 서버 재시작으로 중단 - 다시 실행하세요\n` });
+    }
+  }
+
   /** 큐에 넣는다(수정 작업과 같은 큐 - Claude 하나씩). focus: 사용자가 준 관심사(선택) */
   async enqueue(project, { focus = '' } = {}) {
     const cur = await this.state(project.name);
