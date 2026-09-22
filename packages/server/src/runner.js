@@ -150,6 +150,7 @@ export class Runner {
       await this.updateFix(project, id, { fixSessionId: sessionIdOf(out) });
       await L(`Claude 종료 (${claudeSummary(out)})`);
 
+      await this.revertProtected(project, ex, wt, L);
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!changed) {
         const reason = await readIfExists(path.join(wt, '.bugfix/result.md'));
@@ -243,6 +244,7 @@ export class Runner {
       await this.appendChat(project, id, 'assistant', notBlank(answer) ? answer : '(답변 없음)');
       await L(`Claude 답변: ${firstLine(answer, 200)}`);
 
+      await this.revertProtected(project, ex, wt, L);
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!allowChange || !changed) {
         if (changed) { await ex.exec(wt, 1, ['git', 'checkout', '--', '.']); await ex.exec(wt, 1, ['git', 'clean', '-fdq', '-e', '.bugfix']); await L('질문 모드 - 변경 되돌림'); }
@@ -304,6 +306,7 @@ export class Runner {
           if (left) throw new Error(`충돌이 남아 있습니다:\n${left}`);
           const markers = await ex.execOut(wt, 1, ['git', 'grep', '-l', '-E', '^(<<<<<<<|=======|>>>>>>>)( |$)', '--', '.', ':!*.md', ':!.bugfix/*']);
           if (markers.trim()) throw new Error(`충돌 표시가 남아 있습니다:\n${markers}`);
+          await this.revertProtected(project, ex, wt, L, `origin/${base}`);
           await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '--no-edit']);
           await L('충돌 해결 완료');
         }
@@ -512,7 +515,7 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
 
 모듈과 검증 명령(각 모듈 디렉터리에서 실행):
 ${mods}
-${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n` : ''}
+${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n` : ''}${project.protectedPaths?.length ? `\n건드리면 안 되는 경로(바꿔도 되돌려집니다): ${project.protectedPaths.join(', ')}\n` : ''}
 진행 방법:
   1. summary.md 와 screenshot.png, 로그의 오류 항목을 보고 무엇이 잘못됐는지 한 문장으로 정리합니다.
   2. 로그의 오류 메시지 · URL · 컴포넌트 이름으로 원인 코드를 찾습니다. 추측으로 여러 곳을 고치지 말고 원인 하나를 확정하세요.
@@ -540,6 +543,24 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
      한 항목을 \`- \` 로 시작하는 한 줄로 쓰고(들여쓴 하위 목록 금지), 많아야 5개까지 적습니다. 없으면 절을 빼세요.
 git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
 `;
+  }
+
+  /**
+   * 보호 경로(project.protectedPaths)에 생긴 변경을 되돌린다 - 버그 신고 연결 파일·CI 설정처럼 AI 가 건드리면 안 되는 곳.
+   * 되돌린 파일은 로그에 남긴다. ref 를 주면 그 기준으로(충돌 해결 뒤 base 쪽 내용으로) 되돌린다.
+   */
+  async revertProtected(project, ex, wt, L, ref = null) {
+    const paths = project.protectedPaths || [];
+    if (!paths.length) return;
+    const status = (await ex.execOut(wt, 1, ['git', 'status', '--porcelain'])).trim();
+    const files = status.split(/\r?\n/).filter(Boolean).map((l) => ({ code: l.slice(0, 2), file: l.slice(3).trim().split(' -> ').pop() }));
+    const hit = files.filter((f) => paths.some((p) => f.file === p || f.file.startsWith(p.endsWith('/') ? p : p + '/')));
+    if (!hit.length) return;
+    for (const f of hit) {
+      if (f.code.includes('?') || f.code.startsWith('A')) await ex.execOut(wt, 1, ['rm', '-rf', f.file]);
+      else await ex.execOut(wt, 1, ['git', 'checkout', ...(ref ? [ref] : []), '--', f.file]);
+    }
+    await L(`보호 경로 변경 되돌림(${hit.length}): ${hit.map((f) => f.file).join(', ')}`);
   }
 
   // ── 검증·모듈 ─────────────────────────────────────────────────────────
