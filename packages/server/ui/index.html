@@ -466,9 +466,9 @@
           const show = ['module', 'screen', 'menu'].includes(n.type) || kgMatch(n) || n.id === kSel || (kSel && kNbr.get(kSel)?.has(n.id));
           if (!show || kgDim(n)) return false;
           const t = new SpriteText(n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label);
-          t.color = n.type === 'module' ? '#ffd166' : '#e8eefc'; t.textHeight = n.type === 'module' ? 6 : (n.type === 'screen' || n.type === 'menu' ? 4 : 3);
+          t.color = n.type === 'module' ? '#ffd166' : '#e8eefc'; t.textHeight = n.type === 'module' ? 12 : n.type === 'screen' ? 8 : n.type === 'menu' ? 6 : 3.5;
           t.backgroundColor = 'rgba(10,12,18,0.55)'; t.padding = 1; t.borderRadius = 2;
-          t.position.y = 6 + Math.min(n.deg, 30) * 0.2;
+          t.position.y = 7 + Math.min(n.deg, 30) * 0.25;
           return t;
         })
         .linkColor((l) => (kSel && l.source.id !== kSel && l.target.id !== kSel) ? 'rgba(80,85,100,0.12)' : (K_LINK[l.rel] || 'rgba(160,170,190,0.35)'))
@@ -481,8 +481,8 @@
         .onNodeClick((n) => { kgSelect(n.id === kSel ? null : n.id); kgFly(n); })
         .onBackgroundClick(() => kgSelect(null))
         .warmupTicks(60).cooldownTicks(200);
-      kg3d.d3Force('charge').strength(-90);
-      kg3d.d3Force('link').distance((l) => l.rel === 'contains' ? 18 : 30);
+      kg3d.d3Force('charge').strength(-140);
+      kg3d.d3Force('link').distance((l) => l.rel === 'contains' ? 24 : 40);
       window.addEventListener('resize', () => kg3d && kg3d.width(el.clientWidth).height(el.clientHeight));
     }
     kg3d.width(el.clientWidth).height(el.clientHeight);
@@ -492,7 +492,7 @@
   function kgRefresh() { if (!kg3d) return; kg3d.nodeColor(kg3d.nodeColor()).nodeThreeObject(kg3d.nodeThreeObject()).linkColor(kg3d.linkColor()).linkDirectionalParticles(kg3d.linkDirectionalParticles()).nodeVisibility(kg3d.nodeVisibility()).linkVisibility(kg3d.linkVisibility()); }
   function kgFly(n) {
     if (!kg3d || n.x == null) return;
-    const d = 70, r = Math.hypot(n.x, n.y, n.z) || 1, k = 1 + d / r;
+    const d = 110, r = Math.hypot(n.x, n.y, n.z) || 1, k = 1 + d / r;
     kg3d.cameraPosition({ x: n.x * k, y: n.y * k, z: n.z * k }, n, 900);
   }
   function kgSelect(id) {
