@@ -46,6 +46,8 @@ curl -s localhost:8790/api/health
 | POST | `/api/p/{project}/reports/{id}/request-fix` | 자동 수정 큐에 넣기 |
 | POST | `/api/p/{project}/reports/{id}/fix-chat` | `{ message, mode: 'ask'|'change' }` |
 | POST | `/api/p/{project}/reports/{id}/fix-sync` | GitHub PR 상태와 맞추기(병합 재시도 포함) |
+| GET | `/api/admin/overview` | 전 프로젝트 요약(운영자 키 `X-Bugfix-Admin`) - 대시보드가 쓴다 |
+| GET | `/api/ui/` | 운영자 대시보드(정적) |
 
 응답은 `{ content: … }`, 오류는 `{ message }` + 상태 코드. 헤더: `X-Bugfix-Key`(프로젝트 apiKey), `X-Bugfix-User`(보고자 표시명).
 

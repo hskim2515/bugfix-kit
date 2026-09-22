@@ -168,6 +168,17 @@ export const kit = createBugfix({
 
 ---
 
+## 4-1. 운영자 대시보드 (`/bugfix/ui/`)
+
+앱 안의 뷰어는 그 앱·그 프로젝트만 보입니다. 운영자는 서버가 직접 서빙하는 대시보드에서 **모든 프로젝트**를 한 화면에서 봅니다:
+프로젝트별 건수·상태, 지금 진행 중인 작업과 실시간 로그, 실패/PR 열림/병합 필터, 검색, 행을 누르면 뷰어로 상세(질문·수정 요청 가능).
+
+- 주소: `https://…/bugfix/ui/` (nginx 가 `/bugfix/` → `/api/` 면 자동), 직접이면 `http://서버:8790/api/ui/`
+- 키: `~/.config/bugfix-kit/default.env` 의 `ADMIN_KEY` (또는 `BUGFIX_ADMIN_KEY`). 처음 한 번 넣으면 브라우저에 저장
+- 5초마다 갱신. 진행 중 작업의 로그 꼬리 12줄이 카드에 흐른다
+
+---
+
 ## 5. 개발자가 직접 쓰는 front-check
 
 ```bash

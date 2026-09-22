@@ -455,13 +455,14 @@ export default {
   },
   beforeUnmount() { this._stopFixPolling(); },
   methods: {
-    async open() {
+    async open(id) {
       this.isOpen = true;
       this.selected = null;
       this.detail = null;
       this.expanded = new Set();
       this.project = this.kit?.project || null;
       await this.fetchList();
+      if (id) await this.openDetail(Number(id));     // 대시보드 등에서 특정 리포트로 바로
     },
     async switchProject(key) {
       if (key === this.project) return;

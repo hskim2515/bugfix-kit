@@ -30,8 +30,11 @@ export function loadConfig(file) {
     timeoutMinutes: 45,
     verifyTimeoutMinutes: 20,
     runAsUser: '',
+    adminKey: '',
     ...(raw.server || {}),
   };
+  // 운영자 대시보드 키: 환경변수 → ~/.config/bugfix-kit/default.env 의 ADMIN_KEY → yml
+  server.adminKey = process.env.BUGFIX_ADMIN_KEY || readEnvFile(expandHome('~/.config/bugfix-kit/default.env')).ADMIN_KEY || server.adminKey || '';
   server.dataDir = resolveDir(raw.server?.dataDir, './data');
   server.workDir = resolveDir(raw.server?.workDir, './work');
 

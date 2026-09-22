@@ -65,7 +65,7 @@ export function createBugfix(options = {}) {
       return kit;
     },
     openReport: () => kit._els.modal?.open?.() ?? kit._open?.report?.(),
-    openViewer: () => kit._els.viewer?.open?.() ?? kit._open?.viewer?.(),
+    openViewer: (id) => kit._els.viewer?.open?.(id) ?? kit._open?.viewer?.(id),
     /** Vue 컴포넌트를 직접 쓰는 앱이 open 함수를 등록한다 */
     _open: {},
     register(kind, fn) { kit._open[kind] = fn; },

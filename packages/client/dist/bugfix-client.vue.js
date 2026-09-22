@@ -9,10 +9,10 @@ function yr({ endpoint: e, project: A, apiKey: t, user: r }) {
     g && (c["X-Bugfix-User"] = String(g));
     const d = B ? "?" + new URLSearchParams(B).toString() : "", C = await fetch(s + a + d, { method: o, headers: c, body: u === void 0 ? void 0 : JSON.stringify(u) });
     if (C.status === 204) return null;
-    const F = await C.text();
+    const U = await C.text();
     let y = null;
     try {
-      y = F ? JSON.parse(F) : null;
+      y = U ? JSON.parse(U) : null;
     } catch {
     }
     if (!C.ok) {
@@ -629,8 +629,8 @@ var Ai = "KwAAAAAAAAAACA4AUD0AADAgAAACAAAAAAAIABAAGABAAEgAUABYAGAAaABgAGgAYgBqAF
           return uo;
         case Ji:
         case Yi:
-          var C = this.peekCodePoint(0), F = this.peekCodePoint(1);
-          return C === PA && (jA(F) || F === Ve) && (this.consumeCodePoint(), this.consumeUnicodeRangeToken()), this.reconsumeCodePoint(A), this.consumeIdentLikeToken();
+          var C = this.peekCodePoint(0), U = this.peekCodePoint(1);
+          return C === PA && (jA(U) || U === Ve) && (this.consumeCodePoint(), this.consumeUnicodeRangeToken()), this.reconsumeCodePoint(A), this.consumeIdentLikeToken();
         case Gr:
           if (this.peekCodePoint(0) === le)
             return this.consumeCodePoint(), ao;
@@ -1033,8 +1033,8 @@ var Jr = function(e, A) {
   var t = A.filter(ne), r = t[0], s = t[1], n = t[2], i = t[3], o = (r.type === 17 ? cA(r.number) : Ct.parse(e, r)) / (Math.PI * 2), a = J(s) ? s.number / 100 : 0, u = J(n) ? n.number / 100 : 0, B = typeof i < "u" && J(i) ? G(i, 1) : 1;
   if (a === 0)
     return DA(u * 255, u * 255, u * 255, 1);
-  var c = u <= 0.5 ? u * (a + 1) : u + a - u * a, g = u * 2 - c, d = St(g, c, o + 1 / 3), C = St(g, c, o), F = St(g, c, o - 1 / 3);
-  return DA(d * 255, C * 255, F * 255, B);
+  var c = u <= 0.5 ? u * (a + 1) : u + a - u * a, g = u * 2 - c, d = St(g, c, o + 1 / 3), C = St(g, c, o), U = St(g, c, o - 1 / 3);
+  return DA(d * 255, C * 255, U * 255, B);
 }, Ho = {
   hsl: Jr,
   hsla: Jr,
@@ -1239,8 +1239,8 @@ var Jr = function(e, A) {
       u = null;
     }
   }
-  return e.map(function(F, y) {
-    var w = F.color;
+  return e.map(function(U, y) {
+    var w = U.color;
     return { color: w, stop: Math.max(Math.min(1, s[y] / A), 0) };
   });
 }, bo = function(e, A, t) {
@@ -3653,15 +3653,15 @@ var Ea = 1, Ot = 2, _t = 3, ts = 4, rs = 5, Ha = 7, ss = 8, kt = 9, Rt = 10, ns 
                 var d = c.values.filter(R);
                 d.length && u.appendChild(o.createTextNode(A.getAttribute(d[0].value) || ""));
               } else if (c.name === "counter") {
-                var C = c.values.filter(ne), F = C[0], y = C[1];
-                if (F && R(F)) {
-                  var w = n.counters.getCounterValue(F.value), U = y && R(y) ? or.parse(n.context, y.value) : 3;
-                  u.appendChild(o.createTextNode(be(w, U, !1)));
+                var C = c.values.filter(ne), U = C[0], y = C[1];
+                if (U && R(U)) {
+                  var w = n.counters.getCounterValue(U.value), F = y && R(y) ? or.parse(n.context, y.value) : 3;
+                  u.appendChild(o.createTextNode(be(w, F, !1)));
                 }
               } else if (c.name === "counters") {
-                var K = c.values.filter(ne), F = K[0], m = K[1], y = K[2];
-                if (F && R(F)) {
-                  var I = n.counters.getCounterValues(F.value), v = y && R(y) ? or.parse(n.context, y.value) : 3, D = m && m.type === 0 ? m.value : "", T = I.map(function(tA) {
+                var K = c.values.filter(ne), U = K[0], m = K[1], y = K[2];
+                if (U && R(U)) {
+                  var I = n.counters.getCounterValues(U.value), v = y && R(y) ? or.parse(n.context, y.value) : 3, D = m && m.type === 0 ? m.value : "", T = I.map(function(tA) {
                     return be(tA, v, !1);
                   }).join(D);
                   u.appendChild(o.createTextNode(T));
@@ -3886,12 +3886,12 @@ var cl = function(e, A) {
   /** @class */
   /* @__PURE__ */ function() {
     function e(A) {
-      var t = A.styles, r = A.bounds, s = Ce(t.borderTopLeftRadius, r.width, r.height), n = s[0], i = s[1], o = Ce(t.borderTopRightRadius, r.width, r.height), a = o[0], u = o[1], B = Ce(t.borderBottomRightRadius, r.width, r.height), c = B[0], g = B[1], d = Ce(t.borderBottomLeftRadius, r.width, r.height), C = d[0], F = d[1], y = [];
-      y.push((n + a) / r.width), y.push((C + c) / r.width), y.push((i + F) / r.height), y.push((u + g) / r.height);
+      var t = A.styles, r = A.bounds, s = Ce(t.borderTopLeftRadius, r.width, r.height), n = s[0], i = s[1], o = Ce(t.borderTopRightRadius, r.width, r.height), a = o[0], u = o[1], B = Ce(t.borderBottomRightRadius, r.width, r.height), c = B[0], g = B[1], d = Ce(t.borderBottomLeftRadius, r.width, r.height), C = d[0], U = d[1], y = [];
+      y.push((n + a) / r.width), y.push((C + c) / r.width), y.push((i + U) / r.height), y.push((u + g) / r.height);
       var w = Math.max.apply(Math, y);
-      w > 1 && (n /= w, i /= w, a /= w, u /= w, c /= w, g /= w, C /= w, F /= w);
-      var U = r.width - a, K = r.height - g, m = r.width - c, I = r.height - F, v = t.borderTopWidth, D = t.borderRightWidth, T = t.borderBottomWidth, b = t.borderLeftWidth, X = G(t.paddingTop, A.bounds.width), tA = G(t.paddingRight, A.bounds.width), oA = G(t.paddingBottom, A.bounds.width), k = G(t.paddingLeft, A.bounds.width);
-      this.topLeftBorderDoubleOuterBox = n > 0 || i > 0 ? N(r.left + b / 3, r.top + v / 3, n - b / 3, i - v / 3, _.TOP_LEFT) : new E(r.left + b / 3, r.top + v / 3), this.topRightBorderDoubleOuterBox = n > 0 || i > 0 ? N(r.left + U, r.top + v / 3, a - D / 3, u - v / 3, _.TOP_RIGHT) : new E(r.left + r.width - D / 3, r.top + v / 3), this.bottomRightBorderDoubleOuterBox = c > 0 || g > 0 ? N(r.left + m, r.top + K, c - D / 3, g - T / 3, _.BOTTOM_RIGHT) : new E(r.left + r.width - D / 3, r.top + r.height - T / 3), this.bottomLeftBorderDoubleOuterBox = C > 0 || F > 0 ? N(r.left + b / 3, r.top + I, C - b / 3, F - T / 3, _.BOTTOM_LEFT) : new E(r.left + b / 3, r.top + r.height - T / 3), this.topLeftBorderDoubleInnerBox = n > 0 || i > 0 ? N(r.left + b * 2 / 3, r.top + v * 2 / 3, n - b * 2 / 3, i - v * 2 / 3, _.TOP_LEFT) : new E(r.left + b * 2 / 3, r.top + v * 2 / 3), this.topRightBorderDoubleInnerBox = n > 0 || i > 0 ? N(r.left + U, r.top + v * 2 / 3, a - D * 2 / 3, u - v * 2 / 3, _.TOP_RIGHT) : new E(r.left + r.width - D * 2 / 3, r.top + v * 2 / 3), this.bottomRightBorderDoubleInnerBox = c > 0 || g > 0 ? N(r.left + m, r.top + K, c - D * 2 / 3, g - T * 2 / 3, _.BOTTOM_RIGHT) : new E(r.left + r.width - D * 2 / 3, r.top + r.height - T * 2 / 3), this.bottomLeftBorderDoubleInnerBox = C > 0 || F > 0 ? N(r.left + b * 2 / 3, r.top + I, C - b * 2 / 3, F - T * 2 / 3, _.BOTTOM_LEFT) : new E(r.left + b * 2 / 3, r.top + r.height - T * 2 / 3), this.topLeftBorderStroke = n > 0 || i > 0 ? N(r.left + b / 2, r.top + v / 2, n - b / 2, i - v / 2, _.TOP_LEFT) : new E(r.left + b / 2, r.top + v / 2), this.topRightBorderStroke = n > 0 || i > 0 ? N(r.left + U, r.top + v / 2, a - D / 2, u - v / 2, _.TOP_RIGHT) : new E(r.left + r.width - D / 2, r.top + v / 2), this.bottomRightBorderStroke = c > 0 || g > 0 ? N(r.left + m, r.top + K, c - D / 2, g - T / 2, _.BOTTOM_RIGHT) : new E(r.left + r.width - D / 2, r.top + r.height - T / 2), this.bottomLeftBorderStroke = C > 0 || F > 0 ? N(r.left + b / 2, r.top + I, C - b / 2, F - T / 2, _.BOTTOM_LEFT) : new E(r.left + b / 2, r.top + r.height - T / 2), this.topLeftBorderBox = n > 0 || i > 0 ? N(r.left, r.top, n, i, _.TOP_LEFT) : new E(r.left, r.top), this.topRightBorderBox = a > 0 || u > 0 ? N(r.left + U, r.top, a, u, _.TOP_RIGHT) : new E(r.left + r.width, r.top), this.bottomRightBorderBox = c > 0 || g > 0 ? N(r.left + m, r.top + K, c, g, _.BOTTOM_RIGHT) : new E(r.left + r.width, r.top + r.height), this.bottomLeftBorderBox = C > 0 || F > 0 ? N(r.left, r.top + I, C, F, _.BOTTOM_LEFT) : new E(r.left, r.top + r.height), this.topLeftPaddingBox = n > 0 || i > 0 ? N(r.left + b, r.top + v, Math.max(0, n - b), Math.max(0, i - v), _.TOP_LEFT) : new E(r.left + b, r.top + v), this.topRightPaddingBox = a > 0 || u > 0 ? N(r.left + Math.min(U, r.width - D), r.top + v, U > r.width + D ? 0 : Math.max(0, a - D), Math.max(0, u - v), _.TOP_RIGHT) : new E(r.left + r.width - D, r.top + v), this.bottomRightPaddingBox = c > 0 || g > 0 ? N(r.left + Math.min(m, r.width - b), r.top + Math.min(K, r.height - T), Math.max(0, c - D), Math.max(0, g - T), _.BOTTOM_RIGHT) : new E(r.left + r.width - D, r.top + r.height - T), this.bottomLeftPaddingBox = C > 0 || F > 0 ? N(r.left + b, r.top + Math.min(I, r.height - T), Math.max(0, C - b), Math.max(0, F - T), _.BOTTOM_LEFT) : new E(r.left + b, r.top + r.height - T), this.topLeftContentBox = n > 0 || i > 0 ? N(r.left + b + k, r.top + v + X, Math.max(0, n - (b + k)), Math.max(0, i - (v + X)), _.TOP_LEFT) : new E(r.left + b + k, r.top + v + X), this.topRightContentBox = a > 0 || u > 0 ? N(r.left + Math.min(U, r.width + b + k), r.top + v + X, U > r.width + b + k ? 0 : a - b + k, u - (v + X), _.TOP_RIGHT) : new E(r.left + r.width - (D + tA), r.top + v + X), this.bottomRightContentBox = c > 0 || g > 0 ? N(r.left + Math.min(m, r.width - (b + k)), r.top + Math.min(K, r.height + v + X), Math.max(0, c - (D + tA)), g - (T + oA), _.BOTTOM_RIGHT) : new E(r.left + r.width - (D + tA), r.top + r.height - (T + oA)), this.bottomLeftContentBox = C > 0 || F > 0 ? N(r.left + b + k, r.top + I, Math.max(0, C - (b + k)), F - (T + oA), _.BOTTOM_LEFT) : new E(r.left + b + k, r.top + r.height - (T + oA));
+      w > 1 && (n /= w, i /= w, a /= w, u /= w, c /= w, g /= w, C /= w, U /= w);
+      var F = r.width - a, K = r.height - g, m = r.width - c, I = r.height - U, v = t.borderTopWidth, D = t.borderRightWidth, T = t.borderBottomWidth, b = t.borderLeftWidth, X = G(t.paddingTop, A.bounds.width), tA = G(t.paddingRight, A.bounds.width), oA = G(t.paddingBottom, A.bounds.width), k = G(t.paddingLeft, A.bounds.width);
+      this.topLeftBorderDoubleOuterBox = n > 0 || i > 0 ? N(r.left + b / 3, r.top + v / 3, n - b / 3, i - v / 3, _.TOP_LEFT) : new E(r.left + b / 3, r.top + v / 3), this.topRightBorderDoubleOuterBox = n > 0 || i > 0 ? N(r.left + F, r.top + v / 3, a - D / 3, u - v / 3, _.TOP_RIGHT) : new E(r.left + r.width - D / 3, r.top + v / 3), this.bottomRightBorderDoubleOuterBox = c > 0 || g > 0 ? N(r.left + m, r.top + K, c - D / 3, g - T / 3, _.BOTTOM_RIGHT) : new E(r.left + r.width - D / 3, r.top + r.height - T / 3), this.bottomLeftBorderDoubleOuterBox = C > 0 || U > 0 ? N(r.left + b / 3, r.top + I, C - b / 3, U - T / 3, _.BOTTOM_LEFT) : new E(r.left + b / 3, r.top + r.height - T / 3), this.topLeftBorderDoubleInnerBox = n > 0 || i > 0 ? N(r.left + b * 2 / 3, r.top + v * 2 / 3, n - b * 2 / 3, i - v * 2 / 3, _.TOP_LEFT) : new E(r.left + b * 2 / 3, r.top + v * 2 / 3), this.topRightBorderDoubleInnerBox = n > 0 || i > 0 ? N(r.left + F, r.top + v * 2 / 3, a - D * 2 / 3, u - v * 2 / 3, _.TOP_RIGHT) : new E(r.left + r.width - D * 2 / 3, r.top + v * 2 / 3), this.bottomRightBorderDoubleInnerBox = c > 0 || g > 0 ? N(r.left + m, r.top + K, c - D * 2 / 3, g - T * 2 / 3, _.BOTTOM_RIGHT) : new E(r.left + r.width - D * 2 / 3, r.top + r.height - T * 2 / 3), this.bottomLeftBorderDoubleInnerBox = C > 0 || U > 0 ? N(r.left + b * 2 / 3, r.top + I, C - b * 2 / 3, U - T * 2 / 3, _.BOTTOM_LEFT) : new E(r.left + b * 2 / 3, r.top + r.height - T * 2 / 3), this.topLeftBorderStroke = n > 0 || i > 0 ? N(r.left + b / 2, r.top + v / 2, n - b / 2, i - v / 2, _.TOP_LEFT) : new E(r.left + b / 2, r.top + v / 2), this.topRightBorderStroke = n > 0 || i > 0 ? N(r.left + F, r.top + v / 2, a - D / 2, u - v / 2, _.TOP_RIGHT) : new E(r.left + r.width - D / 2, r.top + v / 2), this.bottomRightBorderStroke = c > 0 || g > 0 ? N(r.left + m, r.top + K, c - D / 2, g - T / 2, _.BOTTOM_RIGHT) : new E(r.left + r.width - D / 2, r.top + r.height - T / 2), this.bottomLeftBorderStroke = C > 0 || U > 0 ? N(r.left + b / 2, r.top + I, C - b / 2, U - T / 2, _.BOTTOM_LEFT) : new E(r.left + b / 2, r.top + r.height - T / 2), this.topLeftBorderBox = n > 0 || i > 0 ? N(r.left, r.top, n, i, _.TOP_LEFT) : new E(r.left, r.top), this.topRightBorderBox = a > 0 || u > 0 ? N(r.left + F, r.top, a, u, _.TOP_RIGHT) : new E(r.left + r.width, r.top), this.bottomRightBorderBox = c > 0 || g > 0 ? N(r.left + m, r.top + K, c, g, _.BOTTOM_RIGHT) : new E(r.left + r.width, r.top + r.height), this.bottomLeftBorderBox = C > 0 || U > 0 ? N(r.left, r.top + I, C, U, _.BOTTOM_LEFT) : new E(r.left, r.top + r.height), this.topLeftPaddingBox = n > 0 || i > 0 ? N(r.left + b, r.top + v, Math.max(0, n - b), Math.max(0, i - v), _.TOP_LEFT) : new E(r.left + b, r.top + v), this.topRightPaddingBox = a > 0 || u > 0 ? N(r.left + Math.min(F, r.width - D), r.top + v, F > r.width + D ? 0 : Math.max(0, a - D), Math.max(0, u - v), _.TOP_RIGHT) : new E(r.left + r.width - D, r.top + v), this.bottomRightPaddingBox = c > 0 || g > 0 ? N(r.left + Math.min(m, r.width - b), r.top + Math.min(K, r.height - T), Math.max(0, c - D), Math.max(0, g - T), _.BOTTOM_RIGHT) : new E(r.left + r.width - D, r.top + r.height - T), this.bottomLeftPaddingBox = C > 0 || U > 0 ? N(r.left + b, r.top + Math.min(I, r.height - T), Math.max(0, C - b), Math.max(0, U - T), _.BOTTOM_LEFT) : new E(r.left + b, r.top + r.height - T), this.topLeftContentBox = n > 0 || i > 0 ? N(r.left + b + k, r.top + v + X, Math.max(0, n - (b + k)), Math.max(0, i - (v + X)), _.TOP_LEFT) : new E(r.left + b + k, r.top + v + X), this.topRightContentBox = a > 0 || u > 0 ? N(r.left + Math.min(F, r.width + b + k), r.top + v + X, F > r.width + b + k ? 0 : a - b + k, u - (v + X), _.TOP_RIGHT) : new E(r.left + r.width - (D + tA), r.top + v + X), this.bottomRightContentBox = c > 0 || g > 0 ? N(r.left + Math.min(m, r.width - (b + k)), r.top + Math.min(K, r.height + v + X), Math.max(0, c - (D + tA)), g - (T + oA), _.BOTTOM_RIGHT) : new E(r.left + r.width - (D + tA), r.top + r.height - (T + oA)), this.bottomLeftContentBox = C > 0 || U > 0 ? N(r.left + b + k, r.top + I, Math.max(0, C - (b + k)), U - (T + oA), _.BOTTOM_LEFT) : new E(r.left + b + k, r.top + r.height - (T + oA));
     }
     return e;
   }()
@@ -4067,13 +4067,13 @@ var N = function(e, A, t, r, s) {
         var c = s.styles.zIndex.order;
         if (c < 0) {
           var g = 0;
-          u.negativeZIndex.some(function(C, F) {
-            return c > C.element.container.styles.zIndex.order ? (g = F, !1) : g > 0;
+          u.negativeZIndex.some(function(C, U) {
+            return c > C.element.container.styles.zIndex.order ? (g = U, !1) : g > 0;
           }), u.negativeZIndex.splice(g, 0, B);
         } else if (c > 0) {
           var d = 0;
-          u.positiveZIndex.some(function(C, F) {
-            return c >= C.element.container.styles.zIndex.order ? (d = F + 1, !1) : d > 0;
+          u.positiveZIndex.some(function(C, U) {
+            return c >= C.element.container.styles.zIndex.order ? (d = U + 1, !1) : d > 0;
           }), u.positiveZIndex.splice(d, 0, B);
         } else
           u.zeroOrAutoZIndexOrTransformedOrOpacity.push(B);
@@ -4191,12 +4191,12 @@ var N = function(e, A, t, r, s) {
       var d = B ? r : s * n, C = c ? s : r / n;
       return [d, C];
     }
-    var F = B ? r : t.width, y = c ? s : t.height;
-    return [F, y];
+    var U = B ? r : t.width, y = c ? s : t.height;
+    return [U, y];
   }
   if (a) {
-    var w = 0, U = 0;
-    return J(i) ? w = G(i, t.width) : J(o) && (U = G(o, t.height)), $A(i) ? w = U * n : (!o || $A(o)) && (U = w / n), [w, U];
+    var w = 0, F = 0;
+    return J(i) ? w = G(i, t.width) : J(o) && (F = G(o, t.height)), $A(i) ? w = F * n : (!o || $A(o)) && (F = w / n), [w, F];
   }
   var K = null, m = null;
   if (J(i) ? K = G(i, t.width) : o && J(o) && (m = G(o, t.height)), K !== null && (!o || $A(o)) && (m = B && c ? K / r * s : t.height), m !== null && $A(i) && (K = B && c ? m / s * r : t.width), K !== null && m !== null)
@@ -4346,8 +4346,8 @@ var N = function(e, A, t, r, s) {
         var s, n, i, o, a, u, B, c, g = this;
         return $(this, function(d) {
           return s = this.createFontStyle(r), n = s[0], i = s[1], o = s[2], this.ctx.font = n, this.ctx.direction = r.direction === 1 ? "rtl" : "ltr", this.ctx.textAlign = "left", this.ctx.textBaseline = "alphabetic", a = this.fontMetrics.getMetrics(i, o), u = a.baseline, B = a.middle, c = r.paintOrder, t.textBounds.forEach(function(C) {
-            c.forEach(function(F) {
-              switch (F) {
+            c.forEach(function(U) {
+              switch (U) {
                 case 0:
                   g.ctx.fillStyle = Y(r.color), g.renderTextWithLetterSpacing(C, r.letterSpacing, u);
                   var y = r.textShadow;
@@ -4385,7 +4385,7 @@ var N = function(e, A, t, r, s) {
       }
     }, A.prototype.renderNodeContent = function(t) {
       return eA(this, void 0, void 0, function() {
-        var r, s, n, i, o, a, U, U, u, B, c, g, m, d, C, I, F, y, w, U, K, m, I;
+        var r, s, n, i, o, a, F, F, u, B, c, g, m, d, C, I, U, y, w, F, K, m, I;
         return $(this, function(v) {
           switch (v.label) {
             case 0:
@@ -4405,7 +4405,7 @@ var N = function(e, A, t, r, s) {
             case 5:
               return v.trys.push([5, 7, , 8]), [4, this.context.cache.match(r.src)];
             case 6:
-              return U = v.sent(), this.renderReplacedElement(r, s, U), [3, 8];
+              return F = v.sent(), this.renderReplacedElement(r, s, F), [3, 8];
             case 7:
               return v.sent(), this.context.logger.error("Error loading image " + r.src), [3, 8];
             case 8:
@@ -4414,7 +4414,7 @@ var N = function(e, A, t, r, s) {
             case 9:
               return v.trys.push([9, 11, , 12]), [4, this.context.cache.match(r.svg)];
             case 10:
-              return U = v.sent(), this.renderReplacedElement(r, s, U), [3, 12];
+              return F = v.sent(), this.renderReplacedElement(r, s, F), [3, 12];
             case 11:
               return v.sent(), this.context.logger.error("Error loading svg " + r.svg.substring(0, 255)), [3, 12];
             case 12:
@@ -4438,15 +4438,15 @@ var N = function(e, A, t, r, s) {
                 new E(r.bounds.left + c * 0.84, r.bounds.top + c * 0.34085),
                 new E(r.bounds.left + c * 0.39363, r.bounds.top + c * 0.79)
               ]), this.ctx.fillStyle = Y(us), this.ctx.fill(), this.ctx.restore()) : r.type === lt && r.checked && (this.ctx.save(), this.ctx.beginPath(), this.ctx.arc(r.bounds.left + c / 2, r.bounds.top + c / 2, c / 4, 0, Math.PI * 2, !0), this.ctx.fillStyle = Y(us), this.ctx.fill(), this.ctx.restore())), Zl(r) && r.value.length) {
-                switch (g = this.createFontStyle(n), m = g[0], d = g[1], C = this.fontMetrics.getMetrics(m, d).baseline, this.ctx.font = m, this.ctx.fillStyle = Y(n.color), this.ctx.textBaseline = "alphabetic", this.ctx.textAlign = ql(r.styles.textAlign), I = ft(r), F = 0, r.styles.textAlign) {
+                switch (g = this.createFontStyle(n), m = g[0], d = g[1], C = this.fontMetrics.getMetrics(m, d).baseline, this.ctx.font = m, this.ctx.fillStyle = Y(n.color), this.ctx.textBaseline = "alphabetic", this.ctx.textAlign = ql(r.styles.textAlign), I = ft(r), U = 0, r.styles.textAlign) {
                   case 1:
-                    F += I.width / 2;
+                    U += I.width / 2;
                     break;
                   case 2:
-                    F += I.width;
+                    U += I.width;
                     break;
                 }
-                y = I.add(F, 0, 0, -I.height / 2 + 1), this.ctx.save(), this.path([
+                y = I.add(U, 0, 0, -I.height / 2 + 1), this.ctx.save(), this.path([
                   new E(I.left, I.top),
                   new E(I.left + I.width, I.top),
                   new E(I.left + I.width, I.top + I.height),
@@ -4460,11 +4460,11 @@ var N = function(e, A, t, r, s) {
               )) return [3, 20];
               if (r.styles.listStyleImage === null) return [3, 19];
               if (w = r.styles.listStyleImage, w.type !== 0) return [3, 18];
-              U = void 0, K = w.url, v.label = 15;
+              F = void 0, K = w.url, v.label = 15;
             case 15:
               return v.trys.push([15, 17, , 18]), [4, this.context.cache.match(K)];
             case 16:
-              return U = v.sent(), this.ctx.drawImage(U, r.bounds.left - (U.width + 10), r.bounds.top), [3, 18];
+              return F = v.sent(), this.ctx.drawImage(F, r.bounds.left - (F.width + 10), r.bounds.top), [3, 18];
             case 17:
               return v.sent(), this.context.logger.error("Error loading list-style-image " + K), [3, 18];
             case 18:
@@ -4481,9 +4481,9 @@ var N = function(e, A, t, r, s) {
       });
     }, A.prototype.renderStackContent = function(t) {
       return eA(this, void 0, void 0, function() {
-        var r, s, w, n, i, w, o, a, w, u, B, w, c, g, w, d, C, w, F, y, w;
-        return $(this, function(U) {
-          switch (U.label) {
+        var r, s, w, n, i, w, o, a, w, u, B, w, c, g, w, d, C, w, U, y, w;
+        return $(this, function(F) {
+          switch (F.label) {
             case 0:
               if (W(
                 t.element.container.flags,
@@ -4493,63 +4493,63 @@ var N = function(e, A, t, r, s) {
                 debugger;
               return [4, this.renderNodeBackgroundAndBorders(t.element)];
             case 1:
-              U.sent(), r = 0, s = t.negativeZIndex, U.label = 2;
+              F.sent(), r = 0, s = t.negativeZIndex, F.label = 2;
             case 2:
               return r < s.length ? (w = s[r], [4, this.renderStack(w)]) : [3, 5];
             case 3:
-              U.sent(), U.label = 4;
+              F.sent(), F.label = 4;
             case 4:
               return r++, [3, 2];
             case 5:
               return [4, this.renderNodeContent(t.element)];
             case 6:
-              U.sent(), n = 0, i = t.nonInlineLevel, U.label = 7;
+              F.sent(), n = 0, i = t.nonInlineLevel, F.label = 7;
             case 7:
               return n < i.length ? (w = i[n], [4, this.renderNode(w)]) : [3, 10];
             case 8:
-              U.sent(), U.label = 9;
+              F.sent(), F.label = 9;
             case 9:
               return n++, [3, 7];
             case 10:
-              o = 0, a = t.nonPositionedFloats, U.label = 11;
+              o = 0, a = t.nonPositionedFloats, F.label = 11;
             case 11:
               return o < a.length ? (w = a[o], [4, this.renderStack(w)]) : [3, 14];
             case 12:
-              U.sent(), U.label = 13;
+              F.sent(), F.label = 13;
             case 13:
               return o++, [3, 11];
             case 14:
-              u = 0, B = t.nonPositionedInlineLevel, U.label = 15;
+              u = 0, B = t.nonPositionedInlineLevel, F.label = 15;
             case 15:
               return u < B.length ? (w = B[u], [4, this.renderStack(w)]) : [3, 18];
             case 16:
-              U.sent(), U.label = 17;
+              F.sent(), F.label = 17;
             case 17:
               return u++, [3, 15];
             case 18:
-              c = 0, g = t.inlineLevel, U.label = 19;
+              c = 0, g = t.inlineLevel, F.label = 19;
             case 19:
               return c < g.length ? (w = g[c], [4, this.renderNode(w)]) : [3, 22];
             case 20:
-              U.sent(), U.label = 21;
+              F.sent(), F.label = 21;
             case 21:
               return c++, [3, 19];
             case 22:
-              d = 0, C = t.zeroOrAutoZIndexOrTransformedOrOpacity, U.label = 23;
+              d = 0, C = t.zeroOrAutoZIndexOrTransformedOrOpacity, F.label = 23;
             case 23:
               return d < C.length ? (w = C[d], [4, this.renderStack(w)]) : [3, 26];
             case 24:
-              U.sent(), U.label = 25;
+              F.sent(), F.label = 25;
             case 25:
               return d++, [3, 23];
             case 26:
-              F = 0, y = t.positiveZIndex, U.label = 27;
+              U = 0, y = t.positiveZIndex, F.label = 27;
             case 27:
-              return F < y.length ? (w = y[F], [4, this.renderStack(w)]) : [3, 30];
+              return U < y.length ? (w = y[U], [4, this.renderStack(w)]) : [3, 30];
             case 28:
-              U.sent(), U.label = 29;
+              F.sent(), F.label = 29;
             case 29:
-              return F++, [3, 27];
+              return U++, [3, 27];
             case 30:
               return [
                 2
@@ -4585,7 +4585,7 @@ var N = function(e, A, t, r, s) {
           switch (u.label) {
             case 0:
               r = t.styles.backgroundImage.length - 1, s = function(B) {
-                var c, g, d, X, rA, sA, k, j, T, C, X, rA, sA, k, j, F, y, w, U, K, m, I, v, D, T, b, X, tA, oA, k, j, yA, rA, sA, kA, QA, IA, RA, MA, UA, GA, FA;
+                var c, g, d, X, rA, sA, k, j, T, C, X, rA, sA, k, j, U, y, w, F, K, m, I, v, D, T, b, X, tA, oA, k, j, yA, rA, sA, kA, QA, IA, RA, MA, UA, GA, FA;
                 return $(this, function(WA) {
                   switch (WA.label) {
                     case 0:
@@ -4604,7 +4604,7 @@ var N = function(e, A, t, r, s) {
                         c.width / c.height
                       ]), X = d[0], rA = d[1], sA = d[2], k = d[3], j = d[4], T = n.ctx.createPattern(n.resizeImage(c, k, j), "repeat"), n.renderRepeat(X, T, rA, sA)), [3, 6];
                     case 5:
-                      Do(B) ? (C = Jt(t, r, [null, null, null]), X = C[0], rA = C[1], sA = C[2], k = C[3], j = C[4], F = mo(B.angle, k, j), y = F[0], w = F[1], U = F[2], K = F[3], m = F[4], I = document.createElement("canvas"), I.width = k, I.height = j, v = I.getContext("2d"), D = v.createLinearGradient(w, K, U, m), Wr(B.stops, y).forEach(function(oe) {
+                      Do(B) ? (C = Jt(t, r, [null, null, null]), X = C[0], rA = C[1], sA = C[2], k = C[3], j = C[4], U = mo(B.angle, k, j), y = U[0], w = U[1], F = U[2], K = U[3], m = U[4], I = document.createElement("canvas"), I.width = k, I.height = j, v = I.getContext("2d"), D = v.createLinearGradient(w, K, F, m), Wr(B.stops, y).forEach(function(oe) {
                         return D.addColorStop(oe.stop, Y(oe.color));
                       }), v.fillStyle = D, v.fillRect(0, 0, k, j), k > 0 && j > 0 && (T = n.ctx.createPattern(I, "repeat"), n.renderRepeat(X, T, rA, sA))) : To(B) && (b = Jt(t, r, [
                         null,
@@ -4682,8 +4682,8 @@ var N = function(e, A, t, r, s) {
             case 1:
               g.sent(), this.ctx.restore(), r.boxShadow.slice(0).reverse().forEach(function(d) {
                 c.ctx.save();
-                var C = gt(t.curves), F = d.inset ? 0 : Wl, y = Ol(C, -F + (d.inset ? 1 : -1) * d.spread.number, (d.inset ? 1 : -1) * d.spread.number, d.spread.number * (d.inset ? -2 : 2), d.spread.number * (d.inset ? -2 : 2));
-                d.inset ? (c.path(C), c.ctx.clip(), c.mask(y)) : (c.mask(C), c.ctx.clip(), c.path(y)), c.ctx.shadowOffsetX = d.offsetX.number + F, c.ctx.shadowOffsetY = d.offsetY.number, c.ctx.shadowColor = Y(d.color), c.ctx.shadowBlur = d.blur.number, c.ctx.fillStyle = d.inset ? Y(d.color) : "rgba(0,0,0,1)", c.ctx.fill(), c.ctx.restore();
+                var C = gt(t.curves), U = d.inset ? 0 : Wl, y = Ol(C, -U + (d.inset ? 1 : -1) * d.spread.number, (d.inset ? 1 : -1) * d.spread.number, d.spread.number * (d.inset ? -2 : 2), d.spread.number * (d.inset ? -2 : 2));
+                d.inset ? (c.path(C), c.ctx.clip(), c.mask(y)) : (c.mask(C), c.ctx.clip(), c.path(y)), c.ctx.shadowOffsetX = d.offsetX.number + U, c.ctx.shadowOffsetY = d.offsetY.number, c.ctx.shadowColor = Y(d.color), c.ctx.shadowBlur = d.blur.number, c.ctx.fillStyle = d.inset ? Y(d.color) : "rgba(0,0,0,1)", c.ctx.fill(), c.ctx.restore();
               }), g.label = 2;
             case 2:
               o = 0, a = 0, u = n, g.label = 3;
@@ -4731,9 +4731,9 @@ var N = function(e, A, t, r, s) {
       });
     }, A.prototype.renderDashedDottedBorder = function(t, r, s, n, i) {
       return eA(this, void 0, void 0, function() {
-        var o, a, u, B, c, g, d, C, F, y, w, U, K, m, I, v, I, v;
+        var o, a, u, B, c, g, d, C, U, y, w, F, K, m, I, v, I, v;
         return $(this, function(D) {
-          return this.ctx.save(), o = Ml(n, s), a = Es(n, s), i === 2 && (this.path(a), this.ctx.clip()), lA(a[0]) ? (u = a[0].start.x, B = a[0].start.y) : (u = a[0].x, B = a[0].y), lA(a[1]) ? (c = a[1].end.x, g = a[1].end.y) : (c = a[1].x, g = a[1].y), s === 0 || s === 2 ? d = Math.abs(u - c) : d = Math.abs(B - g), this.ctx.beginPath(), i === 3 ? this.formatPath(o) : this.formatPath(a.slice(0, 2)), C = r < 3 ? r * 3 : r * 2, F = r < 3 ? r * 2 : r, i === 3 && (C = r, F = r), y = !0, d <= C * 2 ? y = !1 : d <= C * 2 + F ? (w = d / (2 * C + F), C *= w, F *= w) : (U = Math.floor((d + F) / (C + F)), K = (d - U * C) / (U - 1), m = (d - (U + 1) * C) / U, F = m <= 0 || Math.abs(F - K) < Math.abs(F - m) ? K : m), y && (i === 3 ? this.ctx.setLineDash([0, C + F]) : this.ctx.setLineDash([C, F])), i === 3 ? (this.ctx.lineCap = "round", this.ctx.lineWidth = r) : this.ctx.lineWidth = r * 2 + 1.1, this.ctx.strokeStyle = Y(t), this.ctx.stroke(), this.ctx.setLineDash([]), i === 2 && (lA(a[0]) && (I = a[3], v = a[0], this.ctx.beginPath(), this.formatPath([new E(I.end.x, I.end.y), new E(v.start.x, v.start.y)]), this.ctx.stroke()), lA(a[1]) && (I = a[1], v = a[2], this.ctx.beginPath(), this.formatPath([new E(I.end.x, I.end.y), new E(v.start.x, v.start.y)]), this.ctx.stroke())), this.ctx.restore(), [
+          return this.ctx.save(), o = Ml(n, s), a = Es(n, s), i === 2 && (this.path(a), this.ctx.clip()), lA(a[0]) ? (u = a[0].start.x, B = a[0].start.y) : (u = a[0].x, B = a[0].y), lA(a[1]) ? (c = a[1].end.x, g = a[1].end.y) : (c = a[1].x, g = a[1].y), s === 0 || s === 2 ? d = Math.abs(u - c) : d = Math.abs(B - g), this.ctx.beginPath(), i === 3 ? this.formatPath(o) : this.formatPath(a.slice(0, 2)), C = r < 3 ? r * 3 : r * 2, U = r < 3 ? r * 2 : r, i === 3 && (C = r, U = r), y = !0, d <= C * 2 ? y = !1 : d <= C * 2 + U ? (w = d / (2 * C + U), C *= w, U *= w) : (F = Math.floor((d + U) / (C + U)), K = (d - F * C) / (F - 1), m = (d - (F + 1) * C) / F, U = m <= 0 || Math.abs(U - K) < Math.abs(U - m) ? K : m), y && (i === 3 ? this.ctx.setLineDash([0, C + U]) : this.ctx.setLineDash([C, U])), i === 3 ? (this.ctx.lineCap = "round", this.ctx.lineWidth = r) : this.ctx.lineWidth = r * 2 + 1.1, this.ctx.strokeStyle = Y(t), this.ctx.stroke(), this.ctx.setLineDash([]), i === 2 && (lA(a[0]) && (I = a[3], v = a[0], this.ctx.beginPath(), this.formatPath([new E(I.end.x, I.end.y), new E(v.start.x, v.start.y)]), this.ctx.stroke()), lA(a[1]) && (I = a[1], v = a[2], this.ctx.beginPath(), this.formatPath([new E(I.end.x, I.end.y), new E(v.start.x, v.start.y)]), this.ctx.stroke())), this.ctx.restore(), [
             2
             /*return*/
           ];
@@ -4850,7 +4850,7 @@ var N = function(e, A, t, r, s) {
 typeof window < "u" && Hn.setContext(window);
 var nc = function(e, A) {
   return eA(void 0, void 0, void 0, function() {
-    var t, r, s, n, i, o, a, u, B, c, g, d, C, F, y, w, U, K, m, I, D, v, D, T, b, X, tA, oA, k, j, yA, rA, sA, kA, QA, IA, RA, MA, UA, GA;
+    var t, r, s, n, i, o, a, u, B, c, g, d, C, U, y, w, F, K, m, I, D, v, D, T, b, X, tA, oA, k, j, yA, rA, sA, kA, QA, IA, RA, MA, UA, GA;
     return $(this, function(FA) {
       switch (FA.label) {
         case 0:
@@ -4878,19 +4878,19 @@ var nc = function(e, A) {
             copyStyles: u
           }, a.logger.debug("Starting document clone with size " + o.width + "x" + o.height + " scrolled to " + -o.left + "," + -o.top), c = new Fs(a, e, B), g = c.clonedReferenceElement, g ? [4, c.toIFrame(t, o)] : [2, Promise.reject("Unable to find element in cloned iframe")];
         case 1:
-          return d = FA.sent(), C = vr(g) || il(g) ? Tn(g.ownerDocument) : Qt(a, g), F = C.width, y = C.height, w = C.left, U = C.top, K = ic(a, g, A.backgroundColor), m = {
+          return d = FA.sent(), C = vr(g) || il(g) ? Tn(g.ownerDocument) : Qt(a, g), U = C.width, y = C.height, w = C.left, F = C.top, K = ic(a, g, A.backgroundColor), m = {
             canvas: A.canvas,
             backgroundColor: K,
             scale: (QA = (kA = A.scale) !== null && kA !== void 0 ? kA : r.devicePixelRatio) !== null && QA !== void 0 ? QA : 1,
             x: ((IA = A.x) !== null && IA !== void 0 ? IA : 0) + w,
-            y: ((RA = A.y) !== null && RA !== void 0 ? RA : 0) + U,
-            width: (MA = A.width) !== null && MA !== void 0 ? MA : Math.ceil(F),
+            y: ((RA = A.y) !== null && RA !== void 0 ? RA : 0) + F,
+            width: (MA = A.width) !== null && MA !== void 0 ? MA : Math.ceil(U),
             height: (UA = A.height) !== null && UA !== void 0 ? UA : Math.ceil(y)
           }, u ? (a.logger.debug("Document cloned, using foreign object rendering"), D = new Ac(a, m), [4, D.render(g)]) : [3, 3];
         case 2:
           return I = FA.sent(), [3, 5];
         case 3:
-          return a.logger.debug("Document cloned, element located at " + w + "," + U + " with size " + F + "x" + y + " using computed rendering"), a.logger.debug("Starting DOM parsing"), v = hn(a, g), K === v.styles.backgroundColor && (v.styles.backgroundColor = EA.TRANSPARENT), a.logger.debug("Starting renderer for element at " + m.x + "," + m.y + " with size " + m.width + "x" + m.height), D = new Yl(a, m), [4, D.render(v)];
+          return a.logger.debug("Document cloned, element located at " + w + "," + F + " with size " + U + "x" + y + " using computed rendering"), a.logger.debug("Starting DOM parsing"), v = hn(a, g), K === v.styles.backgroundColor && (v.styles.backgroundColor = EA.TRANSPARENT), a.logger.debug("Starting renderer for element at " + m.x + "," + m.y + " with size " + m.width + "x" + m.height), D = new Yl(a, m), [4, D.render(v)];
         case 4:
           I = FA.sent(), FA.label = 5;
         case 5:
@@ -5020,9 +5020,9 @@ function gc({ max: e = 50, axios: A = [], fetch: t = !1, xhr: r = !1, ignore: s 
       const c = B.config._bk || {};
       return i(B.config.url) || n.push({ server: u, time: c.time, duration: c.t0 ? Date.now() - c.t0 : null, method: (g = B.config.method) == null ? void 0 : g.toUpperCase(), url: B.config.url, params: Qr(B.config.params), requestBody: bA(B.config.url, B.config.data), status: B.status, responseBody: bA(B.config.url, B.data), error: null }), B;
     }, (B) => {
-      var g, d, C, F, y, w, U, K, m, I, v;
+      var g, d, C, U, y, w, F, K, m, I, v;
       const c = ((g = B.config) == null ? void 0 : g._bk) || {};
-      return i((d = B.config) == null ? void 0 : d.url) || n.push({ server: u, time: c.time, duration: c.t0 ? Date.now() - c.t0 : null, method: (F = (C = B.config) == null ? void 0 : C.method) == null ? void 0 : F.toUpperCase(), url: (y = B.config) == null ? void 0 : y.url, params: Qr((w = B.config) == null ? void 0 : w.params), requestBody: bA((U = B.config) == null ? void 0 : U.url, (K = B.config) == null ? void 0 : K.data), status: ((m = B.response) == null ? void 0 : m.status) ?? "ERR", responseBody: bA((I = B.config) == null ? void 0 : I.url, (v = B.response) == null ? void 0 : v.data), error: B.message }), Promise.reject(B);
+      return i((d = B.config) == null ? void 0 : d.url) || n.push({ server: u, time: c.time, duration: c.t0 ? Date.now() - c.t0 : null, method: (U = (C = B.config) == null ? void 0 : C.method) == null ? void 0 : U.toUpperCase(), url: (y = B.config) == null ? void 0 : y.url, params: Qr((w = B.config) == null ? void 0 : w.params), requestBody: bA((F = B.config) == null ? void 0 : F.url, (K = B.config) == null ? void 0 : K.data), status: ((m = B.response) == null ? void 0 : m.status) ?? "ERR", responseBody: bA((I = B.config) == null ? void 0 : I.url, (v = B.response) == null ? void 0 : v.data), error: B.message }), Promise.reject(B);
     }));
   }
   if (t && window.fetch) {
@@ -5204,9 +5204,9 @@ function bQ(e = {}) {
       var c, g, d, C;
       return ((g = (c = u._els.modal) == null ? void 0 : c.open) == null ? void 0 : g.call(c)) ?? ((C = (d = u._open) == null ? void 0 : d.report) == null ? void 0 : C.call(d));
     },
-    openViewer: () => {
-      var c, g, d, C;
-      return ((g = (c = u._els.viewer) == null ? void 0 : c.open) == null ? void 0 : g.call(c)) ?? ((C = (d = u._open) == null ? void 0 : d.viewer) == null ? void 0 : C.call(d));
+    openViewer: (c) => {
+      var g, d, C, U;
+      return ((d = (g = u._els.viewer) == null ? void 0 : g.open) == null ? void 0 : d.call(g, c)) ?? ((U = (C = u._open) == null ? void 0 : C.viewer) == null ? void 0 : U.call(C, c));
     },
     /** Vue 컴포넌트를 직접 쓰는 앱이 open 함수를 등록한다 */
     _open: {},
@@ -5217,8 +5217,8 @@ function bQ(e = {}) {
   if (A.hotkeys) {
     const c = (g, d) => {
       if (!d) return !1;
-      const C = d.split("+").map((y) => y.trim().toLowerCase()), F = C.pop();
-      return g.key.toLowerCase() === F && C.includes("shift") === g.shiftKey && C.includes("ctrl") === g.ctrlKey && C.includes("alt") === g.altKey && C.includes("meta") === g.metaKey;
+      const C = d.split("+").map((y) => y.trim().toLowerCase()), U = C.pop();
+      return g.key.toLowerCase() === U && C.includes("shift") === g.shiftKey && C.includes("ctrl") === g.ctrlKey && C.includes("alt") === g.altKey && C.includes("meta") === g.metaKey;
     };
     window.addEventListener("keydown", (g) => {
       c(g, A.hotkeys.report) ? (g.preventDefault(), u.openReport()) : c(g, A.hotkeys.viewer) && (g.preventDefault(), u.openViewer());
@@ -5746,7 +5746,7 @@ const mc = /* @__PURE__ */ Er(Uc, [["render", bc], ["__scopeId", "data-v-e3f0b15
   style: { width: "11px", height: "11px", "border-width": "2px" }
 }, Bw = ["disabled"];
 function aw(e, A, t, r, s, n) {
-  var o, a, u, B, c, g, d, C, F, y;
+  var o, a, u, B, c, g, d, C, U, y;
   const i = Sn("ScreenshotEditor");
   return f(), Q("div", Kc, [
     s.isCapturing && !s.isOpen ? (f(), Q("div", Sc, [...A[26] || (A[26] = [
@@ -5777,7 +5777,7 @@ function aw(e, A, t, r, s, n) {
             (f(!0), Q(x, null, M(n.projects, (w) => (f(), Q("button", {
               key: w.key,
               class: O({ "bug-target__on": s.project === w.key }),
-              onClick: (U) => n.setProject(w.key)
+              onClick: (F) => n.setProject(w.key)
             }, h(w.label), 11, Rc))), 128))
           ])) : p("", !0),
           l("button", {
@@ -5789,7 +5789,7 @@ function aw(e, A, t, r, s, n) {
           (f(!0), Q(x, null, M(n.tabs, (w) => (f(), Q("button", {
             key: w.id,
             class: O(["bug-tab", { active: s.activeTab === w.id }]),
-            onClick: (U) => s.activeTab = w.id
+            onClick: (F) => s.activeTab = w.id
           }, [
             L(h(w.label) + " ", 1),
             w.badge ? (f(), Q("span", Nc, h(w.badge), 1)) : p("", !0)
@@ -5842,7 +5842,7 @@ function aw(e, A, t, r, s, n) {
                 (f(!0), Q(x, null, M(s.severityOptions, (w) => (f(), Q("button", {
                   key: w.value,
                   class: O(["severity-btn", `severity-btn--${w.value.toLowerCase()}`, { active: s.severity === w.value }]),
-                  onClick: (U) => s.severity = w.value
+                  onClick: (F) => s.severity = w.value
                 }, h(w.label), 11, zc))), 128))
               ])
             ]),
@@ -5945,8 +5945,8 @@ function aw(e, A, t, r, s, n) {
                 ])
               ]),
               l("div", hu, [
-                (f(!0), Q(x, null, M(n.filteredLogs, (w, U) => (f(), Q("div", {
-                  key: U,
+                (f(!0), Q(x, null, M(n.filteredLogs, (w, F) => (f(), Q("div", {
+                  key: F,
                   class: O(["log-item", `log-item--${w.level}`])
                 }, [
                   l("span", Cu, h(w.time.slice(11)), 1),
@@ -5997,8 +5997,8 @@ function aw(e, A, t, r, s, n) {
                   onClick: A[18] || (A[18] = (...w) => n.fetchBackendLogs && n.fetchBackendLogs(...w))
                 }, "그래도 가져오기")
               ])) : s.backendLogsState === "error" ? (f(), Q("div", Lu, "백엔드 로그 조회 실패 (인증 확인)")) : (f(), Q("div", xu, [
-                (f(!0), Q(x, null, M(n.filteredBackendLogs, (w, U) => (f(), Q("div", {
-                  key: U,
+                (f(!0), Q(x, null, M(n.filteredBackendLogs, (w, F) => (f(), Q("div", {
+                  key: F,
                   class: O(["log-item", `log-item--${w.level.toLowerCase()}`])
                 }, [
                   l("span", Ku, h(w.time.slice(11)), 1),
@@ -6013,12 +6013,12 @@ function aw(e, A, t, r, s, n) {
           s.activeTab === "network" ? (f(), Q("div", _u, [
             A[49] || (A[49] = l("div", { class: "bug-report-label" }, "최근 API 요청 (최대 50건, 최신순)", -1)),
             l("div", ku, [
-              (f(!0), Q(x, null, M(n.reversedNetwork, (w, U) => {
+              (f(!0), Q(x, null, M(n.reversedNetwork, (w, F) => {
                 var K;
-                return f(), Q(x, { key: U }, [
+                return f(), Q(x, { key: F }, [
                   l("div", {
                     class: O(["net-item", w.error || w.status >= 400 ? "net-item--error" : ""]),
-                    onClick: (m) => n.toggleNetDetail(U)
+                    onClick: (m) => n.toggleNetDetail(F)
                   }, [
                     l("span", {
                       class: O(["net-status", n.statusClass(w.status)])
@@ -6028,7 +6028,7 @@ function aw(e, A, t, r, s, n) {
                     l("span", Nu, h(w.duration) + "ms", 1),
                     l("span", Vu, h((K = w.time) == null ? void 0 : K.slice(11, 19)), 1)
                   ], 10, Ru),
-                  s.expandedNet === U ? (f(), Q("div", Pu, [
+                  s.expandedNet === F ? (f(), Q("div", Pu, [
                     w.params ? (f(), Q("div", Xu, [
                       A[42] || (A[42] = l("b", null, "Params:", -1)),
                       A[43] || (A[43] = L()),
@@ -6058,8 +6058,8 @@ function aw(e, A, t, r, s, n) {
             l("div", ju, [
               A[50] || (A[50] = l("div", { class: "bug-report-label" }, "Vuex Mutation 이력 (최신순, 최대 100건)", -1)),
               l("div", qu, [
-                (f(!0), Q(x, null, M(((u = s.context) == null ? void 0 : u.mutationLog) || [], (w, U) => (f(), Q("div", {
-                  key: U,
+                (f(!0), Q(x, null, M(((u = s.context) == null ? void 0 : u.mutationLog) || [], (w, F) => (f(), Q("div", {
+                  key: F,
                   class: "log-item"
                 }, [
                   l("span", zu, h(w.time), 1),
@@ -6072,8 +6072,8 @@ function aw(e, A, t, r, s, n) {
             l("div", tg, [
               A[52] || (A[52] = l("div", { class: "bug-report-label" }, "라우터 이력", -1)),
               l("div", rg, [
-                (f(!0), Q(x, null, M(((g = s.context) == null ? void 0 : g.routeHistory) || [], (w, U) => (f(), Q("div", {
-                  key: U,
+                (f(!0), Q(x, null, M(((g = s.context) == null ? void 0 : g.routeHistory) || [], (w, F) => (f(), Q("div", {
+                  key: F,
                   class: "route-item"
                 }, [
                   l("span", sg, h(w.time), 1),
@@ -6084,14 +6084,14 @@ function aw(e, A, t, r, s, n) {
                 (C = (d = s.context) == null ? void 0 : d.routeHistory) != null && C.length ? p("", !0) : (f(), Q("div", og, "기록된 라우터 이력이 없습니다"))
               ])
             ]),
-            (F = s.context) != null && F.storage && Object.keys(s.context.storage).length ? (f(), Q("div", Bg, [
+            (U = s.context) != null && U.storage && Object.keys(s.context.storage).length ? (f(), Q("div", Bg, [
               A[53] || (A[53] = l("div", { class: "bug-report-label" }, "localStorage (민감 키 제외)", -1)),
               l("div", ag, [
-                (f(!0), Q(x, null, M(s.context.storage, (w, U) => (f(), Q("div", {
-                  key: U,
+                (f(!0), Q(x, null, M(s.context.storage, (w, F) => (f(), Q("div", {
+                  key: F,
                   class: "env-row"
                 }, [
-                  l("span", null, h(U), 1),
+                  l("span", null, h(F), 1),
                   l("span", null, h(w), 1)
                 ]))), 128))
               ])
@@ -6214,8 +6214,8 @@ function aw(e, A, t, r, s, n) {
               l("div", Ng, [
                 A[74] || (A[74] = l("div", { class: "env-group-title" }, "최근 이벤트 (최신순)", -1)),
                 l("div", Vg, [
-                  (f(!0), Q(x, null, M(s.context.recentEvents.slice(0, 30), (w, U) => (f(), Q("div", {
-                    key: U,
+                  (f(!0), Q(x, null, M(s.context.recentEvents.slice(0, 30), (w, F) => (f(), Q("div", {
+                    key: F,
                     class: "event-item"
                   }, [
                     l("span", Pg, h(w.time), 1),
@@ -6491,9 +6491,9 @@ const mQ = /* @__PURE__ */ Er(xc, [["render", aw], ["__scopeId", "data-v-3edfe55
     this._stopFixPolling();
   },
   methods: {
-    async open() {
-      var e;
-      this.isOpen = !0, this.selected = null, this.detail = null, this.expanded = /* @__PURE__ */ new Set(), this.project = ((e = this.kit) == null ? void 0 : e.project) || null, await this.fetchList();
+    async open(e) {
+      var A;
+      this.isOpen = !0, this.selected = null, this.detail = null, this.expanded = /* @__PURE__ */ new Set(), this.project = ((A = this.kit) == null ? void 0 : A.project) || null, await this.fetchList(), e && await this.openDetail(Number(e));
     },
     async switchProject(e) {
       var A;
@@ -7280,7 +7280,7 @@ function EQ(e, A, t, r, s, n) {
     ], 32)) : p("", !0)
   ]);
 }
-const LQ = /* @__PURE__ */ Er(uw, [["render", EQ], ["__scopeId", "data-v-e60ce07c"]]);
+const LQ = /* @__PURE__ */ Er(uw, [["render", EQ], ["__scopeId", "data-v-3e795eaf"]]);
 export {
   mQ as ReportModal,
   LQ as Viewer,

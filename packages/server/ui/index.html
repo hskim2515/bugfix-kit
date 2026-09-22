@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bugfix-kit 대시보드</title>
+<style>
+  :root { color-scheme: dark; --bg: #151922; --panel: #1e2431; --line: rgba(255,255,255,0.09); --text: #dfe5ee; --dim: #8b97a8; --accent: #6ea0ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 -apple-system, "Pretendard", "Noto Sans KR", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 14px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: #11151c; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--dim); font-size: 12px; }
+  header .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  main { padding: 16px 20px 40px; max-width: 1400px; margin: 0 auto; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .card h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 500; }
+  .card .big { font-size: 22px; font-weight: 600; }
+  .card .row { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
+  .running { background: linear-gradient(180deg, #1f2a44, #1a2030); border-color: rgba(110,160,255,0.35); grid-column: 1 / -1; }
+  .running pre { margin: 8px 0 0; max-height: 200px; overflow: auto; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #cfd8e6; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--dim); padding: 5px 12px; cursor: pointer; font-size: 12px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: rgba(110,160,255,0.22); color: #fff; }
+  input[type=search], input[type=password] { background: #10141b; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 12px; min-width: 220px; }
+  button.btn { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 6px; padding: 5px 11px; cursor: pointer; font-size: 12px; }
+  button.btn:hover { background: rgba(255,255,255,0.06); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11px; color: var(--dim); font-weight: 500; background: #1a2030; }
+  tr.r { cursor: pointer; }
+  tr.r:hover { background: rgba(255,255,255,0.04); }
+  td.prob { max-width: 520px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
+  .p-QUEUED { background: #3b3a1f; color: #f2d16b; } .p-RUNNING { background: #1f3350; color: #8ec1ff; } .p-PR_OPENED { background: #3b2a1f; color: #ffb27a; }
+  .p-MERGED { background: #1e3a2a; color: #7fe0a4; } .p-FAILED { background: #43232a; color: #ff9aa8; } .p-NONE { background: #2b3242; color: #9aa6b8; }
+  .sev-CRITICAL { color: #ff6b7a; } .sev-HIGH { color: #ffb27a; } .sev-MEDIUM { color: #f2d16b; } .sev-LOW { color: #7fe0a4; }
+  .dim { color: var(--dim); font-size: 11px; }
+  .empty { padding: 30px; text-align: center; color: var(--dim); }
+  #login { max-width: 420px; margin: 80px auto; }
+  #login p { color: var(--dim); }
+  .err { color: #ff9aa8; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>bugfix-kit</h1>
+  <span class="sub" id="meta">운영자 대시보드</span>
+  <div class="right">
+    <span class="dim" id="tick"></span>
+    <button class="btn" id="refresh">새로고침</button>
+    <button class="btn" id="logout" title="저장된 운영자 키 지우기">키 지우기</button>
+  </div>
+</header>
+<main>
+  <section id="login" hidden>
+    <div class="card">
+      <h3>운영자 키</h3>
+      <p>서버의 <code>~/.config/bugfix-kit/default.env</code> 에 적은 <code>ADMIN_KEY</code> 입니다. 이 브라우저에만 저장됩니다.</p>
+      <input type="password" id="key" placeholder="ADMIN_KEY" autofocus>
+      <button class="btn" id="enter">들어가기</button>
+      <div class="err" id="loginErr"></div>
+    </div>
+  </section>
+  <section id="app" hidden>
+    <div class="cards" id="cards"></div>
+    <div class="toolbar">
+      <span class="seg" id="projSeg"></span>
+      <span class="seg" id="filterSeg">
+        <button data-f="all" class="on">전체</button>
+        <button data-f="active">진행 중</button>
+        <button data-f="FAILED">실패</button>
+        <button data-f="PR_OPENED">PR 열림</button>
+        <button data-f="MERGED">병합됨</button>
+        <button data-f="NONE">요청 전</button>
+      </span>
+      <input type="search" id="q" placeholder="문제·보고자 검색">
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>리포트가 없습니다</div>
+  </section>
+</main>
+
+<script src="client/bugfix-client.iife.js"></script>
+<script>
+(() => {
+  // 서버 API 는 이 페이지 위치 기준 - /api/ui/ 에서 서빙되므로 상위(../)가 /api/. nginx 로 /bugfix/ui/ 면 ../ 는 /bugfix/ 가 된다
+  const API = new URL('../', location.href).href.replace(/\/$/, '');
+  const $ = (s) => document.querySelector(s);
+  const KEY = 'bugfix-admin-key';
+  let key = localStorage.getItem(KEY) || '';
+  let data = null, project = localStorage.getItem('bugfix-admin-project') || '', filter = 'all', q = '', kit = null;
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
+  const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패' };
+
+  async function load() {
+    if (!key) return showLogin();
+    try {
+      const r = await fetch(`${API}/admin/overview`, { headers: { 'X-Bugfix-Admin': key } });
+      if (r.status === 401 || r.status === 503) { const j = await r.json().catch(() => ({})); return showLogin(j.message || `HTTP ${r.status}`); }
+      data = (await r.json()).content;
+      if (!project || !data.projects.some((p) => p.name === project)) project = data.projects[0]?.name || '';
+      ensureKit();
+      render();
+      $('#login').hidden = true; $('#app').hidden = false;
+      $('#tick').textContent = `갱신 ${new Date().toLocaleTimeString()}`;
+    } catch (e) { $('#tick').textContent = `연결 실패: ${e.message}`; }
+  }
+  function showLogin(msg) { $('#app').hidden = true; $('#login').hidden = false; $('#loginErr').textContent = msg || ''; }
+
+  // 뷰어(Web Component)를 프로젝트 목록·키와 함께 한 번만 만든다 - 행을 누르면 그 리포트로 바로 연다
+  function ensureKit() {
+    if (kit) return;
+    kit = BugfixKit.createBugfix({
+      endpoint: API, user: 'admin', hotkeys: false, interceptors: { console: false },
+      projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })),
+    }).mount();
+  }
+
+  function render() {
+    const cur = data.projects.find((p) => p.name === project);
+    const total = data.projects.reduce((n, p) => n + p.reports.length, 0);
+    const running = data.running;
+    $('#meta').textContent = `프로젝트 ${data.projects.length} · 리포트 ${total} · 큐 ${data.queue}`;
+    $('#cards').innerHTML = data.projects.map((p) => `
+      <div class="card"><h3>${esc(p.name)} <span class="dim">${esc(p.githubRepo)} · ${esc(p.baseBranch)}${p.autoMerge ? ' · 자동 병합' : ' · PR 만'}</span></h3>
+        <div class="big">${p.reports.length}</div>
+        <div class="row">${['RUNNING', 'QUEUED', 'PR_OPENED', 'FAILED', 'MERGED'].filter((k) => p.counts[k]).map((k) => `<span class="pill p-${k}">${fixLabel[k]} ${p.counts[k]}</span>`).join('') || '<span>수정 요청 없음</span>'}</div>
+      </div>`).join('') + (running ? `
+      <div class="card running"><h3>지금 진행 중 · ${esc(running.project)} #${running.bugReportId} <span class="pill p-${running.fixStatus}">${fixLabel[running.fixStatus]}</span> <span class="dim">${running.fixRequestedAt ? '요청 ' + ago(running.fixRequestedAt) : ''}</span></h3>
+        <div>${esc((running.problem || '').slice(0, 160))}</div>
+        <pre>${esc(running.logTail || '(로그 없음)')}</pre>
+      </div>` : '');
+    $('#projSeg').innerHTML = data.projects.map((p) => `<button data-p="${esc(p.name)}" class="${p.name === project ? 'on' : ''}">${esc(p.name)}</button>`).join('');
+    const rows = (cur?.reports || []).filter((r) => {
+      const st = r.fixStatus || 'NONE';
+      if (filter === 'active' && !['QUEUED', 'RUNNING'].includes(st)) return false;
+      if (filter !== 'all' && filter !== 'active' && st !== filter) return false;
+      if (q && !`${r.problem} ${r.reporter} ${r.fixSummary || ''}`.toLowerCase().includes(q.toLowerCase())) return false;
+      return true;
+    }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
+    $('#rows').innerHTML = rows.map((r) => {
+      const st = r.fixStatus || 'NONE';
+      const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
+      return `<tr class="r" data-id="${r.bugReportId}"><td>${r.bugReportId}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td>
+        <td class="prob" title="${esc(r.problem)}">${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td>
+        <td><span class="pill p-${st}">${fixLabel[st] || st}</span></td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`;
+    }).join('');
+    $('#empty').hidden = rows.length > 0;
+  }
+
+  document.addEventListener('click', (e) => {
+    const pb = e.target.closest('#projSeg button'); if (pb) { project = pb.dataset.p; localStorage.setItem('bugfix-admin-project', project); render(); }
+    const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); render(); }
+    const tr = e.target.closest('tr.r'); if (tr && kit) { kit.setProject(project); kit.openViewer(Number(tr.dataset.id)); }
+  });
+  $('#q').addEventListener('input', (e) => { q = e.target.value; render(); });
+  $('#refresh').addEventListener('click', load);
+  $('#logout').addEventListener('click', () => { localStorage.removeItem(KEY); key = ''; showLogin(); });
+  $('#enter').addEventListener('click', () => { key = $('#key').value.trim(); localStorage.setItem(KEY, key); load(); });
+  $('#key').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#enter').click(); });
+
+  load();
+  setInterval(() => { if (key && !document.hidden) load(); }, 5000);   // 진행 중 로그가 5초마다 따라온다
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,7 @@
 import express from 'express';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { FileStore } from './store.js';
 import { HttpError, notBlank } from './util.js';
 
@@ -41,6 +44,38 @@ export function createApi(cfg, store, runner, log = console) {
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
   app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending }));
+
+  // ── 운영자 대시보드: /api/ui/ (nginx 가 /bugfix/ → /api/ 이면 https://…/bugfix/ui/) ──
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const uiDir = path.join(here, '..', 'ui');
+  const clientDist = path.join(here, '..', '..', 'client', 'dist');
+  app.use('/api/ui/client', express.static(clientDist, { maxAge: '1h' }));
+  app.get(['/api/ui', '/api/ui/'], (req, res) => res.sendFile(path.join(uiDir, 'index.html')));
+
+  const admin = (req, res, next) => {
+    if (!notBlank(cfg.server.adminKey)) return next(new HttpError(503, '운영자 키가 설정되지 않았습니다 (BUGFIX_ADMIN_KEY 또는 ~/.config/bugfix-kit/default.env 의 ADMIN_KEY)'));
+    if (req.get('X-Bugfix-Admin') !== cfg.server.adminKey) return next(new HttpError(401, '운영자 키가 맞지 않습니다'));
+    next();
+  };
+  /** 전 프로젝트 요약: 리포트 목록(가벼운 필드 + 수정 상태) · 진행 중 작업의 로그 꼬리 · 큐 길이 · 프로젝트 API 키(뷰어가 쓰게) */
+  app.get('/api/admin/overview', admin, wrap(async () => {
+    const projects = [];
+    let running = null;
+    for (const p of Object.values(cfg.projects)) {
+      const list = await store.list(p.name);
+      const counts = {};
+      for (const r of list) counts[r.fixStatus || 'NONE'] = (counts[r.fixStatus || 'NONE'] || 0) + 1;
+      for (const r of list) {
+        if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) {
+          const full = await store.get(p.name, r.bugReportId);
+          const tail = (full?.fixLog || '').split('\n').filter(Boolean).slice(-12).join('\n');
+          if (!running || r.fixStatus === 'RUNNING') running = { project: p.name, bugReportId: r.bugReportId, fixStatus: r.fixStatus, problem: r.problem, logTail: tail, fixRequestedAt: full?.fixRequestedAt };
+        }
+      }
+      projects.push({ name: p.name, apiKey: p.apiKey || '', githubRepo: p.githubRepo, baseBranch: p.baseBranch, autoMerge: p.autoMerge, counts, reports: list.map((r) => ({ ...r, fixPrNumber: undefined })) });
+    }
+    return { projects, running, queue: runner.pending, now: new Date().toISOString() };
+  }));
 
   const pr = express.Router({ mergeParams: true });
   app.use('/api/p/:project', (req, res, next) => {
@@ -123,6 +158,7 @@ export function createApi(cfg, store, runner, log = console) {
   }));
 
   app.use((req, res) => res.status(404).json({ message: `없는 경로: ${req.method} ${req.path}` }));
+  void fs;
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     const status = err.status || (err.type === 'entity.too.large' ? 413 : 500);
