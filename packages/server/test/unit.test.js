@@ -9,6 +9,7 @@ import { progressLine, claudeSummary, sessionIdOf, resultTextOf } from '../src/c
 import { FileStore } from '../src/store.js';
 import { describe as describeCmd } from '../src/exec.js';
 import { parseSuggestions } from '../src/runner.js';
+import { Insights } from '../src/insights.js';
 
 test('parseResult: 첫 줄이 제목, 나머지가 본문', () => {
   assert.deepEqual(parseResult('# 제목\n## 원인\n내용'), { title: '제목', body: '## 원인\n내용' });
@@ -99,4 +100,19 @@ test('parseSuggestions: 추천 개선 절의 한 줄 항목만', () => {
   const body = '## 원인\n- 아님\n## 추천 개선\n- **첫째** 항목\n  - 들여쓴 건 무시\n2. 둘째\n## 검증\n- 아님';
   assert.deepEqual(parseSuggestions(body), ['첫째 항목', '둘째']);
   assert.deepEqual(parseSuggestions(''), []);
+});
+
+test('Insights.resetInterrupted: 재시작 시 QUEUED/RUNNING 분석을 FAILED 로 정리', async () => {
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bfk-ins-'));
+  const cfg = { server: { dataDir }, projects: { a: { name: 'a' }, b: { name: 'b' }, c: { name: 'c' } } };
+  const ins = new Insights(cfg, null, null, { info() {}, warn() {} });
+  await ins.save('a', { status: 'RUNNING', log: '' });
+  await ins.save('b', { status: 'DONE', log: '' });
+  await ins.resetInterrupted();
+  const a = await ins.state('a');
+  assert.equal(a.status, 'FAILED');
+  assert.match(a.log, /서버 재시작으로 중단/);
+  assert.equal((await ins.state('b')).status, 'DONE');
+  assert.equal((await ins.state('c')).status, 'NONE');
+  await fs.rm(dataDir, { recursive: true, force: true });
 });
