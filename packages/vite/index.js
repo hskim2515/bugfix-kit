@@ -37,9 +37,13 @@ export default function bugfixKit(opts = {}) {
       if (isServe && server) return { server: { proxy: { '/bugfix': { target: server, changeOrigin: true, rewrite: (p) => p.replace(/^\/bugfix/, '/api') } } } };
       return {};
     },
-    transformIndexHtml() {
-      const { endpoint, project, apiKey, restBase } = resolved;
-      return [{ tag: 'script', attrs: { type: 'module' }, injectTo: 'body', children: `import { autoMount } from 'bugfix-kit/client/auto'; autoMount(${JSON.stringify({ endpoint, project, apiKey, restBase })});` }];
+    // 'pre': Vite 가 index.html 을 번들하기 전에 넣어야 이 인라인 모듈도 같이 번들된다(뒤에 넣으면 import 가 그대로 남아 브라우저가 못 푼다)
+    transformIndexHtml: {
+      order: 'pre',
+      handler() {
+        const { endpoint, project, apiKey, restBase } = resolved;
+        return [{ tag: 'script', attrs: { type: 'module' }, injectTo: 'body', children: `import { autoMount } from 'bugfix-kit/client/auto'; autoMount(${JSON.stringify({ endpoint, project, apiKey, restBase })});` }];
+      },
     },
     generateBundle() {
       if (opts.redirect === false || resolved.isServe) return;
