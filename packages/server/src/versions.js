@@ -17,7 +17,7 @@ import { firstLine, hhmmss, notBlank, nowIso, sleep } from './util.js';
  *   base:  /rest/bugfix                   키트가 공개되는 경로(앱 주소 뒤). 미리보기 주소 = {base}/v/{project}/{n}/
  *   host:  192.168.10.182                 워커가 백엔드 컨테이너에 닿는 주소(앱 안 워커가 컨테이너면 127.0.0.1 은 안 됨)
  *   front: { dir, build, dist, env: { VITE_API_URL: '{backUrl}' } }     build 는 sh 명령. BUGFIX_PREVIEW_BASE 는 키트가 넣는다
- *   back:  { dir, build, artifact: 'build/libs/*.jar', image, port, cmd: 'java -jar /app.jar', env: {}, volumes: [] }
+ *   back:  { dir, build, artifact: 'build/libs/*.jar', image, port, cmd: 'java -jar /app.jar', env: {}, volumes: [], startTimeoutMin: 8 }
  *   db:    { container, name, user, mode }  mode: template(기본 - 키트가 {name}_bugfix_tmpl 템플릿 DB 를 하루 한 번 pg_dump 로 갱신해 두고
  *                                          CREATE DATABASE … TEMPLATE 로 초 단위 복제) · clone(매번 라이브 DB 를 pg_dump|psql, 느림) ·
  *                                          shared(사본 없이 라이브 DB 그대로 - 빠르지만 미리보기의 쓰기가 개발 DB 에 남음). {db} = 사본 이름
@@ -246,10 +246,12 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
         const cmd = (r.back.cmd || `java -jar /app${artName}`).split(/\s+/);
         await ex.exec(wt, 5, ['docker', 'run', '-d', '--name', container, '--label', 'bugfix-kit=preview', '--restart', 'no', '-p', `${port}:${r.back.port || 8080}`, '-v', `${artCopy}:/app${artName}:ro`, ...volArgs, ...envArgs, r.back.image || 'eclipse-temurin:21-jdk', ...cmd]);
         await L(`컨테이너 시작: ${container} (${vars.host}:${port} → ${r.back.port})`);
-        const ok = await this.waitUp(vars.host, port, 6 * 60_000);
+        const startMin = Number(r.back.startTimeoutMin) > 0 ? Number(r.back.startTimeoutMin) : 8;
+        const ok = await this.waitUp(vars.host, port, startMin * 60_000);
         if (!ok) {
-          const logs = await ex.execOut(wt, 1, ['docker', 'logs', '--tail', '40', container]);
-          throw new Error(`백엔드가 6분 안에 응답하지 않습니다:\n${logs.slice(-1500)}`);
+          const state = (await ex.execOut(wt, 1, ['docker', 'inspect', container, '--format', '{{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} {{.State.Error}}'])).trim();
+          const logs = await ex.execOut(wt, 1, ['docker', 'logs', '--tail', '60', container]);
+          throw new Error(`백엔드가 ${startMin}분 안에 응답하지 않습니다 (컨테이너 ${state || '없음'}):\n${logs.slice(-2500) || '(출력 없음)'}`);
         }
         await L('✓ 백엔드 응답 확인');
       }
