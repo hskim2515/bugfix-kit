@@ -74,3 +74,10 @@ test('relevantGraph: 맞는 노드(hit)와 이웃, 층 번호', () => {
   assert.ok(r.edges.some((e) => e.from === 'component:DistrictListPopup' && e.to === 'api:districts'));
   assert.deepEqual(relevantGraph(g, ['zzz']), { nodes: [], edges: [] });
 });
+
+test('detectHost: github.com 은 github, 그 밖은 gitlab(주소·프로젝트 경로)', async () => {
+  const { detectHost } = await import('../src/gitlab.js');
+  assert.deepEqual(detectHost('https://github.com/Gaia3D/lhdt.git'), { host: 'github' });
+  assert.deepEqual(detectHost('https://seoul.gaia3d.com:53000/DT/IITP.git'), { host: 'gitlab', gitlabUrl: 'https://seoul.gaia3d.com:53000', gitlabProject: 'DT/IITP' });
+  assert.deepEqual(detectHost('git@gitlab.example.com:grp/sub/app.git'), { host: 'gitlab', gitlabUrl: 'https://gitlab.example.com', gitlabProject: 'grp/sub/app' });
+});

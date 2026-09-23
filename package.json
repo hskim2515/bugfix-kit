@@ -14,18 +14,24 @@
   },
   "exports": {
     "./client": {
+      "types": "./packages/client/types/index.d.ts",
       "import": "./packages/client/dist/bugfix-client.js",
       "default": "./packages/client/dist/bugfix-client.iife.js"
     },
-    "./client/vue": "./packages/client/dist/bugfix-client.vue.js",
+    "./client/vue": {
+      "types": "./packages/client/types/index.d.ts",
+      "default": "./packages/client/dist/bugfix-client.vue.js"
+    },
     "./client/style.css": "./packages/client/dist/style.css",
     "./client/dist/*": "./packages/client/dist/*",
     "./package.json": "./package.json",
-    "./front-check": "./packages/front-check/src/index.js"
+    "./front-check": "./packages/front-check/src/index.js",
+    "./adapters/express": "./packages/adapters/express.js"
   },
-  "version": "0.1.42",
+  "version": "0.1.43",
   "bin": {
-    "front-check": "packages/front-check/bin/front-check.mjs"
+    "front-check": "packages/front-check/bin/front-check.mjs",
+    "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"
   },
   "dependencies": {
     "pixelmatch": "^6.0.0",

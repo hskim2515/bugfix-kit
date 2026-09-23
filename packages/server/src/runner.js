@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { makeExec } from './exec.js';
 import { GitHub } from './github.js';
+import { GitLab } from './gitlab.js';
 import { runClaudeStream, sessionIdOf, resultTextOf, claudeSummary } from './claude.js';
 import { writeReportFiles } from './reportFiles.js';
 import { Shots, mergeShots } from './shots.js';
@@ -54,7 +55,7 @@ export class Runner {
     if (!this.execs.has(project.name)) this.execs.set(project.name, makeExec(this.cfg.server, project, this.log));
     return this.execs.get(project.name);
   }
-  gh(project) { return new GitHub(project.githubRepo, () => this.cfg.githubToken(project), this.log); }
+  gh(project) { return gitClient(project, this.cfg, this.log); }
   paths(project, id) {
     const root = path.join(this.cfg.server.workDir, project.name);
     // 리포트마다 고정 경로 - Claude 세션은 작업 디렉터리에 묶이므로(--resume) 후속 대화 때 같은 경로를 써야 한다
@@ -390,7 +391,7 @@ export class Runner {
       }
       if (anyRun && runs.every((r) => r.status === 'completed')) {
         const ok = runs.every((r) => r.conclusion === 'success');
-        await L(ok ? '✓ 배포 완료 - 개발서버에 반영됐습니다' : '✗ 배포 중 실패한 워크플로가 있습니다 - GitHub Actions 를 확인하세요');
+        await L(ok ? '✓ 배포 완료 - 개발서버에 반영됐습니다' : `✗ 배포 중 실패한 워크플로가 있습니다 - ${project.host === 'gitlab' ? 'GitLab CI' : 'GitHub Actions'} 를 확인하세요`);
         return;
       }
       if (!anyRun && Date.now() - (until - waitMin * 60_000) > 120_000) {
@@ -399,7 +400,7 @@ export class Runner {
       }
       await sleep(30_000);
     }
-    await L(`배포 추적 종료(${waitMin}분 경과) - GitHub Actions 에서 확인하세요`);
+    await L(`배포 추적 종료(${waitMin}분 경과) - ${project.host === 'gitlab' ? 'GitLab CI' : 'GitHub Actions'} 에서 확인하세요`);
   }
 
   /**
@@ -670,12 +671,17 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
     const cache = path.join(this.paths(project, 0).cache, m.name);
     const cacheNm = path.join(cache, 'node_modules');
     const stampFile = path.join(cache, 'package-lock.sha');
-    const lock = await readIfExists(path.join(fe, 'package-lock.json'));
+    // 잠금 파일 종류로 패키지 관리자를 고른다: yarn.lock 이면 yarn(npx 로 받아 씀), 아니면 npm
+    const yarnLock = await readIfExists(path.join(fe, 'yarn.lock'));
+    const npmLock = await readIfExists(path.join(fe, 'package-lock.json'));
+    const useYarn = !!yarnLock && !npmLock;
+    const lock = useYarn ? yarnLock : npmLock;
     const sha = lock ? crypto.createHash('sha1').update(lock).digest('hex') : '';
     const fresh = fss.existsSync(cacheNm) && sha === (await readIfExists(stampFile)).trim();
     if (!fresh) {
       await ex.exec(fe, 1, ['sh', '-c', 'rm -rf node_modules']);
-      await ex.exec(fe, 20, ['npm', 'install', '--legacy-peer-deps', '--no-audit', '--no-fund']);
+      if (useYarn) await ex.exec(fe, 20, ['npx', '-y', 'yarn@1.22.22', 'install', '--frozen-lockfile', '--non-interactive', '--ignore-engines']);
+      else await ex.exec(fe, 20, ['npm', 'install', '--legacy-peer-deps', '--no-audit', '--no-fund']);
       await fs.mkdir(cache, { recursive: true });
       await ex.exec(fe, 5, ['sh', '-c', `rm -rf '${cacheNm}' && mv node_modules '${cacheNm}'`]);
       await fs.writeFile(stampFile, sha, 'utf8');
@@ -741,4 +747,10 @@ export function parsePorcelain(text) {
     if (!m) return null;
     return { code: m[1].padStart(2, ' '), file: m[2].trim().split(' -> ').pop().replace(/^"|"$/g, '') };
   }).filter(Boolean);
+}
+
+/** 프로젝트의 git 호스트에 맞는 클라이언트(GitHub / GitLab) - 인터페이스는 같다 */
+export function gitClient(project, cfg, log = console) {
+  if (project.host === 'gitlab') return new GitLab(project.gitlabUrl, project.gitlabProject, () => cfg.githubToken(project), log);
+  return new GitHub(project.githubRepo, () => cfg.githubToken(project), log);
 }

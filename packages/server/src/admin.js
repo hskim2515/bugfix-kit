@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import YAML from 'yaml';
 import { loadConfig, readEnvFile } from './config.js';
 import { GitHub } from './github.js';
+import { gitClient } from './runner.js';
 import { expandHome, HttpError, notBlank } from './util.js';
 
 const execFileP = promisify(execFile);
@@ -111,7 +112,8 @@ export function adminRouter(cfg, store, runner, log = console) {
     const name = req.params.name;
     if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name)) throw new HttpError(400, '프로젝트 이름은 영문·숫자·-_ 만');
     const b = req.body || {};
-    if (!notBlank(b.repo) || !notBlank(b.githubRepo)) throw new HttpError(400, 'repo, githubRepo 는 필수');
+    if (!notBlank(b.repo)) throw new HttpError(400, 'repo 는 필수');
+    if (/github\.com[/:]/.test(b.repo) && !notBlank(b.githubRepo)) throw new HttpError(400, 'GitHub 저장소는 githubRepo(owner/name) 가 필수');
     const doc = readYml();
     doc.projects = doc.projects || {};
     const cur = doc.projects[name] || {};
@@ -164,9 +166,11 @@ export function adminRouter(cfg, store, runner, log = console) {
     } catch (e) { out.token = { ok: false, message: e.message }; }
     for (const p of Object.values(cfg.projects)) {
       try {
-        const gh = new GitHub(p.githubRepo, () => cfg.githubToken(p), log);
+        const gh = gitClient(p, cfg, log);
         const res = await gh.call('GET', '');
-        out.projects.push({ name: p.name, ok: true, repo: res.full_name, permissions: res.permissions, defaultBranch: res.default_branch });
+        out.projects.push(p.host === 'gitlab'
+          ? { name: p.name, ok: true, repo: `${res.path_with_namespace} (GitLab)`, permissions: { push: !!(res.permissions?.project_access || res.permissions?.group_access) }, defaultBranch: res.default_branch }
+          : { name: p.name, ok: true, repo: res.full_name, permissions: res.permissions, defaultBranch: res.default_branch });
       } catch (e) { out.projects.push({ name: p.name, ok: false, message: e.message }); }
     }
     return out;
@@ -175,7 +179,7 @@ export function adminRouter(cfg, store, runner, log = console) {
   r.post('/check/repo/:name', wrap(async (req) => {
     const p = cfg.projects[req.params.name];
     if (!p) throw new HttpError(404, '없는 프로젝트');
-    const gh = new GitHub(p.githubRepo, () => cfg.githubToken(p), log);
+    const gh = gitClient(p, cfg, log);
     const res = await run('git', ['-c', `http.extraheader=${gh.gitAuthHeader()}`, 'ls-remote', '--heads', p.repo, p.baseBranch], { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, timeout: 30000 });
     const ok = res.status === 0 && res.stdout.trim().length > 0;
     return { ok, message: ok ? `${p.baseBranch} @ ${res.stdout.trim().slice(0, 12)}` : (res.stderr || res.stdout || '').replace(/Authorization: Basic \S+/g, '***').trim().split('\n').slice(-2).join(' ') || `브랜치 ${p.baseBranch} 없음` };

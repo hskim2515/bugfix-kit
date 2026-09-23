@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { expandHome, notBlank } from './util.js';
+import { detectHost } from './gitlab.js';
 
 /**
  * 설정 파일(bugfix-kit.yml) 을 읽고 기본값·환경변수를 합친다.
@@ -10,6 +11,7 @@ import { expandHome, notBlank } from './util.js';
  *           프로젝트별: insights.schedule · knowledge.schedule · knowledge.enabled(false 면 자동 구축 안 함) · frontCheck.config(기본 {cwd}/front-check.config.mjs)
  * github:   tokenFile (또는 환경변수 BUGFIX_GITHUB_TOKEN)
  * projects: 이름 → { apiKey, repo, githubRepo, baseBranch, autoMerge, cors, description, conventions, modules[], allowedTools[], env{} }
+ *           host 는 repo 주소로 자동(github.com → github, 그 밖은 gitlab; 셀프호스팅 GitLab 은 주소 origin 이 API 주소). GitLab 토큰은 프로젝트 env GITLAB_TOKEN
  *   module: { name, match(변경 파일 경로 접두어), dir(명령 실행 위치), verify[](셸 명령), nodeModulesCache(bool), prebuild[]{ when, cwd, run } }
  *
  * 비밀값(API 키·토큰)은 파일보다 환경변수를 우선한다: BUGFIX_GITHUB_TOKEN, BUGFIX_KEY_<PROJECT 대문자>.
@@ -44,7 +46,9 @@ export function loadConfig(file) {
   const projects = {};
   for (const [name, p] of Object.entries(raw.projects || {})) {
     if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name)) throw new Error(`프로젝트 이름은 영문·숫자·-_ 만: ${name}`);
-    if (!notBlank(p.repo) || !notBlank(p.githubRepo)) throw new Error(`projects.${name}: repo, githubRepo 는 필수`);
+    if (!notBlank(p.repo)) throw new Error(`projects.${name}: repo 는 필수`);
+    const hostInfo = detectHost(p.repo, p.host);
+    if (hostInfo.host === 'github' && !notBlank(p.githubRepo)) throw new Error(`projects.${name}: GitHub 저장소는 githubRepo(owner/name) 가 필수`);
     const envKey = process.env[`BUGFIX_KEY_${name.toUpperCase().replace(/-/g, '_')}`];
     // 프로젝트 비밀값은 서버의 파일 하나(envFile, KEY=VALUE)에 - 저장소에는 안 들어가고, front-check 의 FC_USER/FC_PASS 등이 여기서 나온다
     // 운영자 비밀값: ~/.config/bugfix-kit/default.env (모든 프로젝트 공통) ← projects/<이름>.env (프로젝트별, 우선)
@@ -62,11 +66,14 @@ export function loadConfig(file) {
       fixFrom: 'app',            // 'app' = 앱 사용자도 수정 요청 가능, 'admin' = 관리 콘솔에서만 (라이브러리·공용 코드)
       protectedPaths: [],        // AI 가 바꾸면 되돌리는 경로(접두어 또는 정확한 파일) - 예: 버그 신고 연결 파일, CI 설정
       ...p,
+      ...hostInfo,                       // host: 'github'|'gitlab', gitlab 이면 gitlabUrl·gitlabProject
+      githubRepo: p.githubRepo || hostInfo.gitlabProject || '',   // 표시·프롬프트용 저장소 이름
       env: { ...fileEnv, ...(p.env || {}) },
       apiKey: notBlank(envKey) ? envKey : (p.apiKey || fileEnv.BUGFIX_API_KEY || ''),
       // 프로젝트별 GitHub 토큰(선택) - 없으면 서버 공용 토큰
       githubTokenFile: p.githubTokenFile || (fileEnv.GITHUB_TOKEN ? null : undefined),
       githubTokenValue: fileEnv.GITHUB_TOKEN || null,
+      gitlabTokenValue: fileEnv.GITLAB_TOKEN || null,
     };
     projects[name].modules = (projects[name].modules || []).map((m, i) => {
       if (!notBlank(m.match)) throw new Error(`projects.${name}.modules[${i}]: match 는 필수`);
@@ -91,6 +98,11 @@ export function loadConfig(file) {
     },
     /** 토큰: (프로젝트 것) → 환경변수 → 파일(매번 읽어 재시작 없이 교체 가능). 없으면 null */
     githubToken(project) {
+      // GitLab 프로젝트: 프로젝트 env 의 GITLAB_TOKEN → 공용 ~/.config/bugfix-kit/gitlab-token
+      if (project?.host === 'gitlab') {
+        if (project.gitlabTokenValue) return project.gitlabTokenValue;
+        try { return fs.readFileSync(expandHome('~/.config/bugfix-kit/gitlab-token'), 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return null; }
+      }
       if (project?.githubTokenValue) return project.githubTokenValue;
       if (project?.githubTokenFile) { try { return fs.readFileSync(expandHome(project.githubTokenFile), 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return null; } }
       if (notBlank(process.env.BUGFIX_GITHUB_TOKEN)) return process.env.BUGFIX_GITHUB_TOKEN.trim();

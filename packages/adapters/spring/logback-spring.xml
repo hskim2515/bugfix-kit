@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- bugfix-kit: Spring Boot 기본 콘솔 로깅은 그대로 두고, 최근 로그를 메모리에 모으는 appender 를 하나 더 단다.
+     이미 logback-spring.xml 이 있으면 <appender> 와 <appender-ref> 두 줄만 옮겨 넣으면 된다. -->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <appender name="BUGFIX" class="__PACKAGE__.BugfixLogAppender"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="BUGFIX"/>
+    </root>
+</configuration>

@@ -1,0 +1,8 @@
+{
+  "name": "@bugfix-kit/adapters",
+  "version": "0.1.43",
+  "private": true,
+  "type": "module",
+  "description": "bugfix-kit 백엔드 로그 어댑터(Spring 템플릿·Express 미들웨어)",
+  "bin": { "bugfix-adapter": "./bin/bugfix-adapter.mjs" }
+}
