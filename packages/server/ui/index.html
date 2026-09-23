@@ -260,8 +260,8 @@
     <div data-tab="checks" hidden>
       <h2>점검</h2>
       <div class="cards checks">
-        <div class="card"><div class="body"><h3>GitHub 토큰 · 저장소 권한</h3><div id="c_github" class="dim"></div></div><button class="btn" data-check="github">검사</button></div>
-        <div class="card"><div class="body"><h3>Claude Code</h3><div id="c_claude" class="dim"></div></div><button class="btn" data-check="claude">검사</button></div>
+        <div class="card"><div class="body"><h3>저장소 토큰 · 권한 (GitHub/GitLab)</h3><div id="c_github" class="dim"></div></div><button class="btn" data-check="github">검사</button></div>
+        <div class="card"><div class="body"><h3>Claude Code · git · Node (워커 실행 환경)</h3><div id="c_claude" class="dim"></div></div><button class="btn" data-check="claude">검사</button></div>
         <div class="card"><div class="body"><h3>Docker · 브라우저 이미지</h3><div id="c_docker" class="dim"></div></div><button class="btn" data-check="docker">검사</button></div>
         <div class="card"><div class="body"><h3>저장소 접근</h3><div id="c_repo" class="dim"></div></div><span class="seg" id="c_repo_btns"></span></div>
         <div class="card"><div class="body"><h3>앱 화면 열기</h3><div id="c_front" class="dim">1~2분</div></div><span class="seg" id="c_front_btns"></span></div>
@@ -352,21 +352,31 @@
     try {
       const st = await api('GET', '/admin/settings');
       if (!quick) quick = { claude: await api('POST', '/admin/check/claude').catch(() => null), docker: await api('POST', '/admin/check/docker').catch(() => null) };
-      const anyAccount = !!st.global.FC_USER || st.projects.some((p) => p.secrets.FC_USER);
-      const anyReport = st.projects.some((p) => p.reports > 0);
-      const items = [
-        { ok: !!st.global.GITHUB_TOKEN, text: 'GitHub 토큰', go: 'secrets' },
-        { ok: !!quick.claude?.loggedIn, text: 'Claude 로그인 (서버에서 claude login)', go: 'checks' },
-        { ok: !!quick.docker?.imagePresent, text: '브라우저 이미지 (docker pull)', go: 'checks' },
-        { ok: st.projects.length > 0, text: '프로젝트 등록', go: 'projects' },
-        { ok: anyAccount, text: '테스트 계정', go: 'secrets' },
-        { ok: anyReport, text: '앱 SDK 연결 (첫 신고)', go: null },
-      ];
-      const done = items.filter((i) => i.ok).length;
+      const projects = scope ? st.projects.filter((p) => p.name === scope) : st.projects;
+      const items = [];
+      // 1. 프로젝트
+      items.push({ ok: projects.length > 0, text: '프로젝트 등록', how: '프로젝트 탭에서 저장소 주소·브랜치·검증 명령을 저장', go: 'projects' });
+      // 2. 저장소 토큰 - 프로젝트의 호스트에 맞게
+      for (const p of projects) {
+        const gl = p.host === 'gitlab';
+        items.push({ ok: !!p.tokenOk, text: `${gl ? 'GitLab' : 'GitHub'} 토큰 (${esc(p.name)})`,
+          how: gl ? `키·계정 탭 → ${esc(p.name)} 의 GITLAB_TOKEN. ${esc(p.gitlabUrl)}/-/user_settings/personal_access_tokens 에서 api·write_repository 스코프로 발급` : `키·계정 탭의 GitHub 토큰(classic PAT, repo 스코프). 프로젝트 전용이면 ${esc(p.name)} 의 GITHUB_TOKEN`, go: 'secrets' });
+      }
+      // 3. 실행 환경 - 워커가 도는 곳(앱 안 워커면 그 컨테이너/호스트)
+      items.push({ ok: !!quick.claude?.installed, text: 'Claude Code CLI 설치', how: '워커가 도는 곳에 `npm i -g @anthropic-ai/claude-code` (컨테이너면 이미지에)', go: 'checks' });
+      items.push({ ok: !!quick.claude?.loggedIn, text: 'Claude 로그인', how: `워커 실행 계정으로 터미널에서 \`claude login\` 한 번 (${esc(quick.claude?.home || '홈')}/.claude 에 저장). 컨테이너면 호스트의 ~/.claude 를 마운트`, go: 'checks' });
+      items.push({ ok: !!quick.claude?.git?.ok, text: 'git 설치', how: '워커가 도는 곳에 git (저장소 받기·브랜치 푸시)', go: 'checks' });
+      items.push({ ok: !!quick.docker?.imagePresent, text: '헤드리스 브라우저 (docker 이미지)', how: `docker 와 \`docker pull ${esc(quick.docker?.image || 'mcr.microsoft.com/playwright:v1.47.2-jammy')}\` - 없으면 화면 확인만 건너뜀`, go: 'checks', soft: true });
+      // 4. 선택
+      const anyAccount = !!st.global.FC_USER || projects.some((p) => p.secrets.FC_USER);
+      items.push({ ok: anyAccount, text: '테스트 계정 (로그인이 있는 앱만)', how: '키·계정 탭의 FC_USER/FC_PASS - 화면 확인이 로그인 뒤 화면을 보게', go: 'secrets', soft: true });
+      items.push({ ok: projects.some((p) => p.reports > 0), text: '앱 SDK 연결 (첫 신고)', how: '앱에서 Shift+F9 로 신고 한 번 - 여기 리포트 목록에 뜨면 연결된 것', go: null });
+      const required = items.filter((i) => !i.soft);
+      const done = required.filter((i) => i.ok).length;
       const el = $('#checklist');
-      if (done === items.length) { el.hidden = true; return; }
+      if (done === required.length && items.every((i) => i.ok)) { el.hidden = true; return; }
       el.hidden = false;
-      el.innerHTML = `<h3>설정 ${done}/${items.length}</h3><ol>${items.map((i) => `<li><span class="ic ${i.ok ? 'ok' : 'todo'}">${i.ok ? '✓' : '·'}</span><span class="${i.ok ? 'done' : ''}">${esc(i.text)}${!i.ok && i.go ? ` <a href="#" data-go="${i.go}">설정</a>` : ''}</span></li>`).join('')}</ol>`;
+      el.innerHTML = `<h3>설정 ${done}/${required.length}${done === required.length ? ' - 필수는 끝, 선택 항목 남음' : ''}</h3><ol>${items.map((i) => `<li><span class="ic ${i.ok ? 'ok' : 'todo'}">${i.ok ? '✓' : '·'}</span><span class="${i.ok ? 'done' : ''}">${i.text}${i.soft && !i.ok ? ' <span class="dim">(선택)</span>' : ''}${!i.ok ? `<div class="dim" style="margin:2px 0 4px 22px">${i.how}${i.go ? ` <a href="#" data-go="${i.go}">→ ${({ projects: '프로젝트', secrets: '키·계정', checks: '점검' })[i.go]} 탭</a>` : ''}</div>` : ''}</span></li>`).join('')}</ol>`;
     } catch { /* 설정 API 실패는 무시 */ }
   }
 
@@ -701,7 +711,8 @@
   }
   function renderSecrets() {
     const g = settings.global;
-    $('#gsec').innerHTML = secretRow('global', 'GITHUB_TOKEN', 'GitHub 토큰', g.GITHUB_TOKEN, 'classic PAT (repo)', true)
+    const anyGithub = settings.projects.some((p) => p.host !== 'gitlab');
+    $('#gsec').innerHTML = secretRow('global', 'GITHUB_TOKEN', anyGithub ? 'GitHub 토큰 (공용)' : 'GitHub 토큰 (공용 - GitHub 프로젝트가 없어 지금은 안 씀)', g.GITHUB_TOKEN, 'classic PAT (repo)', true)
       + secretRow('global', 'ADMIN_KEY', '운영자 키', g.ADMIN_KEY, '', true)
       + secretRow('global', 'FC_USER', '테스트 계정 아이디', g.FC_USER, '', false)
       + secretRow('global', 'FC_PASS', '테스트 계정 비밀번호', g.FC_PASS, '', true)
@@ -715,7 +726,9 @@
       + secretRow(p.name, 'FC_USER', '테스트 계정 아이디', p.secrets.FC_USER, '', false)
       + secretRow(p.name, 'FC_PASS', '테스트 계정 비밀번호', p.secrets.FC_PASS, '', true)
       + secretRow(p.name, 'BUGFIX_API_KEY', 'API 키', p.secrets.BUGFIX_API_KEY, '', false)
-      + secretRow(p.name, 'GITHUB_TOKEN', 'GitHub 토큰 (전용)', p.secrets.GITHUB_TOKEN, '', true)
+      + (p.host === 'gitlab'
+        ? secretRow(p.name, 'GITLAB_TOKEN', 'GitLab 토큰', p.secrets.GITLAB_TOKEN, `${p.gitlabUrl}/-/user_settings/personal_access_tokens 에서 api + write_repository 스코프로 발급`, true)
+        : secretRow(p.name, 'GITHUB_TOKEN', 'GitHub 토큰 (전용 - 비우면 공용 토큰)', p.secrets.GITHUB_TOKEN, 'classic PAT, repo 스코프', true))
       + (p.secrets.extra?.length ? `<div class="dim">그 밖의 키: ${p.secrets.extra.map(esc).join(', ')}</div>` : '')
       + `<div class="secret"><label>새 키 추가</label><input data-scope="${esc(p.name)}" data-k="__new" placeholder="KEY=VALUE"><div><button class="btn" data-save="__new" data-scope="${esc(p.name)}">저장</button></div></div>` : '';
   }
@@ -743,7 +756,7 @@
     try {
       const r = await api('POST', `/admin/check/${kind}${name ? '/' + name : ''}`);
       if (kind === 'github') el.innerHTML = `<div class="${r.token?.ok ? 'ok' : 'bad'}">토큰: ${r.token?.ok ? `✓ ${esc(r.token.login)} (scopes: ${esc(r.token.scopes || '-')})` : `✗ ${esc(r.token?.message)}`}</div>` + r.projects.map((p) => `<div class="${p.ok ? 'ok' : 'bad'}">${esc(p.name)}: ${p.ok ? `✓ ${esc(p.repo)} · push ${p.permissions?.push ? '가능' : '불가'} · 기본 브랜치 ${esc(p.defaultBranch)}` : `✗ ${esc(p.message)}`}</div>`).join('');
-      else if (kind === 'claude') el.innerHTML = `<div class="${r.installed ? 'ok' : 'bad'}">${r.installed ? `✓ ${esc(r.version)}` : '✗ 실행 파일 없음 - 서버 설정의 Claude 실행 파일/PATH 확인'}</div><div class="${r.loggedIn ? 'ok' : 'bad'}">${r.loggedIn ? '✓ 로그인 흔적 있음' : `✗ 로그인 안 됨 - ${esc(r.hint)}`}</div>`;
+      else if (kind === 'claude') el.innerHTML = `<div class="${r.installed ? 'ok' : 'bad'}">${r.installed ? `✓ ${esc(r.version)}` : '✗ Claude Code CLI 없음 - 워커가 도는 곳에 `npm i -g @anthropic-ai/claude-code`'}</div><div class="${r.loggedIn ? 'ok' : 'bad'}">${r.loggedIn ? '✓ 로그인 흔적 있음' : `✗ 로그인 안 됨 - ${esc(r.hint || '')}`}</div><div class="${r.git?.ok ? 'ok' : 'bad'}">${r.git?.ok ? `✓ ${esc(r.git.version)}` : '✗ git 없음'}</div><div class="dim">node ${esc(r.node || '')} · 홈 ${esc(r.home || '')}</div>`;
       else if (kind === 'docker') el.innerHTML = `<div class="${r.available ? 'ok' : 'bad'}">${r.available ? `✓ docker ${esc(r.version)}` : '✗ docker 없음'}</div><div class="${r.imagePresent ? 'ok' : 'bad'}">${r.imagePresent ? `✓ ${esc(r.image)}` : `✗ 이미지 없음 - <code>${esc(r.hint)}</code>`}</div>`;
       else if (kind === 'repo') el.innerHTML = `<div class="${r.ok ? 'ok' : 'bad'}">${esc(name)}: ${r.ok ? '✓' : '✗'} ${esc(r.message)}</div>`;
       else if (kind === 'front') el.innerHTML = `<div class="${r.ok ? 'ok' : 'bad'}">${esc(name)}: ${r.ok ? '✓ 화면 열림' : '✗'} ${r.title ? `· 제목 "${esc(r.title)}"` : ''} ${r.collected ? `· 콘솔 오류 ${r.collected.consoleErrors} · 실패 요청 ${r.collected.failedRequests}` : ''} ${r.fatal ? `· ${esc(r.fatal)}` : ''} ${r.message ? esc(r.message) : ''}</div>`;

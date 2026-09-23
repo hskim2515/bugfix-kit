@@ -84,8 +84,10 @@ export function adminRouter(cfg, store, runner, log = console) {
       projects.push({
         name, ...Object.fromEntries(PROJECT_FIELDS.map((k) => [k, p[k]])),
         apiKeySet: mask(cfg.projects[name]?.apiKey),
-        secrets: { BUGFIX_API_KEY: mask(env.BUGFIX_API_KEY), GITHUB_TOKEN: mask(env.GITHUB_TOKEN), FC_USER: env.FC_USER || '', FC_PASS: mask(env.FC_PASS),
-          extra: Object.keys(env).filter((k) => !['BUGFIX_API_KEY', 'GITHUB_TOKEN', 'FC_USER', 'FC_PASS'].includes(k)) },
+        host: cfg.projects[name]?.host || 'github', gitlabUrl: cfg.projects[name]?.gitlabUrl || '',
+        tokenOk: notBlank(cfg.githubToken(cfg.projects[name])),          // 이 프로젝트가 실제로 쓸 저장소 토큰이 있는가(프로젝트 → 공용 → 환경변수)
+        secrets: { BUGFIX_API_KEY: mask(env.BUGFIX_API_KEY), GITHUB_TOKEN: mask(env.GITHUB_TOKEN), GITLAB_TOKEN: mask(env.GITLAB_TOKEN), FC_USER: env.FC_USER || '', FC_PASS: mask(env.FC_PASS),
+          extra: Object.keys(env).filter((k) => !['BUGFIX_API_KEY', 'GITHUB_TOKEN', 'GITLAB_TOKEN', 'FC_USER', 'FC_PASS'].includes(k)) },
         reports: (await store.list(name)).length,
       });
     }
@@ -156,15 +158,19 @@ export function adminRouter(cfg, store, runner, log = console) {
 
   // ── 점검 ──
   r.post('/check/github', wrap(async () => {
+    // 프로젝트마다 그 저장소 호스트(GitHub/GitLab)의 토큰으로 사용자 조회 + 저장소 접근을 본다
     const out = { token: null, projects: [] };
-    const token = readToken();
-    if (!token) return { ...out, token: { ok: false, message: '공용 토큰 없음' } };
-    try {
-      const res = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'bugfix-kit', Accept: 'application/vnd.github+json' } });
-      const j = await res.json().catch(() => ({}));
-      out.token = res.ok ? { ok: true, login: j.login, scopes: res.headers.get('x-oauth-scopes') || '' } : { ok: false, message: `HTTP ${res.status} ${j.message || ''}` };
-    } catch (e) { out.token = { ok: false, message: e.message }; }
     for (const p of Object.values(cfg.projects)) {
+      const token = cfg.githubToken(p);
+      if (!token) { out.projects.push({ name: p.name, ok: false, message: p.host === 'gitlab' ? 'GitLab 토큰 없음 - 키·계정 탭의 GITLAB_TOKEN' : 'GitHub 토큰 없음 - 키·계정 탭' }); continue; }
+      try {
+        const res = p.host === 'gitlab'
+          ? await fetch(`${p.gitlabUrl}/api/v4/user`, { headers: { 'PRIVATE-TOKEN': token } })
+          : await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'bugfix-kit', Accept: 'application/vnd.github+json' } });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) { out.projects.push({ name: p.name, ok: false, message: `토큰 거부: HTTP ${res.status} ${j.message || ''}` }); continue; }
+        out.token = out.token || { ok: true, login: j.login || j.username, scopes: res.headers.get('x-oauth-scopes') || '' };
+      } catch (e) { out.projects.push({ name: p.name, ok: false, message: e.message }); continue; }
       try {
         const gh = gitClient(p, cfg, log);
         const res = await gh.call('GET', '');
@@ -173,6 +179,7 @@ export function adminRouter(cfg, store, runner, log = console) {
           : { name: p.name, ok: true, repo: res.full_name, permissions: res.permissions, defaultBranch: res.default_branch });
       } catch (e) { out.projects.push({ name: p.name, ok: false, message: e.message }); }
     }
+    if (!out.token) out.token = { ok: false, message: '점검할 토큰이 없습니다' };
     return out;
   }));
 
@@ -187,13 +194,15 @@ export function adminRouter(cfg, store, runner, log = console) {
 
   r.post('/check/claude', wrap(async () => {
     const bin = cfg.server.claudeBin || 'claude';
-    const v = await run(bin, ['--version'], { timeout: 20000, env: { ...process.env, PATH: `${cfg.server.pathExtra ? cfg.server.pathExtra + ':' : ''}${process.env.PATH}` } });
+    const env = { ...process.env, PATH: `${cfg.server.pathExtra ? cfg.server.pathExtra + ':' : ''}${process.env.PATH}` };
+    const v = await run(bin, ['--version'], { timeout: 20000, env });
+    const gitV = await run('git', ['--version'], { timeout: 10000, env });
     const home = os.homedir();
     const cred = ['.claude/.credentials.json', '.claude.json'].map((f) => path.join(home, f)).find((f) => fs.existsSync(f));
     let loggedIn = false;
     try { if (cred) { const j = JSON.parse(fs.readFileSync(cred, 'utf8')); loggedIn = !!(j.claudeAiOauth || j.oauthAccount || j.primaryApiKey); } } catch { /* 형식 다름 */ }
     if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY) loggedIn = true;
-    return { installed: v.status === 0, version: (v.stdout || '').trim().split('\n')[0], loggedIn, hint: loggedIn ? '' : `서버 실행 계정에서 \`${bin} login\` 을 한 번 실행하세요 (터미널 필요)` };
+    return { installed: v.status === 0, version: (v.stdout || '').trim().split('\n')[0], loggedIn, hint: loggedIn ? '' : `서버 실행 계정에서 \`${bin} login\` 을 한 번 실행하세요 (터미널 필요)`, git: { ok: gitV.status === 0, version: (gitV.stdout || '').trim() }, node: process.version, home: os.homedir() };
   }));
 
   r.post('/check/docker', wrap(async () => {
