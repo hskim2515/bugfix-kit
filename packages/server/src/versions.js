@@ -232,7 +232,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
           await upd({ status: 'STARTING' });
           if (r.db.mode === 'clone') {
             await L(`DB 복제(라이브에서 직접): ${r.db.name} → ${db} (${r.db.container})`);
-            await this.pgsh(ex, wt, r.db, `dropdb -U ${r.db.user} --if-exists --force ${db} 2>/dev/null; createdb -U ${r.db.user} -T template0 ${db} && pg_dump -U ${r.db.user} ${r.db.name} | psql -q -U ${r.db.user} -v ON_ERROR_STOP=0 ${db} >/dev/null`);
+            await this.pgsh(ex, wt, r.db, this.copySql(r.db, r.db.name, db));
           } else {
             await this.ensureTemplate(project, ex, wt, L);
             await L(`DB 복제(템플릿): ${r.db.template} → ${db}`);
@@ -260,6 +260,11 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     }
   }
 
+  /** 라이브 DB → 새 DB 복사: custom 포맷으로 덤프한 뒤 병렬(-j 4) 복원 - 파이프 psql 보다 3~4배 빠르다. 실패 줄이 있어도 계속(대개 확장·권한) */
+  copySql(db, from, to) {
+    const u = db.user, f = `/tmp/bugfix-${to}.dump`;
+    return `dropdb -U ${u} --if-exists --force ${to} 2>/dev/null; createdb -U ${u} -T template0 ${to} && pg_dump -U ${u} -Fc -f ${f} ${from} && (pg_restore -U ${u} -j 4 --no-owner --no-privileges -d ${to} ${f} 2>&1 | grep -c "error" | sed "s/^/restore warnings: /" >&2; true); rm -f ${f}`;
+  }
   pgsh(ex, cwd, db, script) { return ex.sh(cwd, 90, `docker exec ${sq(db.container)} sh -c ${sq(script)}`); }
   /** 템플릿 DB 가 없거나 오래됐으면 라이브 DB 에서 다시 만든다(pg_dump|psql, 한 번만 느림). 프로젝트별 뮤텍스 */
   async ensureTemplate(project, ex, cwd, L = () => {}) {
@@ -274,7 +279,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       await L(`템플릿 DB ${exists ? '갱신' : '생성'}: ${r.db.name} → ${r.db.template} (하루 한 번, 몇 분)`);
       const t0 = Date.now();
       // 템플릿에 붙은 세션이 있으면 --force 로 끊는다(키트만 쓰는 DB)
-      await this.pgsh(ex, cwd, r.db, `dropdb -U ${r.db.user} --if-exists --force ${r.db.template} 2>/dev/null; createdb -U ${r.db.user} -T template0 ${r.db.template} && pg_dump -U ${r.db.user} ${r.db.name} | psql -q -U ${r.db.user} -v ON_ERROR_STOP=0 ${r.db.template} >/dev/null && psql -U ${r.db.user} -Atc "update pg_database set datallowconn = true where datname='${r.db.template}'"`);
+      await this.pgsh(ex, cwd, r.db, this.copySql(r.db, r.db.name, r.db.template));
       await this.save(project.name, { dbTemplate: { name: r.db.template, refreshedAt: nowIso(), seconds: Math.round((Date.now() - t0) / 1000) } });
       await L(`✓ 템플릿 DB 준비 (${Math.round((Date.now() - t0) / 1000)}초)`);
     });
@@ -406,8 +411,11 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       const front = path.join(this.previewDir(project.name, n), 'front');
       if (!fss.existsSync(path.join(front, 'index.html'))) return res.status(503).send(`미리보기 프론트가 준비되지 않았습니다(${pv.status || 'NONE'})`);
       const rel = decodeURIComponent(sub.split('?')[0]);
-      const file = path.join(front, rel);
-      if (rel !== '/' && file.startsWith(front) && fss.existsSync(file) && fss.statSync(file).isFile()) return res.sendFile(file);
+      const previewUrl = `${recipe.base || '/bugfix'}/v/${project.name}/${n}`;
+      // 일부 플러그인(vite-plugin-cesium 등)은 base 를 출력 경로에도 붙여 dist/<base>/… 에 놓는다 - 그 자리도 본다
+      for (const file of [path.join(front, rel), path.join(front, previewUrl, rel)]) {
+        if (rel !== '/' && file.startsWith(front) && fss.existsSync(file) && fss.statSync(file).isFile()) return res.sendFile(file);
+      }
       return res.sendFile(path.join(front, 'index.html'));
     });
     return r;
