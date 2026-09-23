@@ -250,7 +250,7 @@
     <div data-tab="versions" hidden>
       <div class="intro">AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 <b>버전</b>으로 갖고 있습니다(키트 저장소 태그 bugfix/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워 <b>접속</b>해 보고, 마음에 들면 내보냅니다(브랜치·PR·병합).</div>
       <details class="card" id="vRecipeWrap" style="margin-bottom:12px"><summary class="dim">미리보기 레시피 <span id="vRecipeState"></span></summary>
-        <div class="dim" style="margin:6px 0">프론트 빌드·백엔드 실행·DB 복제 방법. 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}</div>
+        <div class="dim" style="margin:6px 0">프론트 빌드·백엔드 실행·DB 복제 방법. 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}. db.mode: template(기본, 템플릿 DB 에서 초 단위 복제) · clone(매번 라이브에서, 느림) · shared(사본 없이 개발 DB 공유). maxUp(동시 개수, 기본 2) · ttlHours(미사용 자동 중지, 기본 12)</div>
         <textarea id="vRecipe" style="min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea>
         <div class="actions"><button class="btn" id="vDraft" title="Claude 가 저장소(컴포즈·Dockerfile·env·properties)를 읽고 초안을 만듭니다 (1~3분)">AI 초안 만들기</button><input id="vNote" placeholder="AI 에게 줄 메모 (선택: 배포 서버 IP, DB 컨테이너 이름 …)" style="flex:1;min-width:200px"><button class="btn primary" id="vSave">레시피 저장</button><span class="msg" id="vMsg"></span></div>
       </details>
@@ -569,7 +569,7 @@
   async function loadVersions() {
     vProject = versionProject(); if (!vProject) return;
     let r; try { r = await api('GET', `/admin/versions/${vProject}`); } catch (e) { $('#vEmpty').hidden = false; $('#vEmpty').textContent = e.message; return; }
-    $('#vRecipeState').textContent = r.recipe ? '· 있음' : '· 없음 (초안을 만들거나 적어 주세요)';
+    $('#vRecipeState').textContent = (r.recipe ? '· 있음' : '· 없음 (초안을 만들거나 적어 주세요)') + (r.dbTemplate ? ` · 템플릿 DB ${esc(r.dbTemplate.name)} ${ago(r.dbTemplate.refreshedAt)} 갱신(${r.dbTemplate.seconds}초)` : '');
     if (document.activeElement !== $('#vRecipe')) $('#vRecipe').value = r.recipe ? JSON.stringify(r.recipe, null, 2) : '';
     $('#vRecipeWrap').open = !r.recipe;
     const vs = r.versions || [];

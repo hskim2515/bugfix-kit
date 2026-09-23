@@ -18,9 +18,13 @@ import { firstLine, hhmmss, notBlank, nowIso, sleep } from './util.js';
  *   host:  192.168.10.182                 워커가 백엔드 컨테이너에 닿는 주소(앱 안 워커가 컨테이너면 127.0.0.1 은 안 됨)
  *   front: { dir, build, dist, env: { VITE_API_URL: '{backUrl}' } }     build 는 sh 명령. BUGFIX_PREVIEW_BASE 는 키트가 넣는다
  *   back:  { dir, build, artifact: 'build/libs/*.jar', image, port, cmd: 'java -jar /app.jar', env: {}, volumes: [] }
- *   db:    { container, name, user }      docker exec 로 pg_dump | psql 복제 → {db} = {name}_v{n}. 없으면 백엔드가 원래 DB 를 씀
+ *   db:    { container, name, user, mode }  mode: template(기본 - 키트가 {name}_bugfix_tmpl 템플릿 DB 를 하루 한 번 pg_dump 로 갱신해 두고
+ *                                          CREATE DATABASE … TEMPLATE 로 초 단위 복제) · clone(매번 라이브 DB 를 pg_dump|psql, 느림) ·
+ *                                          shared(사본 없이 라이브 DB 그대로 - 빠르지만 미리보기의 쓰기가 개발 DB 에 남음). {db} = 사본 이름
+ *          templateMaxAgeHours: 24        템플릿 갱신 주기
  *   proxies: { '/file-proxy/': 'http://…/' }   프론트가 같은 오리진으로 부르는 다른 경로 → 그대로 넘김
- *   ttlHours: 12                          마지막 접속 뒤 이 시간이 지나면 자동 중지
+ *   ttlHours: 12                          마지막 접속 뒤 이 시간이 지나면 자동 중지 (중지 시 컨테이너·DB 사본·빌드 산출물 제거, 다시 띄우면 재빌드)
+ *   maxUp: 2                              프로젝트당 동시에 떠 있는 미리보기 수 - 넘으면 가장 오래 안 쓴 것부터 내림
  */
 export class Versions {
   constructor(cfg, store, runner, log = console) {
@@ -98,7 +102,8 @@ export class Versions {
   recipe(project) {
     const r = project.preview;
     if (!r || typeof r !== 'object' || (!r.front && !r.back)) return null;
-    return { ttlHours: 12, host: '127.0.0.1', proxies: {}, ...r, base: String(r.base || '/bugfix').replace(/\/+$/, '') };
+    const db = r.db ? { mode: 'template', templateMaxAgeHours: 24, ...r.db, template: r.db.template || `${r.db.name}_bugfix_tmpl` } : null;
+    return { ttlHours: 12, maxUp: 2, host: '127.0.0.1', proxies: {}, ...r, db, base: String(r.base || '/bugfix').replace(/\/+$/, '') };
   }
   fill(s, vars) { return String(s ?? '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m)); }
   vars(project, n, extra = {}) {
@@ -159,6 +164,11 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     if (!v) throw Object.assign(new Error('없는 버전'), { status: 404 });
     if (!this.recipe(project)) throw Object.assign(new Error('미리보기 레시피가 없습니다 - 콘솔 버전 탭에서 초안을 만들거나 프로젝트 설정 preview 를 적으세요'), { status: 409 });
     if (['BUILDING', 'STARTING'].includes(v.preview?.status)) throw Object.assign(new Error('이미 준비 중입니다'), { status: 409 });
+    // 동시 개수 제한 - 가장 오래 안 쓴 것부터 내린다
+    const r = this.recipe(project);
+    const up = (await this.state(project.name)).versions.filter((x) => x.n !== Number(n) && x.preview?.status === 'UP')
+      .sort((a, b) => Date.parse(a.preview.lastAccess || a.preview.upAt || 0) - Date.parse(b.preview.lastAccess || b.preview.upAt || 0));
+    for (const x of up.slice(0, Math.max(0, up.length - (r.maxUp - 1)))) { await this.plog(project.name, x.n, `■ 동시 ${r.maxUp}개 제한 - v${n} 을 띄우려고 내림`); await this.stop(project, x.n).catch(() => {}); }
     await this.update(project.name, n, { preview: { status: 'QUEUED', log: '', startedAt: nowIso() } });
     const ahead = this.runner.submit(project, `preview-${n}`, () => this.run(project, n), async (e) => {
       await this.plog(project.name, n, `✗ 실패: ${firstLine(e.message, 300)}`);
@@ -180,7 +190,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const wt = path.join(jobs, `preview-${n}`);
     const out = this.previewDir(name, n);
     const container = `bugfix-${name}-v${n}`;
-    const db = r.db ? `${r.db.name}_v${n}` : null;
+    const db = r.db ? (r.db.mode === 'shared' ? r.db.name : `${r.db.name}_v${n}`) : null;
     const port = r.back ? await this.freePort(ex, 21000 + (n % 800)) : null;
     const vars = this.vars(project, n, { db: db || '', port: port || '' });
     const upd = (p) => this.update(name, n, (x) => ({ preview: { ...x.preview, ...p } }));
@@ -218,12 +228,18 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
         const artCopy = path.join(out, `app${artName}`);
         await fs.copyFile(art, artCopy);
         await L(`✓ 실행 파일: ${path.basename(art)}`);
-        if (db) {
+        if (db && r.db.mode !== 'shared') {
           await upd({ status: 'STARTING' });
-          await L(`DB 복제: ${r.db.name} → ${db} (${r.db.container})`);
-          await ex.sh(wt, 60, `docker exec ${sq(r.db.container)} sh -c ${sq(`dropdb -U ${r.db.user} --if-exists --force ${db} 2>/dev/null; createdb -U ${r.db.user} -T template0 ${db} && pg_dump -U ${r.db.user} ${r.db.name} | psql -q -U ${r.db.user} -v ON_ERROR_STOP=0 ${db} >/dev/null`)}`);
+          if (r.db.mode === 'clone') {
+            await L(`DB 복제(라이브에서 직접): ${r.db.name} → ${db} (${r.db.container})`);
+            await this.pgsh(ex, wt, r.db, `dropdb -U ${r.db.user} --if-exists --force ${db} 2>/dev/null; createdb -U ${r.db.user} -T template0 ${db} && pg_dump -U ${r.db.user} ${r.db.name} | psql -q -U ${r.db.user} -v ON_ERROR_STOP=0 ${db} >/dev/null`);
+          } else {
+            await this.ensureTemplate(project, ex, wt, L);
+            await L(`DB 복제(템플릿): ${r.db.template} → ${db}`);
+            await this.pgsh(ex, wt, r.db, `dropdb -U ${r.db.user} --if-exists --force ${db} 2>/dev/null; createdb -U ${r.db.user} -T ${r.db.template} ${db}`);
+          }
           await L('✓ DB 복제 완료');
-        }
+        } else if (db) await L(`DB: 라이브 DB ${db} 공유(사본 없음 - 미리보기에서 쓴 데이터가 개발 DB 에 남습니다)`);
         await upd({ status: 'STARTING' });
         const envArgs = Object.entries(r.back.env || {}).flatMap(([k, val]) => ['-e', `${k}=${this.fill(val, vars)}`]);
         const volArgs = (r.back.volumes || []).flatMap((m) => ['-v', this.fill(m, vars)]);
@@ -242,6 +258,26 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     } finally {
       await this.runner.removeWorktree(ex, repo, wt);
     }
+  }
+
+  pgsh(ex, cwd, db, script) { return ex.sh(cwd, 90, `docker exec ${sq(db.container)} sh -c ${sq(script)}`); }
+  /** 템플릿 DB 가 없거나 오래됐으면 라이브 DB 에서 다시 만든다(pg_dump|psql, 한 번만 느림). 프로젝트별 뮤텍스 */
+  async ensureTemplate(project, ex, cwd, L = () => {}) {
+    const r = this.recipe(project);
+    if (!r?.db || r.db.mode === 'shared') return;
+    return this.runner.mutex(`dbtmpl:${project.name}`, async () => {
+      const st = await this.state(project.name);
+      const t = st.dbTemplate || {};
+      const exists = (await ex.execOut(cwd, 1, ['docker', 'exec', r.db.container, 'psql', '-U', r.db.user, '-Atc', `select 1 from pg_database where datname='${r.db.template}'`])).trim() === '1';
+      const fresh = exists && t.name === r.db.template && Date.parse(t.refreshedAt || 0) > Date.now() - (r.db.templateMaxAgeHours || 24) * 3600_000;
+      if (fresh) return;
+      await L(`템플릿 DB ${exists ? '갱신' : '생성'}: ${r.db.name} → ${r.db.template} (하루 한 번, 몇 분)`);
+      const t0 = Date.now();
+      // 템플릿에 붙은 세션이 있으면 --force 로 끊는다(키트만 쓰는 DB)
+      await this.pgsh(ex, cwd, r.db, `dropdb -U ${r.db.user} --if-exists --force ${r.db.template} 2>/dev/null; createdb -U ${r.db.user} -T template0 ${r.db.template} && pg_dump -U ${r.db.user} ${r.db.name} | psql -q -U ${r.db.user} -v ON_ERROR_STOP=0 ${r.db.template} >/dev/null && psql -U ${r.db.user} -Atc "update pg_database set datallowconn = true where datname='${r.db.template}'"`);
+      await this.save(project.name, { dbTemplate: { name: r.db.template, refreshedAt: nowIso(), seconds: Math.round((Date.now() - t0) / 1000) } });
+      await L(`✓ 템플릿 DB 준비 (${Math.round((Date.now() - t0) / 1000)}초)`);
+    });
   }
 
   async findArtifact(ex, dir, glob) {
@@ -272,11 +308,12 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const ex = this.runner.ex(project);
     const container = v?.preview?.container || `bugfix-${project.name}-v${n}`;
     await ex.execOut('/', 1, ['docker', 'rm', '-f', container]);
-    if (r?.db && v?.preview?.db) await ex.execOut('/', 5, ['docker', 'exec', r.db.container, 'dropdb', '-U', r.db.user, '--if-exists', '--force', v.preview.db]);
+    if (r?.db && r.db.mode !== 'shared' && v?.preview?.db && v.preview.db !== r.db.name) await ex.execOut('/', 5, ['docker', 'exec', r.db.container, 'dropdb', '-U', r.db.user, '--if-exists', '--force', v.preview.db]);
     if (!quiet) await this.plog(project.name, n, '■ 미리보기 중지(컨테이너·DB 사본 제거)');
   }
   async stop(project, n) {
     await this.teardown(project, n);
+    await fs.rm(this.previewDir(project.name, n), { recursive: true, force: true });   // 빌드 산출물(dist·jar)도 - 다시 띄우면 재빌드
     await this.update(project.name, n, (x) => ({ preview: { ...x.preview, status: 'DOWN', stoppedAt: nowIso() } }));
     return this.get(project.name, n);
   }
@@ -307,7 +344,19 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
         }
       }
     };
-    this.timer = setInterval(() => tick().catch((e) => this.log.warn('[preview] 정리 실패:', e.message)), 10 * 60_000);
+    // 템플릿 DB 는 새벽(03~05시)에 미리 갱신해 두어 낮에 띄울 때 기다리지 않게
+    const refresh = async () => {
+      const h = new Date().getHours();
+      if (h < 3 || h > 5) return;
+      for (const p of Object.values(this.cfg.projects)) {
+        const r = this.recipe(p);
+        if (!r?.db || r.db.mode === 'shared') continue;
+        const lane = this.runner.lane('preview');
+        if (lane.busy || lane.pending) continue;
+        await this.ensureTemplate(p, this.runner.ex(p), this.cfg.server.workDir, (m) => this.log.info(`[preview ${p.name}] ${m}`)).catch((e) => this.log.warn(`[preview ${p.name}] 템플릿 갱신 실패: ${e.message}`));
+      }
+    };
+    this.timer = setInterval(() => { tick().catch((e) => this.log.warn('[preview] 정리 실패:', e.message)); refresh().catch(() => {}); }, 10 * 60_000);
   }
   stopSweeper() { if (this.timer) clearInterval(this.timer); }
 
