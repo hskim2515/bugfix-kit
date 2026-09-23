@@ -35,7 +35,7 @@
     "./webpack": "./packages/webpack/index.js",
     "./webpack/bootstrap.js": "./packages/webpack/bootstrap.js"
   },
-  "version": "0.1.50",
+  "version": "0.1.51",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs",
     "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"

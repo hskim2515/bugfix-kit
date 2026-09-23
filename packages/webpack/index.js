@@ -12,7 +12,7 @@
  *   - hooks 옵션(앱 파일 경로)을 주면 그 모듈을 먼저 실행한다 - window.__bugfix 로 앱 상태·보고자·WebGL 다시 그리기 등을 더한다
  *
  * 옵션(전부 선택): project(기본 package.json name), apiKey(기본 VUE_APP_BUGFIX_KEY/REACT_APP_BUGFIX_KEY), restBase, endpoint, hooks,
- *                 enabled(false 면 아무것도 안 함 - 운영 빌드처럼 키가 없을 때), redirect(false 면 안내 페이지 안 만듦), entry(기본 'app'·'main' 중 있는 것)
+ *                 enabled(기본: 키가 있을 때만 - 운영 빌드처럼 키가 없으면 자동으로 꺼짐), redirect(false 면 안내 페이지 안 만듦), entry(기본 'app'·'main' 중 있는 것)
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -24,7 +24,8 @@ class BugfixKitWebpackPlugin {
     const o = this.opts;
     const env = process.env;
     const key = o.apiKey || env.VUE_APP_BUGFIX_KEY || env.REACT_APP_BUGFIX_KEY || env.BUGFIX_KEY || '';
-    const enabled = o.enabled !== undefined ? !!o.enabled : true;
+    // 키가 없는 빌드(운영)는 자동으로 꺼진다. vue.config.js 는 .env 가 읽히기 전에 평가될 수 있어 여기(apply 시점)서 판단한다
+    const enabled = o.enabled !== undefined ? !!o.enabled : !!(key || o.endpoint);
     if (!enabled) return;
     const rel = (u) => typeof u === 'string' && u.startsWith('/');
     const restBase = String(o.restBase || (rel(env.VUE_APP_API_URL) ? env.VUE_APP_API_URL : '') || '').replace(/\/+$/, '');
