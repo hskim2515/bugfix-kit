@@ -77,19 +77,21 @@ packages/server/deploy/new-instance.sh myapp 8790              # 앱마다: 이�
 
 비밀값은 서버 홈에만 저장됩니다. 저장소에는 절대 안 들어갑니다.
 
-### ③ 앱에 두 줄
+### ③ 앱에 붙이기 — 플러그인 한 줄
 
 ```bash
-npm i -D github:hskim2515/bugfix-kit#v0.1.37 && npx front-check init
+npm i -D github:hskim2515/bugfix-kit#v0.1.47
 ```
 ```js
-// Vue
-import { createBugfix } from 'bugfix-kit/client/vue'; import 'bugfix-kit/client/style.css';
-export const kit = createBugfix({ endpoint: '/bugfix', project: 'myapp', apiKey: '…', interceptors: { console: true, network: { axios: [rest] }, mutation: store, router } });
-// React / HTML
-import { createBugfix } from 'bugfix-kit/client';
-export const kit = createBugfix({ endpoint: '/bugfix', project: 'myapp', apiKey: '…', interceptors: { console: true, network: { fetch: true }, router: true } }).mount();
+// vite.config.js (Vite 앱: React·Vue·Svelte…)
+import bugfixKit from 'bugfix-kit/vite';
+export default defineConfig({ plugins: [react(), bugfixKit({ restBase: '/rest', server: 'http://개발서버:8791' })] });
 ```
+이게 전부입니다. 플러그인이 SDK 를 index.html 에 자동으로 넣고(콘솔·fetch/XHR·주소 변화·큰 캔버스 캡처), 신고 서버 주소를 정하고, `앱주소/bugfix/` 로 들어오면 콘솔로 보내 줍니다. 키는 `.env` 의 `VITE_BUGFIX_KEY`.
+백엔드에는 `npx bugfix-adapter spring …` 한 줄(최근 로그 + `/bugfix/**` 프록시). 앱 nginx 는 안 건드립니다.
+
+더 담고 싶은 것(앱 상태·보고자·WebGL 다시 그리기)은 코드 어디서든 `window.__bugfix = { context: () => ({…}), user: () => '…', beforeCapture: () => viewer.render() }` 로.
+플러그인 없이 직접 붙이려면 `createBugfix(...)`([client](packages/client)).
 
 끝. **Shift+F9** 신고 · **Shift+F10** 목록.
 
@@ -111,7 +113,7 @@ flowchart LR
 
 | 질문 | 답 |
 |---|---|
-| 앱 nginx 를 꼭 고쳐야 하나요? | 아니요. 백엔드 어댑터가 `/bugfix/**` 프록시 라우트도 만들어 주므로(Spring·Express) 앱의 REST 경로 뒤에 `/bugfix` 를 붙여 닿습니다(예: `/rest/bugfix`). nginx 한 줄로 `/bugfix` 를 바로 넘기는 것도 됩니다 |
+| 앱 nginx 를 꼭 고쳐야 하나요? | 아니요. 백엔드 어댑터의 `/bugfix/**` 프록시 라우트(Spring·Express)로 앱 REST 경로 뒤에 `/bugfix` 를 붙여 닿고, Vite 플러그인이 `앱주소/bugfix/` 를 그리로 보내는 안내 페이지를 빌드에 넣습니다. nginx 한 줄로 `/bugfix` 를 바로 넘기는 것도 됩니다 |
 | 백엔드 로그도 신고에 붙나요? | 네. 앱에 최근 로그 끝점 하나만 있으면 됩니다: Spring 은 `npx bugfix-adapter spring …`, Express 는 `bugfix-kit/adapters/express` ([adapters](packages/adapters)) |
 | GitHub 가 아니어도 되나요? | GitLab(셀프호스팅 포함)도 됩니다. 저장소 주소만 적으면 자동 판별, 토큰은 프로젝트 env 의 `GITLAB_TOKEN` (api·write_repository) |
 | 백엔드도 고치나요? | 네, 같은 저장소면 프론트·백엔드 다. 백엔드 검증은 컴파일·테스트까지 |

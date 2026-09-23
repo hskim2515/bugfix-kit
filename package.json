@@ -26,9 +26,14 @@
     "./client/dist/*": "./packages/client/dist/*",
     "./package.json": "./package.json",
     "./front-check": "./packages/front-check/src/index.js",
-    "./adapters/express": "./packages/adapters/express.js"
+    "./adapters/express": "./packages/adapters/express.js",
+    "./client/auto": {
+      "types": "./packages/client/types/index.d.ts",
+      "default": "./packages/client/dist/bugfix-client.auto.js"
+    },
+    "./vite": "./packages/vite/index.js"
   },
-  "version": "0.1.46",
+  "version": "0.1.47",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs",
     "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"

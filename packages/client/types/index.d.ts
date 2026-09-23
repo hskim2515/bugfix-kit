@@ -59,3 +59,6 @@ export function register(): void;
 export function captureScreen(opt?: Record<string, unknown>): Promise<string>;
 export function reduxMiddleware(): ((api: any) => (next: any) => (action: any) => any) & { source: { subscribe: (fn: Function) => () => void } };
 export function zustandSource(useStore: any): { subscribe: (fn: Function) => unknown };
+
+/** 설정 없이 붙는 진입점(bugfix-kit/client/auto) - 빌드 플러그인이 부른다. window.__bugfix 로 선택 항목을 더한다 */
+export function autoMount(options?: { endpoint?: string; project?: string; apiKey?: string; restBase?: string }): BugfixKit | null;
