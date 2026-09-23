@@ -227,8 +227,14 @@ export function adminRouter(cfg, store, runner, log = console) {
 
   r.get('/logs', wrap(async (req) => {
     const n = Math.min(500, Number(req.query.n) || 200);
+    // 1) 이 프로세스가 남긴 로그(앱 안의 워커·내장 모두 동작) 2) systemd 로 띄운 독립 서버면 journald
+    if (typeof log.recent === 'function') {
+      const text = log.recent(n);
+      if (text.trim()) return { source: 'worker', text };
+    }
     const j = await run('journalctl', ['--user', '-u', 'bugfix-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { timeout: 20000 });
     if (j.status === 0 && j.stdout.trim() && !/^-- No entries --/.test(j.stdout.trim())) return { source: 'journalctl', text: j.stdout };
+    if (/ENOENT/.test(j.stderr || '')) return { source: 'worker', text: '(아직 남은 로그가 없습니다 - 이 인스턴스는 앱 프로세스가 띄운 워커라 전체 출력은 앱 로그에 [bugfix-kit] 접두어로 함께 남습니다)' };
     const s = await run('systemctl', ['--user', 'status', 'bugfix-server', '-n', String(n), '--no-pager'], { timeout: 20000 });
     return { source: 'systemctl', text: s.stdout || s.stderr || '(로그를 읽을 수 없습니다 - journald 사용자 로그가 꺼져 있을 수 있습니다)' };
   }));

@@ -11,11 +11,26 @@ export const defaultLog = {
   error: (...a) => console.error(new Date().toISOString(), ...a),
 };
 
+const LOG_KEEP = 2000;
+/** 로그를 원래 출력에도 보내고 최근 LOG_KEEP 줄을 메모리에 남긴다 - 콘솔 '서버 로그' 탭이 읽는다 (systemd 없이 앱 안에서 돌 때도) */
+export function bufferedLog(base = defaultLog) {
+  const lines = [];
+  const fmt = (a) => a.map((x) => (x instanceof Error ? (x.stack || x.message) : typeof x === 'string' ? x : JSON.stringify(x))).join(' ');
+  const push = (level, a) => { lines.push(`${new Date().toISOString()} ${level} ${fmt(a)}`); if (lines.length > LOG_KEEP) lines.splice(0, lines.length - LOG_KEEP); };
+  return {
+    info: (...a) => { push('INFO', a); base.info(...a); },
+    warn: (...a) => { push('WARN', a); base.warn(...a); },
+    error: (...a) => { push('ERROR', a); base.error(...a); },
+    recent: (n = 200) => lines.slice(-n).join('\n'),
+  };
+}
+
 /**
  * bugfix-kit 한 벌(설정·저장소·큐·제안·지식 그래프·라우터)을 만든다. 독립 서버(bin)와 앱 내장(embed)이 같이 쓴다.
  *   const kit = await createBugfixKit({ configFile }); app.use('/api', kit.router); await kit.start();
  */
-export async function createBugfixKit({ configFile, log = defaultLog } = {}) {
+export async function createBugfixKit({ configFile, log: baseLog = defaultLog } = {}) {
+  const log = typeof baseLog.recent === 'function' ? baseLog : bufferedLog(baseLog);
   const cfg = loadConfig(configFile);
   const store = new FileStore(cfg.server.dataDir);
   const runner = new Runner(cfg, store, log);
@@ -42,5 +57,5 @@ export async function createBugfixKit({ configFile, log = defaultLog } = {}) {
     if (!cfg.githubToken(Object.values(cfg.projects)[0])) log.warn('[bugfix] 저장소 토큰이 없습니다 - 리포트 저장은 되지만 자동 수정은 거부됩니다');
   }
   function stop() { insights.stopSchedules(); knowledge.stopSchedules(); }
-  return { cfg, store, runner, insights, knowledge, router, start, stop };
+  return { cfg, store, runner, insights, knowledge, router, log, start, stop };
 }

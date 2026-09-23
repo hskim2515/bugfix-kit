@@ -1,6 +1,6 @@
 {
   "name": "@bugfix-kit/webpack",
-  "version": "0.1.57",
+  "version": "0.1.58",
   "private": true,
   "description": "bugfix-kit webpack 플러그인(Vue CLI·CRA) - SDK 자동 마운트·/bugfix 안내 페이지",
   "main": "index.js",

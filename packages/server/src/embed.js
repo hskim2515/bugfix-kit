@@ -18,12 +18,12 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import YAML from 'yaml';
 import express from 'express';
-import { createBugfixKit, defaultLog } from './core.js';
+import { createBugfixKit, defaultLog, bufferedLog } from './core.js';
 import { detectHost } from './gitlab.js';
 
 export function bugfixKit(options = {}) {
   const o = options;
-  const log = o.log || defaultLog;
+  const log = bufferedLog(o.log || defaultLog);
   const router = express.Router();
   if (o.enabled === false) { router.use((req, res) => res.status(503).json({ message: 'bugfix-kit 이 이 인스턴스에서는 꺼져 있습니다' })); return router; }
 

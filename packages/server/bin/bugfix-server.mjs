@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import express from 'express';
-import { createBugfixKit, defaultLog as log } from '../src/core.js';
+import { createBugfixKit, bufferedLog } from '../src/core.js';
+const log = bufferedLog();
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : dflt; };
