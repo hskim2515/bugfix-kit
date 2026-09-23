@@ -114,6 +114,7 @@
 <body>
 <header>
   <h1 id="brand">bugfix-kit</h1>
+  <select id="scopeSel" class="btn" title="보는 프로젝트 - 한 서버에 여러 앱이 등록될 수 있다" style="display:none"></select>
   <span class="sub" id="meta">관리</span>
   <nav class="tabs" id="tabs">
     <button data-t="reports" class="on">리포트</button>
@@ -217,6 +218,7 @@
         </div>
         <div class="actions">
           <button class="btn primary" id="saveProject">저장</button>
+          <button class="btn" id="newProject">새 프로젝트</button>
           <button class="btn danger" id="delProject" hidden>삭제</button>
           <span class="msg" id="pmsg"></span>
         </div>
@@ -313,14 +315,23 @@
       $('#tick').textContent = `갱신 ${new Date().toLocaleTimeString()}`;
     } catch (e) { $('#tick').textContent = `연결 실패: ${e.message}`; }
   }
+  let allProjects = [];
   async function resolveScope(projects) {
     scopeReady = true;
     let list = projects;
     if (!list.some((p) => Array.isArray(p.cors))) { try { list = (await api('GET', '/admin/settings')).projects; } catch { list = projects; } }
+    allProjects = list.map((p) => p.name);
     const origin = location.origin.replace(/\/$/, '');
     const hit = list.filter((p) => (p.cors || []).some((o) => String(o).replace(/\/$/, '') === origin));
-    scope = hit.length === 1 ? hit[0].name : null;
+    const saved = localStorage.getItem('bugfix-admin-scope');
+    scope = saved !== null ? (allProjects.includes(saved) ? saved : null) : (hit.length === 1 ? hit[0].name : null);
+    applyScope();
+  }
+  function applyScope() {
     const name = scope || 'bugfix-kit';
+    const sel = $('#scopeSel');
+    sel.style.display = allProjects.length > 1 ? '' : 'none';
+    sel.innerHTML = `<option value="">전체 (${allProjects.length})</option>` + allProjects.map((n) => `<option value="${esc(n)}" ${n === scope ? 'selected' : ''}>${esc(n)}</option>`).join('');
     $('#brand').innerHTML = scope ? `${esc(scope)} <span class="dim" style="font-weight:400;font-size:12px">bugfix-kit</span>` : 'bugfix-kit';
     document.title = scope ? `${scope} · bugfix-kit` : 'bugfix-kit 관리';
     // 파비콘: 프로젝트 이름 첫 글자 + 이름에서 뽑은 색 - 탭이 여럿 열려 있어도 어느 프로젝트인지 보이게
@@ -648,7 +659,7 @@
   // 서버 하나에 앱 하나가 기본 - 프로젝트가 여럿(예: 프론트/백엔드 저장소 분리)일 때만 목록·삭제를 보인다. 첫 프로젝트는 빈 폼으로 만든다
   function renderProjects() {
     const multi = settings.projects.length > 1;
-    $('#plist').hidden = !multi; $('#delProject').hidden = !multi;
+    $('#plist').hidden = !multi;
     $('#plist').innerHTML = settings.projects.map((p) => `<button data-p="${esc(p.name)}" class="${editing === p.name ? 'on' : ''}"><div class="n">${esc(p.name)}</div><div class="d">${esc(p.githubRepo)} · ${esc(p.baseBranch || 'main')} · 리포트 ${p.reports}</div></button>`).join('');
     if (editing && !settings.projects.some((p) => p.name === editing)) editing = null;
     if (!editing && settings.projects.length) editing = settings.projects[0].name;
@@ -671,7 +682,7 @@
     const mods = $('#mods'); mods.innerHTML = ''; for (const m of (p?.modules || [])) mods.appendChild(modRow(m));
     v('#p_fc_cwd', p?.frontCheck?.cwd); v('#p_fc_cmd', p?.frontCheck?.command); v('#p_fc_when', (p?.frontCheck?.when || []).join(', '));
     v('#p_allowedTools', (p?.allowedTools || []).join('\n')); v('#p_protectedPaths', (p?.protectedPaths || []).join('\n')); v('#p_env', Object.entries(p?.env || {}).map(([k, x]) => `${k}=${x}`).join('\n'));
-    $('#delProject').disabled = !p; $('#pmsg').textContent = '';
+    $('#delProject').hidden = !p; $('#pmsg').textContent = '';
   }
   function readProject() {
     const modules = [...$('#mods').querySelectorAll('.mod')].map((d) => ({ name: d.querySelector('[data-k=name]').value.trim(), match: d.querySelector('[data-k=match]').value.trim(), dir: d.querySelector('[data-k=dir]').value.trim() || undefined, verify: csv(d.querySelector('[data-k=verify]').value), nodeModulesCache: d.querySelector('[data-k=nm]').checked || undefined })).filter((m) => m.match);
@@ -766,10 +777,18 @@
     const fr = e.target.closest('[data-front]'); if (fr) { runCheck('front', fr.dataset.front, '#c_front'); return; }
   });
   $('#addMod').onclick = () => $('#mods').appendChild(modRow());
-  $('#saveProject').onclick = async () => { const p = readProject(); if (!p.name) return alert('이름을 입력하세요'); $('#pmsg').textContent = '저장 중…'; try { await api('PUT', `/admin/projects/${p.name}`, p); editing = p.name; settings = null; await loadSettings(); data = null; await load(); $('#pmsg').textContent = '저장됨 - 바로 적용'; } catch (e) { $('#pmsg').textContent = e.message; } };
+  $('#saveProject').onclick = async () => { const p = readProject(); if (!p.name) return alert('이름을 입력하세요'); $('#pmsg').textContent = '저장 중…'; try { await api('PUT', `/admin/projects/${p.name}`, p); editing = p.name; settings = null; await loadSettings(); data = null; await load(); $('#pmsg').textContent = '저장됨 - 바로 적용'; scopeReady = false; await load(); } catch (e) { $('#pmsg').textContent = e.message; } };
   $('#delProject').onclick = async () => { if (!editing || !confirm(`${editing} 프로젝트 설정을 지울까요? (리포트 데이터는 남습니다)`)) return; try { await api('DELETE', `/admin/projects/${editing}`); editing = null; await loadSettings(); await load(); } catch (e) { alert(e.message); } };
   $('#saveServer').onclick = async () => { const b = {}; for (const k of ['port', 'claudeBin', 'pathExtra', 'javaHome', 'model', 'maxTurns', 'timeoutMinutes', 'verifyTimeoutMinutes', 'workDir', 'dataDir']) b[k] = $(`#s_${k}`).value; $('#smsg').textContent = '저장 중…'; try { const r = await api('PUT', '/admin/server', b); $('#smsg').textContent = r.restartNeeded ? '저장됨 - 포트는 재시작 뒤 적용' : '저장됨 - 바로 적용'; } catch (e) { $('#smsg').textContent = e.message; } };
   $('#loadLogs').onclick = loadLogs;
+  $('#scopeSel').addEventListener('change', async (e) => {
+    scope = e.target.value || null; localStorage.setItem('bugfix-admin-scope', scope || '');
+    applyScope(); data = null; settings = null; kGraphKey = ''; kg3d = null; $('#kGraph').innerHTML = '';
+    await load();
+    if (['projects', 'secrets', 'server', 'checks'].includes(tab)) await loadSettings().catch((x) => alert(x.message));
+    if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge();
+  });
+  $('#newProject').onclick = () => { editing = null; fillProject(null); document.querySelectorAll('#plist button').forEach((b) => b.classList.remove('on')); };
   $('#iRun').onclick = async () => {
     const names = data.projects.map((p) => p.name);
     if (!confirm(`${names.join(', ')} 을 분석할까요? (프로젝트마다 5분 안팎, Claude 비용 발생)`)) return;
