@@ -47,6 +47,16 @@ flowchart LR
     S["① 서버 켜기<br/>(한 번만, 5분)"] --> K["② 콘솔에서 설정<br/>키 넣고 · 프로젝트 추가 · 점검"] --> A["③ 앱에 두 줄<br/>SDK 설치"]
 ```
 
+### ⓪ 백엔드가 Node 라면 — 서버 없이 앱에 내장
+
+```js
+import { bugfixKit } from 'bugfix-kit/embed';
+app.use('/bugfix', bugfixKit());          // 신고 API · 콘솔(/bugfix/ui/) · AI 수정 파이프라인 전부. 앱과 같이 뜨고 같이 갱신된다
+```
+package.json 한 줄 + 이 한 줄. 프로젝트 이름·저장소·브랜치·검증 명령은 package.json 과 git remote 에서 알아서 읽고, 설정은 `.bugfix-data/`(gitignore) 에 둔다.
+그 기계에 git·Claude Code CLI(로그인)·빌드 도구가 있으면 된다. 저장소 토큰은 `BUGFIX_GITHUB_TOKEN` / `GITLAB_TOKEN` 환경변수. 프론트는 아래 ③ 의 플러그인 한 줄(endpoint 는 `/bugfix`).
+Spring 백엔드처럼 JS 를 못 돌리는 앱은 ①② 처럼 별도 인스턴스를 둔다.
+
 ### ① 서버 켜기 — **앱 하나에 인스턴스 하나**
 
 코드는 한 번만 받고, 앱마다 인스턴스(포트·데이터·콘솔이 따로)를 띄웁니다. 같은 개발서버에 앱이 여럿이면 인스턴스를 그만큼.

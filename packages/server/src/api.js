@@ -25,9 +25,12 @@ const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 's
  *
  * 인증: 프로젝트에 apiKey 가 있으면 `X-Bugfix-Key` 헤더가 같아야 한다. 보고자는 `X-Bugfix-User` 헤더(앱이 로그인 사용자를 넣는다) 또는 body.reporter.
  */
+/**
+ * 라우터를 돌려준다(경로는 마운트 지점 기준). 독립 서버는 `app.use('/api', router)`, 앱 내장(bugfix-kit/embed)은 `app.use('/bugfix', router)`.
+ * 콘솔(/ui/)은 자기 주소의 한 단계 위를 API 기준으로 쓰므로 어디에 마운트해도 맞는다.
+ */
 export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null) {
-  const app = express();
-  app.disable('x-powered-by');
+  const app = express.Router();
   app.use(express.json({ limit: '60mb' }));
 
   // CORS - 프로젝트 cors 목록(없으면 전부 허용). 프리플라이트는 프로젝트를 모르므로 요청 origin 을 그대로 돌려준다
@@ -45,14 +48,14 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
-  app.get('/api/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy }));
+  app.get('/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy }));
 
-  // ── 운영자 대시보드: /api/ui/ (nginx 가 /bugfix/ → /api/ 이면 https://…/bugfix/ui/) ──
+  // ── 운영자 대시보드: <마운트>/ui/ (독립 서버 /api/ui/, 내장 /bugfix/ui/) ──
   const here = path.dirname(fileURLToPath(import.meta.url));
   const uiDir = path.join(here, '..', 'ui');
   const clientDist = path.join(here, '..', '..', 'client', 'dist');
-  app.use('/api/ui/client', express.static(clientDist, { maxAge: '1h' }));
-  app.get(['/api/ui', '/api/ui/'], (req, res) => res.sendFile(path.join(uiDir, 'index.html')));
+  app.use('/ui/client', express.static(clientDist, { maxAge: '1h' }));
+  app.get(['/ui', '/ui/'], (req, res) => res.sendFile(path.join(uiDir, 'index.html')));
 
   const admin = (req, res, next) => {
     if (!notBlank(cfg.server.adminKey)) return next(new HttpError(503, '운영자 키가 설정되지 않았습니다 (BUGFIX_ADMIN_KEY 또는 ~/.config/bugfix-kit/default.env 의 ADMIN_KEY)'));
@@ -60,7 +63,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     next();
   };
   /** 전 프로젝트 요약: 리포트 목록(가벼운 필드 + 수정 상태) · 진행 중 작업의 로그 꼬리 · 큐 길이 · 프로젝트 API 키(뷰어가 쓰게) */
-  app.get('/api/admin/overview', admin, wrap(async () => {
+  app.get('/admin/overview', admin, wrap(async () => {
     const projects = [];
     let running = null;
     for (const p of Object.values(cfg.projects)) {
@@ -78,19 +81,19 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     }
     return { projects, running, queue: runner.pending, now: new Date().toISOString() };
   }));
-  app.use('/api/admin', admin, adminRouter(cfg, store, runner, log));
+  app.use('/admin', admin, adminRouter(cfg, store, runner, log));
 
   // ── 제안(Insights): AI 가 먼저 고칠 점을 찾는다 ──
   const proj = (req) => { const p = cfg.projects[req.params.project]; if (!p) throw new HttpError(404, `모르는 프로젝트: ${req.params.project}`); return p; };
-  app.get('/api/admin/insights/:project', admin, wrap(async (req) => insights ? insights.state(proj(req).name) : { status: 'NONE', items: [] }));
-  app.post('/api/admin/insights/:project', admin, wrap(async (req) => { if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다'); await insights.enqueue(proj(req), { focus: String(req.body?.focus || '').slice(0, 500) }); return insights.state(proj(req).name); }));
+  app.get('/admin/insights/:project', admin, wrap(async (req) => insights ? insights.state(proj(req).name) : { status: 'NONE', items: [] }));
+  app.post('/admin/insights/:project', admin, wrap(async (req) => { if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다'); await insights.enqueue(proj(req), { focus: String(req.body?.focus || '').slice(0, 500) }); return insights.state(proj(req).name); }));
   // ── 지식 그래프(Knowledge): 메뉴·기능 → 파일·API 온톨로지 ──
-  app.get('/api/admin/knowledge/:project', admin, wrap(async (req) => knowledge ? knowledge.summary(proj(req).name) : { status: 'NONE' }));
-  app.get('/api/admin/knowledge/:project/graph', admin, wrap(async (req) => { const s = knowledge ? await knowledge.state(proj(req).name) : {}; return { nodes: s.nodes || [], edges: s.edges || [], head: s.head || null }; }));
-  app.post('/api/admin/knowledge/:project', admin, wrap(async (req) => { if (!knowledge) throw new HttpError(503, '지식 그래프 기능이 꺼져 있습니다'); await knowledge.enqueue(proj(req), { mode: req.body?.mode === 'full' ? 'full' : 'update', reason: '콘솔' }); return knowledge.summary(proj(req).name); }));
+  app.get('/admin/knowledge/:project', admin, wrap(async (req) => knowledge ? knowledge.summary(proj(req).name) : { status: 'NONE' }));
+  app.get('/admin/knowledge/:project/graph', admin, wrap(async (req) => { const s = knowledge ? await knowledge.state(proj(req).name) : {}; return { nodes: s.nodes || [], edges: s.edges || [], head: s.head || null }; }));
+  app.post('/admin/knowledge/:project', admin, wrap(async (req) => { if (!knowledge) throw new HttpError(503, '지식 그래프 기능이 꺼져 있습니다'); await knowledge.enqueue(proj(req), { mode: req.body?.mode === 'full' ? 'full' : 'update', reason: '콘솔' }); return knowledge.summary(proj(req).name); }));
 
   // 제안 삭제 - 목록에서 빼고 제목을 '무시' 목록에 남겨 다음 분석에서 같은 것을 다시 내지 않게
-  app.delete('/api/admin/insights/:project/items/:id', admin, wrap(async (req) => {
+  app.delete('/admin/insights/:project/items/:id', admin, wrap(async (req) => {
     if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
     const p = proj(req);
     const id = Number(req.params.id);
@@ -104,7 +107,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     return { ok: true };
   }));
 
-  app.post('/api/admin/insights/:project/report', admin, wrap(async (req) => {
+  app.post('/admin/insights/:project/report', admin, wrap(async (req) => {
     if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
     const p = proj(req);
     const fix = !!req.body?.fix;
@@ -124,7 +127,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   }));
 
   const pr = express.Router({ mergeParams: true });
-  app.use('/api/p/:project', (req, res, next) => {
+  app.use('/p/:project', (req, res, next) => {
     const project = cfg.projects[req.params.project];
     if (!project) return next(new HttpError(404, `모르는 프로젝트: ${req.params.project}`));
     const origin = req.headers.origin;

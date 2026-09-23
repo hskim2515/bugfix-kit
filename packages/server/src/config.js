@@ -76,8 +76,9 @@ export function loadConfig(file) {
       gitlabTokenValue: fileEnv.GITLAB_TOKEN || null,
     };
     projects[name].modules = (projects[name].modules || []).map((m, i) => {
-      if (!notBlank(m.match)) throw new Error(`projects.${name}.modules[${i}]: match 는 필수`);
-      return { name: m.name || m.match.replace(/\/$/, ''), dir: m.dir || m.match.replace(/\/$/, ''), verify: [], nodeModulesCache: false, prebuild: [], ...m };
+      // match '' 는 저장소 전체(앱이 곧 저장소 루트인 내장 모드)
+      if (typeof m.match !== 'string') throw new Error(`projects.${name}.modules[${i}]: match 는 필수('' 면 전체)`);
+      return { name: m.name || m.match.replace(/\/$/, '') || 'app', dir: m.dir || m.match.replace(/\/$/, '') || '.', verify: [], nodeModulesCache: false, prebuild: [], ...m };
     });
   }
   if (Object.keys(projects).length === 0) console.warn('[bugfix] projects 가 비어 있습니다 - 콘솔(/api/ui/)의 프로젝트 탭에서 채우세요');
@@ -101,6 +102,8 @@ export function loadConfig(file) {
       // GitLab 프로젝트: 프로젝트 env 의 GITLAB_TOKEN → 공용 ~/.config/bugfix-kit/gitlab-token
       if (project?.host === 'gitlab') {
         if (project.gitlabTokenValue) return project.gitlabTokenValue;
+        if (notBlank(process.env.BUGFIX_GITLAB_TOKEN)) return process.env.BUGFIX_GITLAB_TOKEN.trim();
+        if (notBlank(process.env.GITLAB_TOKEN)) return process.env.GITLAB_TOKEN.trim();
         try { return fs.readFileSync(expandHome('~/.config/bugfix-kit/gitlab-token'), 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return null; }
       }
       if (project?.githubTokenValue) return project.githubTokenValue;

@@ -1,10 +1,6 @@
 #!/usr/bin/env node
-import { loadConfig } from '../src/config.js';
-import { FileStore } from '../src/store.js';
-import { Runner } from '../src/runner.js';
-import { createApi } from '../src/api.js';
-import { Insights } from '../src/insights.js';
-import { Knowledge } from '../src/knowledge.js';
+import express from 'express';
+import { createBugfixKit, defaultLog as log } from '../src/core.js';
 
 const args = process.argv.slice(2);
 const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : dflt; };
@@ -16,35 +12,13 @@ if (args.includes('-h') || args.includes('--help')) {
   process.exit(0);
 }
 
-const log = {
-  info: (...a) => console.log(new Date().toISOString(), ...a),
-  warn: (...a) => console.warn(new Date().toISOString(), ...a),
-  error: (...a) => console.error(new Date().toISOString(), ...a),
-};
-
-const cfg = loadConfig(opt('--config', process.env.BUGFIX_CONFIG || 'bugfix-kit.yml'));
+const kit = await createBugfixKit({ configFile: opt('--config', process.env.BUGFIX_CONFIG || 'bugfix-kit.yml'), log });
+const cfg = kit.cfg;
 const port = Number(opt('--port', cfg.server.port));
-const store = new FileStore(cfg.server.dataDir);
-const runner = new Runner(cfg, store, log);
-const insights = new Insights(cfg, store, runner, log);
-const knowledge = new Knowledge(cfg, store, runner, log);
-runner.knowledge = knowledge;
-insights.knowledge = knowledge;
-
-const redo = await store.resetInterrupted(log);
-for (const r of redo) {
-  const project = cfg.projects[r.project];
-  if (!project) continue;
-  if (r.kind === 'followup') await runner.enqueueFollowUp(project, r.id, r.message, r.mode);
-  else await runner.enqueue(project, r.id);
-}
-if (redo.length) log.info(`[bugfix] 재시작으로 끊긴 작업 ${redo.length}건을 다시 큐에 넣었습니다`);
-const app = createApi(cfg, store, runner, log, insights, knowledge);
-await insights.resetInterrupted();
-await knowledge.resetInterrupted();
-insights.startSchedules();
-knowledge.startSchedules();
+const app = express();
+app.disable('x-powered-by');
+app.use('/api', kit.router);
+await kit.start();
 app.listen(port, cfg.server.host, () => {
   log.info(`[bugfix] 서버 시작 http://${cfg.server.host}:${port}  프로젝트: ${Object.keys(cfg.projects).join(', ')}  data=${cfg.server.dataDir}  work=${cfg.server.workDir}`);
-  if (!cfg.githubToken()) log.warn('[bugfix] GitHub 토큰이 없습니다 - 리포트 저장은 되지만 자동 수정은 거부됩니다');
 });

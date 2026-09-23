@@ -33,9 +33,10 @@
     },
     "./vite": "./packages/vite/index.js",
     "./webpack": "./packages/webpack/index.js",
-    "./webpack/bootstrap.js": "./packages/webpack/bootstrap.js"
+    "./webpack/bootstrap.js": "./packages/webpack/bootstrap.js",
+    "./embed": "./packages/server/src/embed.js"
   },
-  "version": "0.1.52",
+  "version": "0.1.53",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs",
     "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"
@@ -43,6 +44,8 @@
   "dependencies": {
     "pixelmatch": "^6.0.0",
     "playwright-core": "1.47.2",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "express": "^4.19.2",
+    "yaml": "^2.5.0"
   }
 }
