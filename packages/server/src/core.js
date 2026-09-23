@@ -50,6 +50,7 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
       else await runner.enqueue(project, r.id);
     }
     if (redo.length) log.info(`[bugfix] 재시작으로 끊긴 작업 ${redo.length}건을 다시 큐에 넣었습니다`);
+    runner.resumeDeployWatch().catch((e) => log.warn('[bugfix] 배포 추적 재개 실패:', e.message));
     await insights.resetInterrupted();
     await knowledge.resetInterrupted();
     insights.startSchedules();

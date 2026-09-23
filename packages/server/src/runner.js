@@ -376,7 +376,7 @@ export class Runner {
       if ((await ex.execRc(wt, 1, ['git', 'merge-base', '--is-ancestor', 'HEAD', `origin/${base}`])) !== 0) {
         throw new Error(`GitHub 는 병합됐다고 했지만 ${base} 에 이번 커밋이 없습니다(응답 sha ${sha.slice(0, 8)})`);
       }
-      await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' });
+      await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED', fixMergeSha: sha, fixMergedAt: nowIso(), fixDeploy: 'WATCHING' });
       await L(`✓ 병합 완료 ${base} @ ${sha.slice(0, 8)}`);
       // 코드가 바뀌었으니 지식 그래프도 따라 갱신 (같은 큐 뒤에 붙는다)
       this.knowledge?.afterMerge(project, `#${id} 병합`).catch(() => {});
@@ -396,6 +396,7 @@ export class Runner {
    */
   async watchDeploy(project, gh, id, sha, waitMin = 30) {
     const L = (s) => this.logLine(project, id, s);
+    const done = (fixDeploy) => this.updateFix(project, id, { fixDeploy });
     const until = Date.now() + waitMin * 60_000;
     const seen = new Map();          // run id → 마지막으로 로그한 status
     let anyRun = false;
@@ -413,15 +414,37 @@ export class Runner {
       if (anyRun && runs.every((r) => r.status === 'completed')) {
         const ok = runs.every((r) => r.conclusion === 'success');
         await L(ok ? '✓ 배포 완료 - 개발서버에 반영됐습니다' : `✗ 배포 중 실패한 워크플로가 있습니다 - ${project.host === 'gitlab' ? 'GitLab CI' : 'GitHub Actions'} 를 확인하세요`);
+        await done(ok ? 'DONE' : 'FAILED');
         return;
       }
       if (!anyRun && Date.now() - (until - waitMin * 60_000) > 120_000) {
         await L('배포 워크플로가 시작되지 않았습니다 - 바뀐 경로가 배포 대상(paths)에 없거나 워크플로가 없는 저장소입니다');
+        await done('NONE');
         return;
       }
       await sleep(30_000);
     }
     await L(`배포 추적 종료(${waitMin}분 경과) - ${project.host === 'gitlab' ? 'GitLab CI' : 'GitHub Actions'} 에서 확인하세요`);
+    await done('TIMEOUT');
+  }
+
+  /**
+   * 워커 재시작 뒤 끊긴 배포 추적을 잇는다 - 앱 안에서 도는 워커는 "병합 → 배포" 가 곧 자기 자신의 재시작이라
+   * 추적이 매번 끊긴다. 병합 2시간 안쪽의 WATCHING 리포트를 이어서 지켜본다.
+   */
+  async resumeDeployWatch() {
+    for (const project of Object.values(this.cfg.projects)) {
+      let list = [];
+      try { list = await this.store.list(project.name); } catch { continue; }
+      for (const r of list) {
+        if (r.fixStatus !== 'MERGED' || r.fixDeploy !== 'WATCHING' || !r.fixMergeSha) continue;
+        const age = Date.now() - Date.parse(r.fixMergedAt || 0);
+        if (!(age < 2 * 3600_000)) { await this.updateFix(project, r.bugReportId, { fixDeploy: 'TIMEOUT' }); continue; }
+        await this.logLine(project, r.bugReportId, '워커가 다시 떠서 배포 추적을 이어갑니다…');
+        this.watchDeploy(project, this.gh(project), r.bugReportId, r.fixMergeSha, Math.max(5, 30 - Math.floor(age / 60_000)))
+          .catch((e) => this.log.warn(`[bugfix ${project.name}#${r.bugReportId}] 배포 추적 실패: ${e.message}`));
+      }
+    }
   }
 
   /**
