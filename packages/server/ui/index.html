@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>bugfix-kit 관리</title>
 <style>
   :root { color-scheme: dark; --bg: #151922; --panel: #1e2431; --line: rgba(255,255,255,0.09); --text: #dfe5ee; --dim: #8b97a8; --accent: #6ea0ff; --ok: #7fe0a4; --bad: #ff9aa8; --warn: #f2d16b; }
@@ -68,6 +68,7 @@
   th { font-size: 11px; color: var(--dim); font-weight: 500; background: #1a2030; }
   tr.r { cursor: pointer; } tr.r:hover { background: rgba(255,255,255,0.04); }
   td.prob { max-width: 520px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #rows td:last-child, #rows td:nth-child(7) { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
   .p-QUEUED { background: #3b3a1f; color: var(--warn); } .p-RUNNING { background: #1f3350; color: #8ec1ff; } .p-PR_OPENED { background: #3b2a1f; color: #ffb27a; }
   .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
@@ -109,6 +110,77 @@
   .checks .card { display: flex; gap: 12px; align-items: flex-start; }
   .checks .card .body { flex: 1; }
   code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; }
+  /* ── 반응형: 폰·태블릿에서도 작업 가능하게 ── */
+  header { flex-wrap: wrap; gap: 8px 14px; }
+  nav.tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex: 1 1 auto; min-width: 0; }
+  nav.tabs::-webkit-scrollbar { display: none; }
+  nav.tabs button { white-space: nowrap; flex: 0 0 auto; }
+  .toolbar input.wide { min-width: 320px; flex: 1 1 320px; max-width: 520px; }
+  .form .inline .w140 { width: 140px; } .form .inline .w120 { width: 120px; } .form .inline .grow { flex: 1 1 320px; min-width: 200px; }
+  .shots .ph { width: 220px; height: 124px; background: #000; border-radius: 6px; }
+  .row.kv { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; font-size: 12px; }
+  .kg-tip { max-width: min(360px, 80vw); }
+
+  /* 표 → 카드(열 머리글 없이 한 행이 한 장): 리포트 표는 720px, 제안 표는 내용이 넓어 1000px 아래에서 */
+  table.cardrows { display: block; border: 0; background: transparent; border-radius: 0; }
+  table.cardrows thead { display: none; }
+  table.cardrows tbody { display: block; }
+  table.cardrows tbody tr { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 10px 12px; margin-bottom: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  table.cardrows tbody td { display: block; border: 0; padding: 0; max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+  table.cardrows tbody td:empty, table.cardrows tbody td[hidden] { display: none; }
+  @media (max-width: 1000px) {
+    #iRows td:nth-child(3), #iRows td:nth-child(4) { flex-basis: 100%; }
+    #iRows td:nth-child(3) { order: 1; } #iRows td:nth-child(4) { order: 2; word-break: break-all; }
+    #iRows td:nth-child(5) { margin-left: auto; } #iRows td:nth-child(5)::before { content: '확신 '; }
+    #iRows td:nth-child(6) { order: 3; flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    #iRows td:nth-child(6) .btn { flex: 1 1 auto; white-space: nowrap; }
+  }
+  @media (max-width: 900px) {
+    main { padding: 12px 12px 60px; }
+    header { padding: 8px 12px; }
+    header .sub { flex: 1 1 auto; }
+    nav.tabs { order: 10; flex-basis: 100%; margin: 0 -12px -8px; padding: 0 12px 6px; }
+    .kg-info { width: min(340px, calc(100% - 24px)); }
+  }
+  @media (max-width: 720px) {
+    header h1 { font-size: 14px; }
+    header .sub { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 표 → 카드: 열 머리글은 숨기고 한 행이 한 장 */
+    table.cardrows td.prob { flex-basis: 100%; white-space: normal; order: 1; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+    table.cardrows #rows td:nth-child(1)::before { content: '#'; color: var(--dim); }
+    table.cardrows #rows td:nth-child(7), table.cardrows #rows td:nth-child(8) { order: 2; }
+    #rows td:nth-child(7)::before { content: '보고 '; }
+    .toolbar input[type=search], .toolbar input.wide { min-width: 0; flex: 1 1 160px; max-width: none; }
+    .toolbar .seg { max-width: 100%; overflow-x: auto; }
+    .kg { height: 62vh; min-height: 360px; }
+    .kg-info { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-height: 46%; }
+    .kg-side { font-size: 10px; padding: 6px 8px; max-width: 46%; }
+    .shots figure, .shots .ph, .shots img { width: 160px; } .shots img, .shots .ph { height: 90px; }
+    .checks .card { flex-wrap: wrap; } .checks .card .body { flex-basis: 100%; }
+    .plist button { min-width: 0; flex: 1 1 140px; }
+    #login { margin: 40px auto; }
+  }
+  @media (max-width: 640px) {
+    .form { grid-template-columns: 1fr; gap: 2px 0; }
+    .form label { padding: 8px 0 2px; }
+    .form label:first-child { padding-top: 0; }
+    .form .inline .w140, .form .inline .w120, .form .inline .grow { width: 100%; flex-basis: 100%; min-width: 0; }
+    .mod { grid-template-columns: 1fr 1fr; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+    .mod input[data-k=verify] { grid-column: 1 / -1; }
+    .secret { grid-template-columns: 1fr; gap: 4px; margin-bottom: 12px; }
+    .secret .state { text-align: right; }
+    .row.kv { grid-template-columns: 1fr; gap: 0 0; } .row.kv > :nth-child(odd) { margin-top: 6px; }
+    .steps { font-size: 11px; }
+    .checklist ol { grid-template-columns: 1fr; }
+  }
+  /* 손가락으로 누르는 기기: 탭 대상 키우기 */
+  @media (pointer: coarse) {
+    button.btn, nav.tabs button, .seg button, .plist button { min-height: 38px; padding-top: 8px; padding-bottom: 8px; }
+    input:not([type=checkbox]), select { min-height: 38px; font-size: 14px; }
+    textarea { font-size: 14px; }
+    input[type=checkbox] { width: 18px; height: 18px; }
+    tr.r td { padding-top: 10px; padding-bottom: 10px; }
+  }
 </style>
 </head>
 <body>
@@ -154,21 +226,21 @@
         </span>
         <input type="search" id="q" placeholder="문제·보고자 검색">
       </div>
-      <table><thead><tr><th>#</th><th class="pcol">프로젝트</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead><tbody id="rows"></tbody></table>
+      <table id="rTable"><thead><tr><th>#</th><th class="pcol">프로젝트</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead><tbody id="rows"></tbody></table>
       <div class="empty" id="empty" hidden>리포트가 없습니다</div>
     </div>
 
     <!-- 제안 -->
     <div data-tab="insights" hidden>
       <div class="toolbar">
-        <input type="search" id="iFocus" placeholder="특히 볼 것 (선택)" style="min-width:320px">
+        <input type="search" id="iFocus" class="wide" placeholder="특히 볼 것 (선택)">
         <button class="btn primary" id="iRun">분석 실행</button>
         <span class="dim" id="iState"></span>
       </div>
       <details class="card" id="iLogWrap" style="margin-bottom:12px"><summary class="dim">진행 로그</summary><pre class="log" id="iLog"></pre></details>
       <div class="card" id="iShotsWrap" hidden><div class="dim" id="iShotsHead"></div><div class="shots" id="iShots"></div></div>
       <div class="dim" id="iDoneNote" hidden style="margin:0 0 8px"></div>
-      <table><thead><tr><th style="width:70px">심각도</th><th class="pcol">프로젝트</th><th>제안</th><th style="width:220px">파일</th><th style="width:60px">확신</th><th style="width:200px"></th></tr></thead><tbody id="iRows"></tbody></table>
+      <table id="iTable"><thead><tr><th style="width:70px">심각도</th><th class="pcol">프로젝트</th><th>제안</th><th style="width:220px">파일</th><th style="width:60px">확신</th><th style="width:200px"></th></tr></thead><tbody id="iRows"></tbody></table>
       <div class="empty" id="iEmpty">분석 실행을 누르면 AI 가 최근 리포트·커밋·코드를 읽고 고칠 점을 찾습니다 (5분 안팎, Claude 비용 발생)</div>
     </div>
 
@@ -179,7 +251,7 @@
         <span class="dim" id="kState"></span>
         <button class="btn" id="kUpdate" title="마지막 구축 이후 바뀐 파일만 반영">갱신</button>
         <button class="btn" id="kFull" title="처음부터 다시 만든다 (5~15분, Claude 비용 발생)">전체 구축</button>
-        <input type="search" id="kQ" placeholder="메뉴·기능·파일 검색" style="min-width:280px">
+        <input type="search" id="kQ" class="wide" placeholder="메뉴·기능·파일 검색">
         <button class="btn" id="kExpandAll" title="모든 노드 펼치기">모두 펼치기</button>
         <button class="btn" id="kCollapse" title="화면·메뉴만">접기</button>
       </div>
@@ -211,7 +283,7 @@
           <div class="mods" id="mods"></div>
           <label></label><div><button class="btn" id="addMod">+ 모듈</button></div>
           <label>화면 확인 <small>front-check</small></label>
-          <div class="inline"><input id="p_fc_cwd" placeholder="cwd (예: web)" style="width:140px"><input id="p_fc_cmd" placeholder="npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json" style="flex:1;min-width:320px"><input id="p_fc_when" placeholder="when: front" style="width:120px"></div>
+          <div class="inline"><input id="p_fc_cwd" class="w140" placeholder="cwd (예: web)"><input id="p_fc_cmd" class="grow" placeholder="npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json"><input id="p_fc_when" class="w120" placeholder="when: front"></div>
           <label>보호 경로 <small>AI 가 바꾸면 되돌림. 줄마다 하나</small></label><textarea id="p_protectedPaths" style="min-height:44px" placeholder="web/src/utils/bugfixKit.js&#10;.github/workflows/"></textarea>
           <label>허용 도구 <small>줄마다 하나</small></label><textarea id="p_allowedTools" style="min-height:50px"></textarea>
           <label>환경변수 <small>KEY=VALUE</small></label><textarea id="p_env" style="min-height:44px" placeholder="NODE_OPTIONS=--openssl-legacy-provider"></textarea>
@@ -289,6 +361,10 @@
   let scope = null, scopeReady = false;
   let data = null, settings = null, filter = 'all', q = '', kit = null, tab = 'reports', editing = null, secretProject = '';
 
+  // 표 → 카드 전환: 리포트 표 720px, 제안 표 1000px (매체 질의는 CSS, 클래스는 여기서)
+  const mqR = matchMedia('(max-width: 720px)'), mqI = matchMedia('(max-width: 1000px)');
+  const applyCardRows = () => { $('#rTable').classList.toggle('cardrows', mqR.matches); $('#iTable').classList.toggle('cardrows', mqI.matches); };
+  mqR.addEventListener('change', applyCardRows); mqI.addEventListener('change', applyCardRows); applyCardRows();
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
   const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패' };
@@ -458,7 +534,7 @@
     const u = URL.createObjectURL(await r.blob()); shotCache.set(k, u); return u;
   }
   async function renderShots(el, project, shots) {
-    el.innerHTML = shots.map((s) => `<figure data-shot="${esc(s.file)}" data-sp="${esc(project)}"><div style="width:220px;height:124px;background:#000;border-radius:6px"></div><figcaption title="${esc(s.label || '')}">${esc(s.name)} <span class="dim">${ago(s.at)}</span></figcaption></figure>`).join('');
+    el.innerHTML = shots.map((s) => `<figure data-shot="${esc(s.file)}" data-sp="${esc(project)}"><div class="ph"></div><figcaption title="${esc(s.label || '')}">${esc(s.name)} <span class="dim">${ago(s.at)}</span></figcaption></figure>`).join('');
     for (const f of el.querySelectorAll('figure')) { try { const u = await shotUrl(project, f.dataset.shot); f.firstElementChild.outerHTML = `<img src="${u}" alt="${esc(f.dataset.shot)}">`; } catch { /* 없어진 파일 */ } }
   }
 
@@ -520,9 +596,18 @@
     if (kSel) return n.id !== kSel && !kNbr.get(kSel)?.has(n.id);
     return !!qq && !kgMatch(n);
   }
+  function webglOk() { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } }
+  function kgFallbackToTree(why) {
+    kView = 'tree';
+    document.querySelectorAll('#kViewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.kv === 'tree'));
+    $('#kGraphWrap').hidden = true; $('#kTree').hidden = false;
+    $('#kState').textContent = `${$('#kState').textContent} · 3D 불가(${why}) - 트리로 보여줍니다`;
+    loadKnowledge();
+  }
   async function kgRender(force = false) {
     if (!kMerged) return;
     const el = $('#kGraph');
+    if (!webglOk()) { kgFallbackToTree('WebGL 없음'); return; }
     const { ForceGraph3D, SpriteText } = await kgLoadLibs();
     if (!kg3d) {
       kg3d = ForceGraph3D()(el)
@@ -621,7 +706,7 @@
       for (const { name, s } of all) { if (!s.nodes) continue; graphs.push({ name, g: await api('GET', `/admin/knowledge/${name}/graph`) }); }
       kMerged = graphs.length ? kgMerge(graphs) : null;
       if (graphs.length) $('#kTree').innerHTML = `<div class="ktree">${graphs.map(({ name, g }) => `${multi ? `<h3 style="margin:0 0 6px">${esc(name)}</h3>` : ''}${renderTree(g, kq)}`).join('')}</div>`;
-      if (kMerged) { kgLegend(kMerged.nodes); if (kView === '3d') kgRender(true).catch((e) => { $('#kGraph').innerHTML = `<div class="dim" style="padding:16px">3D 그래프 라이브러리를 불러오지 못했습니다(인터넷 연결 필요): ${esc(e.message)}</div>`; }); }
+      if (kMerged) { kgLegend(kMerged.nodes); if (kView === '3d') kgRender(true).catch((e) => { kgFallbackToTree(`라이브러리 로드 실패 - ${e.message}`); }); }
     } else if (kView === 'tree' && kMerged) {
       $('#kTree').innerHTML = `<div class="ktree">${(await Promise.all(all.filter(({ s }) => s.nodes).map(async ({ name }) => ({ name, g: await api('GET', `/admin/knowledge/${name}/graph`) })))).map(({ name, g }) => `${multi ? `<h3 style="margin:0 0 6px">${esc(name)}</h3>` : ''}${renderTree(g, kq)}`).join('')}</div>`;
     }
@@ -738,7 +823,7 @@
     const s = settings.server;
     for (const k of ['port', 'claudeBin', 'pathExtra', 'javaHome', 'model', 'maxTurns', 'timeoutMinutes', 'verifyTimeoutMinutes', 'workDir', 'dataDir']) $(`#s_${k}`).value = s[k] ?? '';
     const e = settings.status;
-    $('#envinfo').innerHTML = `<div class="row" style="display:grid;grid-template-columns:160px 1fr;gap:4px 12px;font-size:12px">
+    $('#envinfo').innerHTML = `<div class="row kv">
       <span class="dim">설정 파일</span><code>${esc(settings.file)}</code><span class="dim">호스트 · 계정</span><span>${esc(e.hostname)} · ${esc(e.user)}</span>
       <span class="dim">Node · git</span><span>${esc(e.node)} · ${esc(e.git)}</span><span class="dim">플랫폼</span><span>${esc(e.platform)}</span>
       <span class="dim">서버 가동</span><span>${Math.floor(e.uptimeSec / 3600)}시간 ${Math.floor((e.uptimeSec % 3600) / 60)}분</span>
