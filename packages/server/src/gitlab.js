@@ -58,11 +58,14 @@ export class GitLab {
    */
   async getPullRequest(number) {
     const r = await this.call('GET', `/merge_requests/${number}`);
+    // 구버전 GitLab 은 detailed_merge_status 없이 merge_status(can_be_merged · cannot_be_merged · unchecked · checking) 만 준다
     const dms = String(r.detailed_merge_status || r.merge_status || 'unknown');
     const merged = r.state === 'merged';
-    const calculating = ['checking', 'unchecked', 'preparing'].includes(dms);
-    const mergeable = merged ? false : (calculating ? null : dms === 'mergeable');
-    return { state: r.state === 'opened' ? 'open' : 'closed', merged, mergeable, mergeableState: calculating ? 'unknown' : (dms === 'conflict' ? 'dirty' : dms), headSha: r.sha || '' };
+    const calculating = ['checking', 'unchecked', 'preparing', 'cannot_be_merged_recheck'].includes(dms);
+    const ok = dms === 'mergeable' || dms === 'can_be_merged';
+    const conflict = dms === 'conflict' || dms === 'cannot_be_merged';
+    const mergeable = merged ? false : (calculating ? null : ok);
+    return { state: r.state === 'opened' ? 'open' : 'closed', merged, mergeable, mergeableState: calculating ? 'unknown' : (conflict ? 'dirty' : (ok ? 'clean' : dms)), headSha: r.sha || '' };
   }
 
   async waitMergeable(number, waitSec, headSha = null) {

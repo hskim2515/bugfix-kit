@@ -336,11 +336,11 @@ export class Runner {
       if (st.merged) throw new Error(`PR #${pr.number} 은 이미 병합된 PR 입니다 - 이번 변경은 들어가지 않았습니다. 새 PR 이 필요합니다.`);
       if (st.mergeable === false && st.mergeableState === 'dirty') {
         // 로컬에선 이미 origin/base 를 합쳐 충돌이 없다 - 캐시가 늦게 갱신된 것이니 조금 더 기다려 본다
-        await L('GitHub 가 아직 충돌로 표시 - 재계산 대기…');
+        await L('저장소가 아직 충돌로 표시 - 재계산 대기…');
         await sleep(8000);
         st = await gh.waitMergeable(pr.number, 60, head);
       }
-      if (st.mergeable === false) throw new Error(`GitHub 가 병합 불가로 판단: ${st.mergeableState}`);
+      if (st.mergeable === false) throw new Error(`저장소가 병합 불가로 판단: ${st.mergeableState}`);
       let sha = null;
       for (let attempt = 1; attempt <= 4 && !sha; attempt++) {
         try { sha = await gh.mergePullRequest(pr.number, prTitle); }
