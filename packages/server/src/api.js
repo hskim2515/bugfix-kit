@@ -48,7 +48,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
 
   const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).then((v) => { if (v !== undefined) res.json({ content: v }); }).catch(next);
 
-  app.get('/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy }));
+  app.get('/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy, lanes: runner.laneState() }));
 
   // ── 운영자 대시보드: <마운트>/ui/ (독립 서버 /api/ui/, 내장 /bugfix/ui/) ──
   const here = path.dirname(fileURLToPath(import.meta.url));

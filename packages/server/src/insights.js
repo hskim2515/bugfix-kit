@@ -76,7 +76,7 @@ export class Insights {
     const ahead = this.runner.submit(project, 'insights', () => this.run(project, focus), async (e) => {
       await this.logLine(project.name, `✗ 실패: ${firstLine(e.message, 300)}`);
       await this.save(project.name, { status: 'FAILED' });
-    });
+    }, 'insights');
     await this.logLine(project.name, `▶ 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
   }
 
@@ -91,7 +91,7 @@ export class Insights {
     const { repo, jobs } = this.runner.paths(project, 0);
     const wt = path.join(jobs, 'insights');
     await this.runner.prepareRepo(project, ex, auth, L);
-    await ex.exec(repo, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', '--prune', 'origin', project.baseBranch]);
+    if (!await this.runner.fetch(project, ex, auth, [project.baseBranch])) throw new Error(`origin/${project.baseBranch} 를 받지 못했습니다`);
     await this.runner.freshWorktree(ex, repo, jobs, wt, `origin/${project.baseBranch}`);
     await L(`작업 사본: ${project.baseBranch} @ ${(await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim()}`);
 

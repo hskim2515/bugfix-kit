@@ -46,9 +46,29 @@ export class Runner {
     this.cfg = cfg;
     this.store = store;
     this.log = log;
-    this.chain = Promise.resolve();
-    this.pending = 0;
+    // 종류별 레인 - 수정(fix)·제안(insights)·지식(knowledge)은 서로 기다리지 않는다. 레인 안에서는 한 번에 하나.
+    this.lanes = new Map();
+    this.mutexes = new Map();
     this.execs = new Map();
+  }
+  lane(name) {
+    if (!this.lanes.has(name)) this.lanes.set(name, { chain: Promise.resolve(), pending: 0, busy: false });
+    return this.lanes.get(name);
+  }
+  /** 대기 중인 작업 수(전체) - /health 와 콘솔이 본다 */
+  get pending() { let n = 0; for (const l of this.lanes.values()) n += l.pending; return n; }
+  get busy() { for (const l of this.lanes.values()) if (l.busy) return true; return false; }
+  laneState() { const o = {}; for (const [k, l] of this.lanes) o[k] = { pending: l.pending, busy: l.busy }; return o; }
+  /** 같은 키의 작업이 겹치지 않게 - 공유 저장소의 git 조작·node_modules 캐시처럼 레인이 달라도 같은 디스크를 만지는 곳에 */
+  async mutex(key, fn) {
+    const prev = this.mutexes.get(key) || Promise.resolve();
+    let release;
+    const cur = new Promise((r) => { release = r; });
+    const chain = prev.then(() => cur);
+    this.mutexes.set(key, chain);
+    await prev;
+    try { return await fn(); }
+    finally { release(); if (this.mutexes.get(key) === chain) this.mutexes.delete(key); }
   }
 
   ex(project) {
@@ -87,16 +107,17 @@ export class Runner {
   }
 
   // ── 큐 ──────────────────────────────────────────────────────────────────
-  submit(project, id, job, onError) {
-    const ahead = this.pending++;
-    const p = this.chain.then(async () => {
-      this.pending--;
-      this.busy = true;
+  submit(project, id, job, onError, laneName = 'fix') {
+    const lane = this.lane(laneName);
+    const ahead = lane.pending++;
+    const p = lane.chain.then(async () => {
+      lane.pending--;
+      lane.busy = true;
       try { await job(); }
       catch (e) { this.log.error(`[bugfix ${project.name}#${id}] 실패`, e); await onError(e); }
-      finally { this.busy = false; }
+      finally { lane.busy = false; }
     });
-    this.chain = p.catch(() => {});
+    lane.chain = p.catch(() => {});
     return ahead;
   }
 
@@ -105,7 +126,7 @@ export class Runner {
       await this.logLine(project, id, `✗ 실패: ${firstLine(e.message, 300)}`);
       await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: `실패: ${firstLine(e.message, 200)}` });
     });
-    if (ahead > 0) await this.logLine(project, id, `▶ 대기열 등록 (앞에 ${ahead}건, 한 번에 하나씩 실행)`);
+    if (ahead > 0) await this.logLine(project, id, `▶ 대기열 등록 (앞에 수정 ${ahead}건, 수정은 한 번에 하나씩 실행)`);
   }
 
   async enqueueFollowUp(project, id, message, mode) {
@@ -141,7 +162,7 @@ export class Runner {
     const L = (s) => this.logLine(project, id, s);
 
     await this.prepareRepo(project, ex, auth, L);
-    await ex.exec(repo, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', '--prune', 'origin', base]);
+    if (!await this.fetch(project, ex, auth, [base])) throw new Error(`origin/${base} 를 받지 못했습니다`);
     await this.freshWorktree(ex, repo, jobs, wt, `origin/${base}`);
     await L(`작업 사본 준비: ${base} @ ${(await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim()}`);
 
@@ -225,10 +246,10 @@ export class Runner {
       } catch (e) { await L(`PR 상태 확인 실패(브랜치를 이어 씁니다): ${firstLine(e.message, 120)}`); }
     }
     await this.prepareRepo(project, ex, auth, L);
-    await ex.exec(repo, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', '--prune', 'origin', base]);
+    if (!await this.fetch(project, ex, auth, [base])) throw new Error(`origin/${base} 를 받지 못했습니다`);
     let startRef = `origin/${base}`;
     if (prOpen) {
-      if ((await ex.execRc(repo, 5, ['git', '-c', `http.extraheader=${auth}`, 'fetch', 'origin', r.fixBranch])) === 0) startRef = `origin/${r.fixBranch}`;
+      if (await this.fetch(project, ex, auth, [r.fixBranch], { prune: false })) startRef = `origin/${r.fixBranch}`;
       else prOpen = false;
     }
     await this.freshWorktree(ex, repo, jobs, wt, startRef);
@@ -300,7 +321,7 @@ export class Runner {
     const base = project.baseBranch;
     const L = (s) => this.logLine(project, id, s);
     try {
-      await ex.exec(wt, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', 'origin', base]);
+      await this.mutex(this.repoKey(project), () => ex.exec(wt, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', 'origin', base]));
       const behind = (await ex.exec(wt, 1, ['git', 'rev-list', '--count', `HEAD..origin/${base}`])).trim();
       if (behind !== '0') {
         await L(`${base} 가 ${behind}커밋 앞서 있어 합칩니다…`);
@@ -351,7 +372,7 @@ export class Runner {
         }
       }
       // 정말 들어갔는지 확인 - 우리 HEAD 가 base 의 조상이어야 한다
-      await ex.exec(wt, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', 'origin', base]);
+      await this.mutex(this.repoKey(project), () => ex.exec(wt, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', 'origin', base]));
       if ((await ex.execRc(wt, 1, ['git', 'merge-base', '--is-ancestor', 'HEAD', `origin/${base}`])) !== 0) {
         throw new Error(`GitHub 는 병합됐다고 했지만 ${base} 에 이번 커밋이 없습니다(응답 sha ${sha.slice(0, 8)})`);
       }
@@ -433,7 +454,7 @@ export class Runner {
     const auth = gh.gitAuthHeader();
     const { repo, jobs, wt } = this.paths(project, id);
     await this.prepareRepo(project, ex, auth, L);
-    await ex.exec(repo, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', '--prune', 'origin', base, r.fixBranch]);
+    if (!await this.fetch(project, ex, auth, [base, r.fixBranch])) throw new Error(`origin/${base}·${r.fixBranch} 를 받지 못했습니다`);
     await this.freshWorktree(ex, repo, jobs, wt, `origin/${r.fixBranch}`);
     await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, `origin/${r.fixBranch}`]);
     try {
@@ -668,6 +689,9 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
    * 작업 사본에는 심볼릭 링크로 넣는다. package-lock 이 바뀌면 캐시를 갱신한다.
    */
   async ensureNodeModules(project, ex, fe, m) {
+    return this.mutex(`nm:${project.name}:${m.name}`, () => this.ensureNodeModulesLocked(project, ex, fe, m));
+  }
+  async ensureNodeModulesLocked(project, ex, fe, m) {
     const cache = path.join(this.paths(project, 0).cache, m.name);
     const cacheNm = path.join(cache, 'node_modules');
     const stampFile = path.join(cache, 'package-lock.sha');
@@ -690,24 +714,38 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
   }
 
   // ── 저장소·worktree ────────────────────────────────────────────────────
+  // 공유 저장소({workDir}/{project}/repo)의 clone·fetch·worktree 조작은 레인이 달라도 겹치면 안 되므로 프로젝트별 뮤텍스 안에서
+  repoKey(project) { return `repo:${project.name}`; }
   async prepareRepo(project, ex, auth, L) {
-    const { root, repo, jobs } = this.paths(project, 0);
-    await fs.mkdir(jobs, { recursive: true });
-    if (!fss.existsSync(path.join(repo, '.git'))) {
-      await L('저장소 복제 중…');
-      await ex.exec(root, 20, ['git', '-c', `http.extraheader=${auth}`, 'clone', '--no-checkout', '--branch', project.baseBranch, project.repo, repo]);
-      await fs.writeFile(path.join(repo, '.git', 'info', 'exclude'), '.bugfix/\n', 'utf8');
-    }
+    await this.mutex(this.repoKey(project), async () => {
+      const { root, repo, jobs } = this.paths(project, 0);
+      await fs.mkdir(jobs, { recursive: true });
+      if (!fss.existsSync(path.join(repo, '.git'))) {
+        await L('저장소 복제 중…');
+        await ex.exec(root, 20, ['git', '-c', `http.extraheader=${auth}`, 'clone', '--no-checkout', '--branch', project.baseBranch, project.repo, repo]);
+        await fs.writeFile(path.join(repo, '.git', 'info', 'exclude'), '.bugfix/\n', 'utf8');
+      }
+    });
+  }
+  /** origin 에서 refs 를 받는다(--prune). 없는 ref 가 있으면 false */
+  async fetch(project, ex, auth, refs, { prune = true } = {}) {
+    const { repo } = this.paths(project, 0);
+    return this.mutex(this.repoKey(project), async () =>
+      (await ex.execRc(repo, 10, ['git', '-c', `http.extraheader=${auth}`, 'fetch', ...(prune ? ['--prune'] : []), 'origin', ...refs])) === 0);
   }
   async freshWorktree(ex, repo, jobs, wt, ref) {
-    if (fss.existsSync(wt)) { try { await ex.exec(repo, 2, ['git', 'worktree', 'remove', '--force', wt]); } catch { /* 아래 prune */ } }
-    await ex.exec(repo, 2, ['git', 'worktree', 'prune']);
-    await fs.rm(wt, { recursive: true, force: true });
-    await ex.exec(repo, 2, ['git', 'worktree', 'add', '--detach', wt, ref]);
+    await this.mutex(`repo:${path.basename(path.dirname(repo))}`, async () => {
+      if (fss.existsSync(wt)) { try { await ex.exec(repo, 2, ['git', 'worktree', 'remove', '--force', wt]); } catch { /* 아래 prune */ } }
+      await ex.exec(repo, 2, ['git', 'worktree', 'prune']);
+      await fs.rm(wt, { recursive: true, force: true });
+      await ex.exec(repo, 2, ['git', 'worktree', 'add', '--detach', wt, ref]);
+    });
   }
   async removeWorktree(ex, repo, wt) {
-    try { await ex.exec(repo, 2, ['git', 'worktree', 'remove', '--force', wt]); }
-    catch (e) { this.log.warn('[bugfix] worktree 정리 실패:', e.message); }
+    await this.mutex(`repo:${path.basename(path.dirname(repo))}`, async () => {
+      try { await ex.exec(repo, 2, ['git', 'worktree', 'remove', '--force', wt]); }
+      catch (e) { this.log.warn('[bugfix] worktree 정리 실패:', e.message); }
+    });
   }
 }
 
