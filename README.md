@@ -90,7 +90,7 @@ export default defineConfig({ plugins: [react(), bugfixKit({ restBase: '/rest', 
 ```js
 // vue.config.js (Vue CLI / webpack 앱)
 const bugfixKit = require('bugfix-kit/webpack');
-module.exports = { configureWebpack: { plugins: [bugfixKit({ project: 'myapp', restBase: process.env.VUE_APP_REST_SERVER })] } };   // 키(VUE_APP_BUGFIX_KEY)가 없는 빌드는 자동으로 꺼짐
+module.exports = { configureWebpack: { plugins: [bugfixKit({ project: 'myapp', restBase: () => process.env.VUE_APP_REST_SERVER })] } };   // 키(VUE_APP_BUGFIX_KEY)가 없는 빌드는 자동으로 꺼짐
 ```
 이게 전부입니다. 플러그인이 SDK 를 index.html 에 자동으로 넣고(콘솔·fetch/XHR·주소 변화·큰 캔버스 캡처), 신고 서버 주소를 정하고, `앱주소/bugfix/` 로 들어오면 콘솔로 보내 줍니다. 키는 `.env` 의 `VITE_BUGFIX_KEY`.
 백엔드에는 `npx bugfix-adapter spring …` 한 줄(최근 로그 + `/bugfix/**` 프록시). 앱 nginx 는 안 건드립니다.

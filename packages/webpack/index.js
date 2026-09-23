@@ -3,7 +3,7 @@
  *
  *   // vue.config.js
  *   const bugfixKit = require('bugfix-kit/webpack');
- *   module.exports = { configureWebpack: { plugins: [bugfixKit({ project: 'lhdt', restBase: process.env.VUE_APP_REST_SERVER, hooks: './src/utils/bugfixHooks.js' })] } };
+ *   module.exports = { configureWebpack: { plugins: [bugfixKit({ project: 'lhdt', restBase: () => process.env.VUE_APP_REST_SERVER, hooks: './src/utils/bugfixHooks.js' })] } };
  *
  * 하는 일:
  *   - 앱 엔트리 뒤에 SDK 자동 마운트 모듈을 붙인다 (Shift+F9 신고 · Shift+F10 목록. 콘솔·fetch/XHR·주소 변화·큰 캔버스 캡처)
@@ -28,7 +28,9 @@ class BugfixKitWebpackPlugin {
     const enabled = o.enabled !== undefined ? !!o.enabled : !!(key || o.endpoint);
     if (!enabled) return;
     const rel = (u) => typeof u === 'string' && u.startsWith('/');
-    const restBase = String(o.restBase || (rel(env.VUE_APP_API_URL) ? env.VUE_APP_API_URL : '') || '').replace(/\/+$/, '');
+    // restBase 는 함수도 된다 - vue.config.js 평가 시점엔 .env 가 아직 안 읽혔을 수 있어 apply 때 process.env 를 보게
+    const rb = typeof o.restBase === 'function' ? o.restBase() : o.restBase;
+    const restBase = String(rb || (rel(env.VUE_APP_API_URL) ? env.VUE_APP_API_URL : '') || '').replace(/\/+$/, '');
     const endpoint = o.endpoint || env.VUE_APP_BUGFIX_ENDPOINT || env.REACT_APP_BUGFIX_ENDPOINT || (restBase ? `${restBase}/bugfix` : '/bugfix');
     let project = o.project || env.VUE_APP_BUGFIX_PROJECT || env.REACT_APP_BUGFIX_PROJECT;
     if (!project) { try { project = JSON.parse(fs.readFileSync(path.join(compiler.context, 'package.json'), 'utf8')).name; } catch { project = 'app'; } }
