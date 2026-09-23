@@ -181,7 +181,7 @@ public class BugfixWorker implements SmartLifecycle {
         sb.append("server:\n  port: 0\n  dataDir: ").append(dataDir.resolve("data")).append("\n  workDir: ").append(dataDir.resolve("work")).append("\n");
         sb.append("projects:\n  ").append(name).append(":\n    repo: ").append(repo).append("\n    baseBranch: ").append(branch).append("\n");
         if (repo.contains("github.com/")) sb.append("    githubRepo: ").append(repo.replaceAll("^https?://github\\.com/", "").replaceAll("\\.git$", "")).append("\n");
-        sb.append("    autoMerge: ").append(props.isAutoMerge()).append("\n    fixFrom: app\n");
+        sb.append("    delivery: ").append(props.getDelivery() == null || props.getDelivery().isBlank() ? (props.isAutoMerge() ? "merge" : "pr") : props.getDelivery()).append("\n    fixFrom: app\n");
         if (!props.getDescription().isBlank()) sb.append("    description: ").append(quote(props.getDescription())).append("\n");
         if (!props.getCors().isEmpty()) sb.append("    cors: [").append(String.join(", ", props.getCors())).append("]\n");
         if (!props.getProtectedPaths().isEmpty()) sb.append("    protectedPaths: [").append(String.join(", ", props.getProtectedPaths())).append("]\n");

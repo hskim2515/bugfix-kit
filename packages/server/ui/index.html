@@ -71,7 +71,7 @@
   #rows td:last-child, #rows td:nth-child(7) { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
   .p-QUEUED { background: #3b3a1f; color: var(--warn); } .p-RUNNING { background: #1f3350; color: #8ec1ff; } .p-PR_OPENED { background: #3b2a1f; color: #ffb27a; }
-  .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
+  .p-READY { background: #1f3a3a; color: #8ee0d0; } .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
   .sev-CRITICAL { color: #ff6b7a; } .sev-HIGH { color: #ffb27a; } .sev-MEDIUM { color: var(--warn); } .sev-LOW { color: var(--ok); }
   .dim { color: var(--dim); font-size: 11px; }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
@@ -222,7 +222,7 @@
       <div class="toolbar">
         <span class="seg" id="filterSeg">
           <button data-f="all" class="on">전체</button><button data-f="active">진행 중</button><button data-f="FAILED">실패</button>
-          <button data-f="PR_OPENED">PR 열림</button><button data-f="MERGED">병합됨</button><button data-f="NONE">요청 전</button>
+          <button data-f="READY">수정본 준비</button><button data-f="PR_OPENED">PR 열림</button><button data-f="MERGED">병합됨</button><button data-f="NONE">요청 전</button>
         </span>
         <input type="search" id="q" placeholder="문제·보고자 검색">
       </div>
@@ -273,7 +273,12 @@
           <label>저장소 URL</label><input id="p_repo" placeholder="https://github.com/org/myapp.git">
           <label>GitHub owner/repo</label><input id="p_githubRepo" placeholder="org/myapp">
           <label>기준 브랜치</label><input id="p_baseBranch" placeholder="develop">
-          <label>자동 병합 <small>끄면 PR 만</small></label><div class="inline"><input type="checkbox" id="p_autoMerge"></div>
+          <label>수정본 내보내기 <small>AI 가 고친 뒤 어디까지</small></label><div class="inline"><select id="p_delivery">
+            <option value="merge">푸시 + PR + 자동 병합 (검증 통과 시)</option>
+            <option value="pr">푸시 + PR 만 (병합은 사람이)</option>
+            <option value="branch">원격 브랜치 푸시만 (PR 없음)</option>
+            <option value="local">보관만 - 키트 저장소 안 브랜치 (원격에 안 올림)</option>
+          </select></div>
           <label>수정 요청 <small>누가 할 수 있나</small></label><div class="inline"><select id="p_fixFrom"><option value="app">앱 사용자 + 관리 콘솔</option><option value="admin">관리 콘솔에서만 (앱은 신고만)</option></select></div>
           <label>앱 주소 <small>쉼표 구분</small></label><input id="p_cors" placeholder="https://dev.myapp.com, http://localhost:3000">
           <label>API 키 <small>프론트에 넣는 공개 키</small></label><input id="p_apiKey" placeholder="(선택)">
@@ -367,7 +372,8 @@
   mqR.addEventListener('change', applyCardRows); mqI.addEventListener('change', applyCardRows); applyCardRows();
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
-  const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패' };
+  const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패' };
+  const deliveryLabel = { merge: '자동 병합', pr: 'PR 까지', branch: '브랜치 푸시', local: '보관만' };
   const H = () => ({ 'X-Bugfix-Admin': key, 'Content-Type': 'application/json' });
   async function api(method, path, body) {
     const r = await fetch(`${API}${path}`, { method, headers: H(), body: body === undefined ? undefined : JSON.stringify(body) });
@@ -466,7 +472,7 @@
     const counts = {};
     for (const p of data.projects) for (const [k, n] of Object.entries(p.counts || {})) counts[k] = (counts[k] || 0) + n;
     $('#cards').innerHTML = `
-      <div class="card"><h3>리포트 <span class="dim">${data.projects.map((p) => `${esc(p.name)} ${esc(p.githubRepo)} · ${esc(p.baseBranch)}${p.autoMerge ? '' : ' · PR 만'}`).join(' / ')}</span></h3>
+      <div class="card"><h3>리포트 <span class="dim">${data.projects.map((p) => `${esc(p.name)} ${esc(p.githubRepo)} · ${esc(p.baseBranch)}${p.delivery && p.delivery !== 'merge' ? ` · ${deliveryLabel[p.delivery] || p.delivery}` : ''}`).join(' / ')}</span></h3>
         <div class="big">${total}</div>
         <div class="row">${['RUNNING', 'QUEUED', 'PR_OPENED', 'FAILED', 'MERGED'].filter((k) => counts[k]).map((k) => `<span class="pill p-${k}">${fixLabel[k]} ${counts[k]}</span>`).join('') || '<span>수정 요청 없음</span>'}</div>
       </div>` + (running ? `
@@ -480,7 +486,7 @@
     }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
     $('#rows').innerHTML = rows.map((r) => { const st = r.fixStatus || 'NONE';
       const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
-      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span></td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
+      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 푸시됨' : ' · 키트 안'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
     $('#empty').hidden = rows.length > 0;
   }
 
@@ -773,7 +779,7 @@
     const v = (id, val) => { $(id).value = val ?? ''; };
     v('#p_name', p?.name); $('#p_name').disabled = !!p;
     v('#p_repo', p?.repo); v('#p_githubRepo', p?.githubRepo); v('#p_baseBranch', p?.baseBranch || 'main');
-    $('#p_autoMerge').checked = p ? p.autoMerge !== false : true;
+    $('#p_delivery').value = p ? (p.delivery || (p.autoMerge === false ? 'pr' : 'merge')) : 'merge';
     $('#p_fixFrom').value = p?.fixFrom === 'admin' ? 'admin' : 'app';
     v('#p_cors', (p?.cors || []).join(', ')); v('#p_apiKey', ''); $('#p_apiKey').placeholder = p?.apiKeySet ? `${p.apiKeySet} - 바꾸려면 입력` : '(선택)';
     v('#p_description', p?.description); v('#p_conventions', p?.conventions);
@@ -786,7 +792,7 @@
     const modules = [...$('#mods').querySelectorAll('.mod')].map((d) => ({ name: d.querySelector('[data-k=name]').value.trim(), match: d.querySelector('[data-k=match]').value.trim(), dir: d.querySelector('[data-k=dir]').value.trim() || undefined, verify: csv(d.querySelector('[data-k=verify]').value), nodeModulesCache: d.querySelector('[data-k=nm]').checked || undefined })).filter((m) => m.match);
     const env = Object.fromEntries(lines($('#p_env').value).map((l) => l.split('=')).filter((a) => a.length >= 2).map(([k, ...r]) => [k.trim(), r.join('=').trim()]));
     const fc = $('#p_fc_cmd').value.trim() ? { cwd: $('#p_fc_cwd').value.trim() || '.', command: $('#p_fc_cmd').value.trim(), when: csv($('#p_fc_when').value) } : null;
-    return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', autoMerge: $('#p_autoMerge').checked, fixFrom: $('#p_fixFrom').value,
+    return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', delivery: $('#p_delivery').value, autoMerge: $('#p_delivery').value === 'merge', fixFrom: $('#p_fixFrom').value,
       cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), protectedPaths: lines($('#p_protectedPaths').value), env };
   }
 
@@ -861,6 +867,7 @@
     const op = e.target.closest('[data-open]'); if (op && kit) { e.preventDefault(); kit.setProject(op.dataset.ip || op.closest('tr')?.dataset.ip); kit.openViewer(Number(op.dataset.open)); return; }
     const idl = e.target.closest('[data-idel]'); if (idl) { const proj = idl.closest('tr')?.dataset.ip; if (!confirm('이 제안을 지울까요? 다음 분석에서 같은 내용은 다시 나오지 않습니다.')) return; try { await api('DELETE', `/admin/insights/${proj}/items/${idl.dataset.idel}`); await loadInsights(); } catch (x) { alert(x.message); } return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
+    const ex = e.target.closest('[data-export]'); if (ex) { const proj = ex.closest('tr')?.dataset.p; const mode = ex.dataset.mode; if (!confirm(mode === 'merge' ? '이 수정본을 푸시하고 PR 을 만들어 병합까지 진행할까요?' : '이 수정본을 푸시하고 PR 을 만들까요?')) return; try { await api('POST', `/p/${proj}/reports/${ex.dataset.export}/merge`, { mode }); await load(); } catch (x) { alert(x.message); } return; }
     const tr = e.target.closest('tr.r'); if (tr && kit) { kit.setProject(tr.dataset.p); kit.openViewer(Number(tr.dataset.id)); return; }
     const pl = e.target.closest('#plist button'); if (pl) { editing = pl.dataset.p; renderProjects(); return; }
     const sp = e.target.closest('#splist button'); if (sp) { secretProject = sp.dataset.sp; renderSecrets(); return; }

@@ -68,6 +68,8 @@ export function loadConfig(file) {
       ...p,
       ...hostInfo,                       // host: 'github'|'gitlab', gitlab 이면 gitlabUrl·gitlabProject
       githubRepo: p.githubRepo || hostInfo.gitlabProject || '',   // 표시·프롬프트용 저장소 이름
+      // 수정본을 어디까지 내보내나: local(키트 저장소 안 브랜치에 보관만) · branch(원격 브랜치 푸시) · pr(푸시+PR) · merge(푸시+PR+자동 병합)
+      delivery: ['local', 'branch', 'pr', 'merge'].includes(p.delivery) ? p.delivery : (p.autoMerge === false ? 'pr' : 'merge'),
       env: { ...fileEnv, ...(p.env || {}) },
       apiKey: notBlank(envKey) ? envKey : (p.apiKey || fileEnv.BUGFIX_API_KEY || ''),
       // 프로젝트별 GitHub 토큰(선택) - 없으면 서버 공용 토큰
@@ -75,6 +77,7 @@ export function loadConfig(file) {
       githubTokenValue: fileEnv.GITHUB_TOKEN || null,
       gitlabTokenValue: fileEnv.GITLAB_TOKEN || null,
     };
+    projects[name].autoMerge = projects[name].delivery === 'merge';
     projects[name].modules = (projects[name].modules || []).map((m, i) => {
       // match '' 는 저장소 전체(앱이 곧 저장소 루트인 내장 모드)
       if (typeof m.match !== 'string') throw new Error(`projects.${name}.modules[${i}]: match 는 필수('' 면 전체)`);

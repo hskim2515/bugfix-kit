@@ -77,7 +77,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
           if (!running || r.fixStatus === 'RUNNING') running = { project: p.name, bugReportId: r.bugReportId, fixStatus: r.fixStatus, problem: r.problem, logTail: tail, fixRequestedAt: full?.fixRequestedAt };
         }
       }
-      projects.push({ name: p.name, apiKey: p.apiKey || '', githubRepo: p.githubRepo, baseBranch: p.baseBranch, autoMerge: p.autoMerge, cors: p.cors || [], host: p.host, counts, reports: list.map((r) => ({ ...r, fixPrNumber: undefined })) });
+      projects.push({ name: p.name, apiKey: p.apiKey || '', githubRepo: p.githubRepo, baseBranch: p.baseBranch, autoMerge: p.autoMerge, delivery: p.delivery, cors: p.cors || [], host: p.host, counts, reports: list.map((r) => ({ ...r, fixPrNumber: undefined })) });
     }
     return { projects, running, queue: runner.pending, now: new Date().toISOString() };
   }));
@@ -141,7 +141,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   const fixGuard = (req, res, next) => (req.project.fixFrom === 'admin' && !req.isAdmin ? next(new HttpError(403, '이 프로젝트의 수정 요청은 관리 콘솔에서만 할 수 있습니다. 신고는 접수됐습니다.')) : next());
 
   /** 앱 SDK 가 화면을 맞추는 데 필요한 공개 정보 */
-  pr.get('/info', wrap((req) => ({ name: req.project.name, fixFrom: req.project.fixFrom, canFix: req.project.fixFrom !== 'admin' || !!req.isAdmin, autoMerge: !!req.project.autoMerge })));
+  pr.get('/info', wrap((req) => ({ name: req.project.name, fixFrom: req.project.fixFrom, canFix: req.project.fixFrom !== 'admin' || !!req.isAdmin, autoMerge: !!req.project.autoMerge, delivery: req.project.delivery })));
 
   pr.post('/reports', wrap(async (req) => {
     const b = req.body || {};
@@ -234,9 +234,11 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   }));
 
   /** 열린 PR 을 정식 경로로 병합 (관리 콘솔·자동 병합 프로젝트용) */
+  // 내보내기·병합: body.mode = branch|pr|merge (기본 merge). 보관만 한 수정본(READY)도 여기서 푸시·PR·병합
   pr.post('/reports/:id/merge', fixGuard, wrap(async (req) => {
     const r = await loadFixable(req);
-    await runner.enqueueMerge(req.project, r.bugReportId);
+    const mode = ['branch', 'pr', 'merge'].includes(req.body?.mode) ? req.body.mode : 'merge';
+    await runner.enqueueMerge(req.project, r.bugReportId, mode);
     return FileStore.fixState(await store.get(req.project.name, r.bugReportId));
   }));
 

@@ -71,7 +71,7 @@ function prepareConfig(o, log) {
     server: { port: 0, dataDir: path.join(dataDir, 'data'), workDir: path.join(dataDir, 'work'), maxTurns: o.maxTurns || 40, timeoutMinutes: o.timeoutMinutes || 45, ...(o.server || {}) },
     projects: {
       [name]: {
-        repo, baseBranch, autoMerge: o.autoMerge !== false, fixFrom: o.fixFrom || 'app',
+        repo, baseBranch, delivery: ['local', 'branch', 'pr', 'merge'].includes(o.delivery) ? o.delivery : (o.autoMerge === false ? 'pr' : 'merge'), fixFrom: o.fixFrom || 'app',
         ...(host.host === 'github' ? { githubRepo: o.githubRepo || repo.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '') } : {}),
         cors: o.cors || [], description: o.description || pkg.description || '', conventions: o.conventions || '',
         modules, ...(o.frontCheck ? { frontCheck: o.frontCheck } : {}), protectedPaths: o.protectedPaths || [], ...(o.apiKey ? { apiKey: o.apiKey } : {}),

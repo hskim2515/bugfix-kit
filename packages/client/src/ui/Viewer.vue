@@ -369,11 +369,12 @@ const FIX_LABELS = {
   none:      '요청 전',
   QUEUED:    '대기 중',
   RUNNING:   'AI 가 고치는 중',
+  READY:     '수정본 준비 · 아직 내보내지 않음(콘솔에서 PR·병합)',
   PR_OPENED: 'PR 올라옴 · 병합 안 됨(로그 확인)',
   MERGED:    '병합 완료',
   FAILED:    '실패 · 진행 로그 확인',
 };
-const FIX_SHORT = { QUEUED: '대기', RUNNING: '수정중', PR_OPENED: 'PR', MERGED: '병합', FAILED: '실패' };
+const FIX_SHORT = { QUEUED: '대기', RUNNING: '수정중', READY: '준비', PR_OPENED: 'PR', MERGED: '병합', FAILED: '실패' };
 
 const STATUSES = [
   { value: 'OPEN',        label: '접수' },
@@ -922,6 +923,7 @@ export default {
 .brv-fix--queued    { background: #fff3cd; color: #7a5a00; }
 .brv-fix--running   { background: #dbeafe; color: #1e3a8a; }
 .brv-fix--pr_opened { background: #e0f2fe; color: #075985; }
+.brv-fix--ready     { background: #ccfbf1; color: #115e59; }
 .brv-fix--merged    { background: #dcfce7; color: #166534; }
 .brv-fix--failed    { background: #fee2e2; color: #991b1b; }
 .brv-link { color: #2563eb; text-decoration: underline; word-break: break-all; }

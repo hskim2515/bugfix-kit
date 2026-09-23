@@ -11,11 +11,14 @@
   → .bugfix/ (summary.md · screenshot.png · context.json · *-logs.json)
   → claude -p … --output-format stream-json  (진행 로그를 그때그때 fixLog 에)
   → 변경 없으면 FAILED / 있으면 바뀐 모듈의 verify 명령
-  → 브랜치 claude/bugfix-{id}-{시각} 푸시 → PR → PR_OPENED
-  → (autoMerge) base 합치기·충돌은 Claude 가 해결·재검증 → 병합 → 실제 반영 확인 → MERGED
+  → 브랜치 claude/bugfix-{id}-{시각} 커밋 → 프로젝트 delivery 만큼 내보내기
+      local  : 키트 저장소 안에 브랜치로 보관만 → READY (콘솔 '내보내기' 로 PR·병합)
+      branch : 원격 브랜치 푸시 → READY
+      pr     : 푸시 → PR → PR_OPENED
+      merge  : 푸시 → PR → base 합치기·충돌은 Claude 가 해결·재검증 → 병합 → 실제 반영 확인 → MERGED
 ```
 
-상태: `QUEUED → RUNNING → PR_OPENED → MERGED | FAILED`. 후속 대화(`fix-chat`)는 같은 Claude 세션을 `--resume` 으로 이어
+상태: `QUEUED → RUNNING → READY | PR_OPENED → MERGED | FAILED`. `POST /reports/{id}/merge {mode}` 가 READY·PR_OPENED 를 다음 단계로 보낸다. 후속 대화(`fix-chat`)는 같은 Claude 세션을 `--resume` 으로 이어
 질문(`ask`, 코드 변경 없음) 또는 추가 수정(`change`, 검증·PR·병합까지)을 한다.
 
 ## 설치 (개발서버, sudo 불필요)

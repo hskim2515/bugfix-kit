@@ -201,19 +201,10 @@ export class Runner {
       await ex.exec(wt, 1, ['git', 'checkout', '-b', branch]);
       await ex.exec(wt, 1, ['git', 'add', '-A']);
       await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '-F', '-'], { stdin: commitMsg });
-      await ex.exec(wt, 5, ['git', '-c', `http.extraheader=${auth}`, 'push', '-u', 'origin', branch]);
-      await this.updateFix(project, id, { fixBranch: branch, fixSummary: summary });
-      await L(`브랜치 푸시: ${branch}`);
-
-      // 보고자·문제 원문은 저장소를 보는 모든 사람에게 공개되므로 넣지 않는다 - 번호로 앱 안에서 찾아본다
-      const prTitle = `fix: ${summary} (버그 #${id})`;
-      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 bugfix-kit 이 Claude Code 를 돌려 만들었습니다. `
-        + (project.autoMerge ? '검증이 통과해 자동으로 병합됩니다.' : '검토 후 병합하세요.');
-      const pr = await gh.createPullRequest(prTitle, prBody, branch, base);
-      await this.updateFix(project, id, { fixStatus: 'PR_OPENED', fixPrUrl: pr.url, fixPrNumber: pr.number });
-      await L(`✓ PR: ${pr.url}`);
-
-      if (project.autoMerge) await this.autoMerge(project, ex, gh, id, wt, branch, auth, pr, prTitle, mods);
+      await this.updateFix(project, id, { fixBranch: branch, fixSummary: summary, fixPushed: false });
+      // 보고자·문제 원문은 저장소를 보는 모든 사람에게 공개되므로 PR 본문에 넣지 않는다 - 번호로 앱 안에서 찾아본다
+      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 bugfix-kit 이 Claude Code 를 돌려 만들었습니다. `;
+      await this.deliver(project, ex, gh, id, wt, branch, auth, { summary, prBody, existingPr: null }, mods);
     } finally {
       await this.removeWorktree(ex, repo, wt);
     }
@@ -248,12 +239,18 @@ export class Runner {
     await this.prepareRepo(project, ex, auth, L);
     if (!await this.fetch(project, ex, auth, [base])) throw new Error(`origin/${base} 를 받지 못했습니다`);
     let startRef = `origin/${base}`;
+    // 이어 쓸 브랜치: PR 이 열려 있으면 원격 브랜치, 아니면(보관만·푸시만 모드) 키트 저장소에 남은 브랜치
+    let cont = false;
     if (prOpen) {
-      if (await this.fetch(project, ex, auth, [r.fixBranch], { prune: false })) startRef = `origin/${r.fixBranch}`;
+      if (await this.fetch(project, ex, auth, [r.fixBranch], { prune: false })) { startRef = `origin/${r.fixBranch}`; cont = true; }
       else prOpen = false;
+    } else if (r.fixStatus === 'READY' && notBlank(r.fixBranch)) {
+      if (r.fixPushed && await this.fetch(project, ex, auth, [r.fixBranch], { prune: false })) { startRef = `origin/${r.fixBranch}`; cont = true; }
+      else if ((await ex.execRc(repo, 1, ['git', 'rev-parse', '--verify', '-q', `refs/heads/${r.fixBranch}`])) === 0) { startRef = r.fixBranch; cont = true; }
+      if (cont) await L(`보관된 수정본 브랜치 이어서: ${r.fixBranch}`);
     }
     await this.freshWorktree(ex, repo, jobs, wt, startRef);
-    if (prOpen) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, startRef]);
+    if (cont) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, startRef]);
     await writeReportFiles(path.join(wt, '.bugfix'), r);
     await this.knowledge?.writeFor(project, path.join(wt, '.bugfix'), r).catch(() => false);
     await this.prepareNodeModules(project, ex, wt, L, true);
@@ -290,30 +287,47 @@ export class Runner {
       const summary = result.title || `버그 #${id} 추가 수정`;
       await this.saveSuggestions(project, id, result.body);
       const commitMsg = `fix: ${summary} (버그 #${id} 추가 요청)\n\n${result.body || ''}\n\n요청: ${firstLine(message, 200)}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
-      const branch = prOpen ? r.fixBranch : `claude/bugfix-${id}-${stamp()}`;
-      if (!prOpen) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
+      const branch = cont ? r.fixBranch : `claude/bugfix-${id}-${stamp()}`;
+      if (!cont) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
       await ex.exec(wt, 1, ['git', 'add', '-A']);
       await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '-F', '-'], { stdin: commitMsg });
-      await ex.exec(wt, 5, ['git', '-c', `http.extraheader=${auth}`, 'push', '-u', 'origin', branch]);
       await this.updateFix(project, id, { fixBranch: branch, fixSummary: summary });
-      await L(`브랜치 푸시: ${branch}`);
-      const prTitle = `fix: ${summary} (버그 #${id})`;
-      let pr;
-      if (prOpen && r.fixPrNumber != null) {
-        pr = { number: r.fixPrNumber, url: r.fixPrUrl };
-        await L(`기존 PR 갱신: ${pr.url}`);
-      } else {
-        const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 bugfix-kit 이 만들었습니다.`
-          + (project.autoMerge ? ' 검증이 통과해 자동으로 병합됩니다.' : ' 검토 후 병합하세요.');
-        pr = await gh.createPullRequest(prTitle, prBody, branch, base);
-        await this.updateFix(project, id, { fixPrNumber: pr.number });
-        await L(`✓ PR: ${pr.url}`);
-      }
-      await this.updateFix(project, id, { fixStatus: 'PR_OPENED', fixPrUrl: pr.url });
-      if (project.autoMerge) await this.autoMerge(project, ex, gh, id, wt, branch, auth, pr, prTitle, mods);
+      const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 bugfix-kit 이 만들었습니다.`;
+      const existingPr = prOpen && r.fixPrNumber != null ? { number: r.fixPrNumber, url: r.fixPrUrl } : null;
+      await this.deliver(project, ex, gh, id, wt, branch, auth, { summary, prBody, existingPr }, mods);
     } finally {
       await this.removeWorktree(ex, repo, wt);
     }
+  }
+
+  // ── 내보내기: 프로젝트 delivery 모드만큼 (local 보관 · branch 푸시 · pr · merge) ─────────────
+  async deliver(project, ex, gh, id, wt, branch, auth, { summary, prBody, existingPr }, mods, modeOverride = null) {
+    const L = (s) => this.logLine(project, id, s);
+    const base = project.baseBranch;
+    const mode = modeOverride || project.delivery || 'merge';
+    if (mode === 'local') {
+      await this.updateFix(project, id, { fixStatus: 'READY', fixPushed: false });
+      await L(`✓ 수정본 보관: 브랜치 ${branch} (키트 저장소 안에만 - 콘솔에서 '내보내기' 로 푸시·PR·병합)`);
+      return;
+    }
+    await ex.exec(wt, 5, ['git', '-c', `http.extraheader=${auth}`, 'push', '-u', 'origin', branch]);
+    await this.updateFix(project, id, { fixPushed: true });
+    await L(`브랜치 푸시: ${branch}`);
+    if (mode === 'branch') {
+      await this.updateFix(project, id, { fixStatus: 'READY' });
+      await L(`✓ 원격 브랜치까지 (PR 은 안 만듦 - 콘솔에서 '내보내기' 로 PR·병합)`);
+      return;
+    }
+    const prTitle = `fix: ${summary} (버그 #${id})`;
+    let pr = existingPr;
+    if (pr) await L(`기존 PR 갱신: ${pr.url}`);
+    else {
+      pr = await gh.createPullRequest(prTitle, prBody + (mode === 'merge' ? '검증이 통과해 자동으로 병합됩니다.' : '검토 후 병합하세요.'), branch, base);
+      await this.updateFix(project, id, { fixPrNumber: pr.number });
+      await L(`✓ PR: ${pr.url}`);
+    }
+    await this.updateFix(project, id, { fixStatus: 'PR_OPENED', fixPrUrl: pr.url });
+    if (mode === 'merge') await this.autoMerge(project, ex, gh, id, wt, branch, auth, pr, prTitle, mods);
   }
 
   // ── 자동 병합 ──────────────────────────────────────────────────────────
@@ -451,40 +465,55 @@ export class Runner {
    * 열려 있는 PR 을 정식 경로로 병합한다: base 와 합치고(충돌은 Claude) → 재검증 → 푸시 → 병합 → 실제 반영 확인.
    * 새로고침(fix-sync)이 autoMerge 프로젝트의 열린 PR 에 대해 부르고, 큐에서 하나씩 돈다.
    */
-  async enqueueMerge(project, id) {
+  /** 내보내기·병합: mode 는 branch|pr|merge (기본 merge). READY(보관·푸시만) 리포트도 여기서 푸시·PR·병합까지 간다 */
+  async enqueueMerge(project, id, mode = 'merge') {
     const r = await this.store.get(project.name, id);
-    if (!r?.fixPrNumber || !notBlank(r.fixBranch)) throw Object.assign(new Error('병합할 PR 이 없습니다'), { status: 409 });
-    if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw Object.assign(new Error('작업이 진행 중입니다'), { status: 409 });
+    if (!notBlank(r?.fixBranch) || !['READY', 'PR_OPENED', 'FAILED'].includes(r.fixStatus)) throw Object.assign(new Error('내보낼 수정본이 없습니다'), { status: 409 });
+    if (r.fixStatus === 'FAILED' && r.fixPrNumber == null) throw Object.assign(new Error('내보낼 수정본이 없습니다'), { status: 409 });
+    const prev = r.fixStatus;
     await this.updateFix(project, id, { fixStatus: 'QUEUED' });
-    const ahead = this.submit(project, id, () => this.runMerge(project, id), async (e) => {
-      await this.logLine(project, id, `✗ 병합 작업 실패: ${firstLine(e.message, 300)}`);
-      await this.updateFix(project, id, { fixStatus: 'PR_OPENED' });
+    const ahead = this.submit(project, id, () => this.runMerge(project, id, mode), async (e) => {
+      await this.logLine(project, id, `✗ 내보내기·병합 실패: ${firstLine(e.message, 300)}`);
+      await this.updateFix(project, id, { fixStatus: prev === 'FAILED' ? 'PR_OPENED' : prev });
     });
-    await this.logLine(project, id, `▶ 병합 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
+    await this.logLine(project, id, `▶ 내보내기(${mode}) 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
   }
 
-  async runMerge(project, id) {
+  async runMerge(project, id, mode = 'merge') {
     const r = await this.store.get(project.name, id);
     const gh = this.gh(project);
     const L = (s) => this.logLine(project, id, s);
-    const st = await gh.getPullRequest(r.fixPrNumber);
-    if (st.merged) { await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' }); await L('✓ 이미 병합됨'); return; }
-    if (st.state !== 'open') { await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: 'PR 이 병합되지 않고 닫혔습니다.' }); await L('✗ PR 이 닫힘'); return; }
+    if (r.fixPrNumber != null) {
+      const st = await gh.getPullRequest(r.fixPrNumber);
+      if (st.merged) { await this.updateFix(project, id, { fixStatus: 'MERGED', status: 'RESOLVED' }); await L('✓ 이미 병합됨'); return; }
+      if (st.state !== 'open') { await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: 'PR 이 병합되지 않고 닫혔습니다.' }); await L('✗ PR 이 닫힘'); return; }
+    }
     await this.updateFix(project, id, { fixStatus: 'RUNNING' });
-    await L(`▶ PR #${r.fixPrNumber} 병합 시작`);
+    await L(r.fixPrNumber != null ? `▶ PR #${r.fixPrNumber} 병합 시작` : `▶ 수정본 내보내기(${mode}) 시작: ${r.fixBranch}`);
     const ex = this.ex(project);
     const base = project.baseBranch;
     const auth = gh.gitAuthHeader();
     const { repo, jobs, wt } = this.paths(project, id);
     await this.prepareRepo(project, ex, auth, L);
-    if (!await this.fetch(project, ex, auth, [base, r.fixBranch])) throw new Error(`origin/${base}·${r.fixBranch} 를 받지 못했습니다`);
-    await this.freshWorktree(ex, repo, jobs, wt, `origin/${r.fixBranch}`);
-    await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, `origin/${r.fixBranch}`]);
+    if (!await this.fetch(project, ex, auth, [base])) throw new Error(`origin/${base} 를 받지 못했습니다`);
+    // 브랜치 위치: 푸시된 것은 원격, 보관만 한 것은 키트 저장소의 로컬 브랜치
+    let ref = null;
+    if ((r.fixPushed || r.fixPrNumber != null) && await this.fetch(project, ex, auth, [r.fixBranch], { prune: false })) ref = `origin/${r.fixBranch}`;
+    else if ((await ex.execRc(repo, 1, ['git', 'rev-parse', '--verify', '-q', `refs/heads/${r.fixBranch}`])) === 0) ref = r.fixBranch;
+    if (!ref) throw new Error(`수정본 브랜치 ${r.fixBranch} 를 찾지 못했습니다(원격에도 키트 저장소에도 없음)`);
+    await this.freshWorktree(ex, repo, jobs, wt, ref);
+    await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, ref]);
     try {
       const changed = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim();
       const mods = this.changedModules(project, changed.split(/\r?\n/).map((f) => `M  ${f}`).join('\n'));
       await this.prepareNodeModules(project, ex, wt, L, true);
-      await this.autoMerge(project, ex, gh, id, wt, r.fixBranch, auth, { number: r.fixPrNumber, url: r.fixPrUrl }, `fix: ${orDash(r.fixSummary)} (버그 #${id})`, mods);
+      if (r.fixPrNumber != null) {
+        if (mode === 'merge') await this.autoMerge(project, ex, gh, id, wt, r.fixBranch, auth, { number: r.fixPrNumber, url: r.fixPrUrl }, `fix: ${orDash(r.fixSummary)} (버그 #${id})`, mods);
+        else { await this.updateFix(project, id, { fixStatus: 'PR_OPENED' }); await L('PR 은 이미 있습니다 - 병합은 merge 모드로'); }
+      } else {
+        const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${orDash(r.fixSummary)}\n\n---\n이 PR 은 bugfix-kit 콘솔의 '내보내기' 로 만들었습니다. `;
+        await this.deliver(project, ex, gh, id, wt, r.fixBranch, auth, { summary: orDash(r.fixSummary), prBody, existingPr: null }, mods, mode);
+      }
     } finally {
       await this.removeWorktree(ex, repo, wt);
     }

@@ -6621,10 +6621,11 @@ const Bd = /* @__PURE__ */ ms(Ng, [["render", Fh], ["__scopeId", "data-v-0b6144a
   none: "요청 전",
   QUEUED: "대기 중",
   RUNNING: "AI 가 고치는 중",
+  READY: "수정본 준비 · 아직 내보내지 않음(콘솔에서 PR·병합)",
   PR_OPENED: "PR 올라옴 · 병합 안 됨(로그 확인)",
   MERGED: "병합 완료",
   FAILED: "실패 · 진행 로그 확인"
-}, Eh = { QUEUED: "대기", RUNNING: "수정중", PR_OPENED: "PR", MERGED: "병합", FAILED: "실패" }, Lr = [
+}, Eh = { QUEUED: "대기", RUNNING: "수정중", READY: "준비", PR_OPENED: "PR", MERGED: "병합", FAILED: "실패" }, Lr = [
   { value: "OPEN", label: "접수" },
   { value: "IN_PROGRESS", label: "진행중" },
   { value: "RESOLVED", label: "해결" },
@@ -7781,7 +7782,7 @@ function sd(e, A, t, s, r, n) {
     ], 32)) : F("", !0)
   ]);
 }
-const ld = /* @__PURE__ */ ms(mh, [["render", sd], ["__scopeId", "data-v-fa8495fd"]]);
+const ld = /* @__PURE__ */ ms(mh, [["render", sd], ["__scopeId", "data-v-e3220c88"]]);
 export {
   Bd as ReportModal,
   ld as Viewer,

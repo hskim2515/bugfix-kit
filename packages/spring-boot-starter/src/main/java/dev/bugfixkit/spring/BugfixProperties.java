@@ -37,6 +37,8 @@ public class BugfixProperties {
     private List<String> cors = new ArrayList<>();
     private List<String> protectedPaths = new ArrayList<>();
     private boolean autoMerge = true;
+    /** 수정본 내보내기: local(키트 저장소 보관만) · branch(원격 푸시) · pr(푸시+PR) · merge(푸시+PR+자동 병합). 비우면 autoMerge 로 결정 */
+    private String delivery = "";
     private String dataDir = "";
     private String adminKey = "";
 
@@ -92,6 +94,8 @@ public class BugfixProperties {
     public void setProtectedPaths(List<String> protectedPaths) { this.protectedPaths = protectedPaths; }
     public boolean isAutoMerge() { return autoMerge; }
     public void setAutoMerge(boolean autoMerge) { this.autoMerge = autoMerge; }
+    public String getDelivery() { return delivery; }
+    public void setDelivery(String delivery) { this.delivery = delivery; }
     public String getDataDir() { return dataDir; }
     public void setDataDir(String dataDir) { this.dataDir = dataDir; }
     public String getAdminKey() { return adminKey; }
