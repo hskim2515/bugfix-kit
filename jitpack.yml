@@ -1,0 +1,4 @@
+jdk:
+  - openjdk17
+install:
+  - ./gradlew clean :spring-boot-starter:publishToMavenLocal -x test --no-daemon

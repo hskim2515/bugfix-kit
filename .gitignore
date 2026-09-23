@@ -1,6 +1,9 @@
-node_modules/
-data/
 *.log
 .DS_Store
+.gradle/
 bugfix-kit.yml
+build/
+data/
+node_modules/
 packages/server/bugfix-kit.yml
+packages/spring-boot-starter/build/

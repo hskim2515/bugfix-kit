@@ -1,0 +1,5 @@
+// bugfix-kit 의 Java 쪽(스프링 스타터). JitPack 이 저장소 루트의 Gradle 을 빌드한다:
+//   implementation 'com.github.hskim2515.bugfix-kit:spring-boot-starter:v0.1.54'   (repositories 에 https://jitpack.io)
+rootProject.name = 'bugfix-kit'
+include ':spring-boot-starter'
+project(':spring-boot-starter').projectDir = file('packages/spring-boot-starter')

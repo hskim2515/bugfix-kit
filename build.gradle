@@ -1,0 +1,2 @@
+// 루트는 모듈 묶음만. 실제 빌드 설정은 packages/spring-boot-starter/build.gradle
+allprojects { group = 'com.github.hskim2515.bugfix-kit' }

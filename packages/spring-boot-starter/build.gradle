@@ -1,0 +1,32 @@
+// bugfix-kit Spring Boot 스타터 - 의존성 한 줄로: 최근 로그 끝점 + /bugfix/** 프록시 + (Node 가 있으면) bugfix-kit 워커를 자식 프로세스로.
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+group = 'com.github.hskim2515.bugfix-kit'
+version = (findProperty('kitVersion') ?: new groovy.json.JsonSlurper().parse(file('../../package.json')).version)
+
+java { withSourcesJar() }
+// JDK 17 이상 어느 것으로 빌드해도 17 바이트코드로 (툴체인 강제 안 함 - JitPack 은 openjdk17)
+tasks.withType(JavaCompile).configureEach { options.release = 17 }
+repositories { mavenCentral() }
+
+// 컴파일에만 Boot 3.4 를 쓰고 앱의 Boot 버전(3.x·4.x)에 따라간다 - 안정적인 API(AutoConfiguration·ConfigurationProperties·RestController·SmartLifecycle)만 쓴다
+def bootVersion = '3.4.5'
+dependencies {
+    compileOnly "org.springframework.boot:spring-boot-autoconfigure:${bootVersion}"
+    compileOnly "org.springframework.boot:spring-boot:${bootVersion}"
+    compileOnly "org.springframework:spring-webmvc:6.2.6"
+    compileOnly "org.springframework:spring-context:6.2.6"
+    compileOnly "jakarta.servlet:jakarta.servlet-api:6.0.0"
+    compileOnly "ch.qos.logback:logback-classic:1.5.18"
+    compileOnly "org.springframework.security:spring-security-config:6.4.5"
+    compileOnly "org.springframework.security:spring-security-web:6.4.5"
+    compileOnly "com.fasterxml.jackson.core:jackson-databind:2.18.3"
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+processResources { filesMatching('bugfix-kit.properties') { expand(version: project.version) } }
+
+publishing {
+    publications { maven(MavenPublication) { from components.java; artifactId = 'spring-boot-starter' } }
+}
