@@ -66,7 +66,8 @@
               <div class="screenshot-wrap" :class="{ 'screenshot-wrap--editable': screenshotUrl }"
                 title="클릭해서 그리기·표시" @click="screenshotUrl && (isEditingShot = true)">
                 <img v-if="screenshotUrl" :src="screenshotUrl" class="screenshot-img" alt="screenshot" />
-                <div v-else class="screenshot-placeholder">캡처 중...</div>
+                <div v-else-if="isCapturing" class="screenshot-placeholder">캡처 중...</div>
+                <div v-else class="screenshot-placeholder">화면 캡처를 못 했습니다 - 스크린샷 없이 저장하거나, 이미지를 붙여넣기(Ctrl+V)·불러오기로 넣을 수 있습니다</div>
               </div>
               <div class="screenshot-hint">이미지를 붙여넣기(Ctrl+V)해도 캡처 대신 쓸 수 있습니다.</div>
             </div>
@@ -397,11 +398,11 @@
             </svg>
             {{ copyStatus }}
           </button>
-          <button v-if="serverEnabled" class="bug-btn-save" @click="saveToServer" :disabled="isSaving || !screenshotUrl">
+          <button v-if="serverEnabled" class="bug-btn-save" @click="saveToServer" :disabled="isSaving || isCapturing">
             <span v-if="isSaving" class="bug-capture-spin" style="width:11px;height:11px;border-width:2px;"></span>
             {{ saveStatus }}
           </button>
-          <button class="bug-btn-download" @click="download" :disabled="!screenshotUrl">
+          <button class="bug-btn-download" @click="download" :disabled="isCapturing">
             다운로드
           </button>
         </div>
@@ -736,10 +737,12 @@ export default {
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const severityTag = this.severity.toLowerCase();
 
-      const imgLink = document.createElement('a');
-      imgLink.href = this.screenshotUrl;
-      imgLink.download = `bug-screenshot_${severityTag}_${ts}.png`;
-      imgLink.click();
+      if (this.screenshotUrl) {
+        const imgLink = document.createElement('a');
+        imgLink.href = this.screenshotUrl;
+        imgLink.download = `bug-screenshot_${severityTag}_${ts}.png`;
+        imgLink.click();
+      }
 
       const report = this.buildReport();
       const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });

@@ -1,4 +1,5 @@
-import html2canvas from 'html2canvas';
+// html2canvas-pro: 원본 html2canvas 는 최신 CSS 색 함수(color()·oklch·lab)를 못 읽어 antd 등 요즘 UI 에서 통째로 실패한다
+import html2canvas from 'html2canvas-pro';
 
 /**
  * 화면 캡처 - WebGL 캔버스(Cesium·Three 등, preserveDrawingBuffer 필요)와 DOM UI 를 합성한 PNG dataURL.
@@ -17,20 +18,30 @@ export async function captureScreen(opt = {}) {
   const canvasSet = new Set(canvases);
   const ignore = opt.ignore || [];
 
-  const ui = await html2canvas(document.body, {
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: null,
-    scale: 1,
-    width: w,
-    height: h,
-    ignoreElements: (el) => {
-      if (canvasSet.has(el)) return true;
-      if (el.tagName && el.tagName.toLowerCase().startsWith('bugfix-')) return true;   // 우리 UI 자체
-      if (opt.ignoreElement?.(el)) return true;
-      return ignore.some((sel) => { try { return el.matches?.(sel); } catch { return false; } });
-    },
-  });
+  // DOM 렌더가 실패하거나(지원 안 되는 CSS 등) 너무 오래 걸리면 캔버스 배경만으로라도 만든다 - 신고가 막히면 안 된다
+  let ui = null;
+  try {
+    ui = await Promise.race([
+      html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        scale: 1,
+        width: w,
+        height: h,
+        ignoreElements: (el) => {
+          if (canvasSet.has(el)) return true;
+          if (el.tagName && el.tagName.toLowerCase().startsWith('bugfix-')) return true;   // 우리 UI 자체
+          if (opt.ignoreElement?.(el)) return true;
+          return ignore.some((sel) => { try { return el.matches?.(sel); } catch { return false; } });
+        },
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('화면 렌더 시간 초과(15초)')), opt.timeoutMs || 15000)),
+    ]);
+  } catch (e) {
+    console.warn('[BugReport] 화면 UI 렌더 실패 - 캔버스 배경만 저장:', e?.message || e);
+    if (!bgImages.length) throw e;
+  }
 
   const composite = document.createElement('canvas');
   composite.width = w; composite.height = h;
@@ -43,6 +54,6 @@ export async function captureScreen(opt = {}) {
       img.src = src;
     });
   }
-  ctx.drawImage(ui, 0, 0);
+  if (ui) ctx.drawImage(ui, 0, 0);
   return composite.toDataURL('image/png');
 }
