@@ -1,6 +1,6 @@
 {
   "name": "@bugfix-kit/vite",
-  "version": "0.1.54",
+  "version": "0.1.55",
   "private": true,
   "type": "module",
   "description": "bugfix-kit Vite 플러그인 - 플러그인 한 줄로 SDK 자동 마운트·개발 프록시·/bugfix 안내 페이지",

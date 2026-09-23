@@ -1,4 +1,5 @@
 jdk:
   - openjdk17
 install:
-  - ./gradlew clean :spring-boot-starter:publishToMavenLocal -x test --no-daemon
+  # JitPack 은 아티팩트 버전이 태그와 같아야 찾는다 - 태그($VERSION)를 그대로 버전으로
+  - ./gradlew clean :spring-boot-starter:publishToMavenLocal -x test --no-daemon -PkitVersion=$VERSION

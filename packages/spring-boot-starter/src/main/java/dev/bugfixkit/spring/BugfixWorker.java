@@ -149,7 +149,7 @@ public class BugfixWorker implements SmartLifecycle {
 
     /** bugfix-kit 설치(같은 버전이 있으면 건너뜀) → bin/bugfix-server.mjs 경로 */
     private Path ensureKit(String node, Path dataDir) throws IOException, InterruptedException {
-        String version = props.getWorker().getKitVersion().isBlank() ? "v" + starterVersion : props.getWorker().getKitVersion();
+        String version = props.getWorker().getKitVersion().isBlank() ? (starterVersion.startsWith("v") ? starterVersion : "v" + starterVersion) : props.getWorker().getKitVersion();
         Path kitDir = dataDir.resolve("kit");
         Path pkgJson = kitDir.resolve("node_modules/bugfix-kit/package.json");
         Path bin = kitDir.resolve("node_modules/bugfix-kit/packages/server/bin/bugfix-server.mjs");
