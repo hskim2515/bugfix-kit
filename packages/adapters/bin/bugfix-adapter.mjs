@@ -12,7 +12,7 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 
 if (kind !== 'spring') {
   console.log(`사용법:
-  npx bugfix-adapter spring --package <자바 패키지> --out <그 패키지 디렉터리> [--base /debug] [--resources src/main/resources] [--proxy /bugfix] [--server http://127.0.0.1:8790]
+  npx bugfix-adapter spring --package <자바 패키지> --out <그 패키지 디렉터리> [--base /debug] [--resources src/main/resources] [--proxy /bugfix] [--server http://127.0.0.1:8790] [--only proxy|logs]
 
   spring: BugfixLogAppender.java + BugfixLogController.java(최근 로그) + BugfixProxyController.java(앱 REST 서버가 /bugfix/** 를
           bugfix-kit 인스턴스로 넘김 - nginx 를 안 건드려도 '<REST 경로>/bugfix' 로 닿는다) 를 --out 에 만들고,
@@ -27,17 +27,19 @@ const out = opt('--out');
 const base = opt('--base', '/debug');
 const resources = opt('--resources', null);
 const proxy = opt('--proxy', '/bugfix');
+const only = opt('--only', null);   // 'proxy' | 'logs' - 이미 한쪽이 있는 앱(예: 자체 로그 끝점)에서 나머지만
 const server = opt('--server', 'http://127.0.0.1:8790');
 if (!pkg || !out) { console.error('--package 와 --out 은 필수'); process.exit(1); }
 fs.mkdirSync(out, { recursive: true });
-for (const f of ['BugfixLogAppender.java', 'BugfixLogController.java', ...(proxy !== 'none' ? ['BugfixProxyController.java'] : [])]) {
+const files = [...(only === 'proxy' ? [] : ['BugfixLogAppender.java', 'BugfixLogController.java']), ...(proxy !== 'none' && only !== 'logs' ? ['BugfixProxyController.java'] : [])];
+for (const f of files) {
   const src = fs.readFileSync(path.join(here, '..', 'spring', f), 'utf8').replaceAll('__PACKAGE__', pkg).replaceAll('__BASE__', base).replaceAll('__PROXY__', proxy);
   const dest = path.join(out, f);
   if (fs.existsSync(dest)) { console.log(`이미 있음(그대로 둠): ${dest}`); continue; }
   fs.writeFileSync(dest, src, 'utf8');
   console.log(`만듦: ${dest}`);
 }
-if (resources) {
+if (resources && only !== 'proxy') {
   const lb = path.join(resources, 'logback-spring.xml');
   if (fs.existsSync(lb)) {
     console.log(`logback-spring.xml 이 이미 있습니다. 아래 두 줄을 넣어 주세요:\n  <appender name="BUGFIX" class="${pkg}.BugfixLogAppender"/>\n  <root> 안에 <appender-ref ref="BUGFIX"/>`);

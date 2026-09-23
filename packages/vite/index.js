@@ -20,6 +20,7 @@ import { loadEnv } from 'vite';
 
 export default function bugfixKit(opts = {}) {
   let resolved = null;
+  if (opts.enabled === false) return { name: 'bugfix-kit(off)' };   // 운영 빌드처럼 키가 없을 때
   return {
     name: 'bugfix-kit',
     config(cfg, { command, mode }) {

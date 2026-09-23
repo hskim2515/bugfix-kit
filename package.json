@@ -31,9 +31,11 @@
       "types": "./packages/client/types/index.d.ts",
       "default": "./packages/client/dist/bugfix-client.auto.js"
     },
-    "./vite": "./packages/vite/index.js"
+    "./vite": "./packages/vite/index.js",
+    "./webpack": "./packages/webpack/index.js",
+    "./webpack/bootstrap.js": "./packages/webpack/bootstrap.js"
   },
-  "version": "0.1.49",
+  "version": "0.1.50",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs",
     "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"
