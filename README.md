@@ -55,7 +55,7 @@ app.use('/bugfix', bugfixKit());          // 신고 API · 콘솔(/bugfix/ui/) �
 ```
 package.json 한 줄 + 이 한 줄. 프로젝트 이름·저장소·브랜치·검증 명령은 package.json 과 git remote 에서 알아서 읽고, 설정은 `.bugfix-data/`(gitignore) 에 둔다.
 그 기계에 git·Claude Code CLI(로그인)·빌드 도구가 있으면 된다. 저장소 토큰은 `BUGFIX_GITHUB_TOKEN` / `GITLAB_TOKEN` 환경변수. 프론트는 아래 ③ 의 플러그인 한 줄(endpoint 는 `/bugfix`).
-Spring 백엔드는 **스타터 한 줄**: `implementation 'com.github.hskim2515:bugfix-kit:v0.1.64'` (JitPack). 최근 로그 끝점·`/bugfix/**` 프록시·보안 허용이 자동으로 붙고, 그 호스트에 Node 가 있으면 bugfix-kit 워커까지 앱과 같이 띄운다([spring-boot-starter](packages/spring-boot-starter)). Node 가 없는 컨테이너 배포는 `bugfix.server` 로 ①② 의 인스턴스를 가리킨다.
+Spring 백엔드는 **스타터 한 줄**: `implementation 'com.github.hskim2515:bugfix-kit:v0.1.65'` (JitPack). 최근 로그 끝점·`/bugfix/**` 프록시·보안 허용이 자동으로 붙고, 그 호스트에 Node 가 있으면 bugfix-kit 워커까지 앱과 같이 띄운다([spring-boot-starter](packages/spring-boot-starter)). Node 가 없는 컨테이너 배포는 `bugfix.server` 로 ①② 의 인스턴스를 가리킨다.
 
 ### ① 서버 켜기 — **앱 하나에 인스턴스 하나**
 
@@ -109,6 +109,11 @@ module.exports = { configureWebpack: { plugins: [bugfixKit({ project: 'myapp', r
 플러그인 없이 직접 붙이려면 `createBugfix(...)`([client](packages/client)).
 
 끝. **Shift+F9** 신고 · **Shift+F10** 목록.
+
+### 버전·미리보기 (AI 수정본을 원격에 올리기 전에 직접 써 보기)
+AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 **버전**(키트 저장소 태그 `bugfix/v{n}`)으로 갖습니다. 프로젝트 `delivery` 로 어디까지 내보낼지 정하고(`local` 보관만 · `branch` · `pr` · `merge`),
+콘솔 **버전** 탭의 레시피(`preview`: 프론트 빌드·백엔드 실행 이미지·DB 복제)를 적으면 버전마다 프론트+백엔드+DB 사본을 띄워 `앱주소/<키트 경로>/v/{project}/{n}/` 로 접속합니다(AI 초안 버튼이 저장소를 읽고 레시피를 만들어 줍니다).
+프론트는 키트가 `BUGFIX_PREVIEW_BASE` 를 주고 빌드하며 vite 플러그인은 `base`, webpack 플러그인은 `publicPath` 를 맞춥니다. Vue CLI 앱은 router 의 `BASE_URL` 때문에 `vue.config.js` 에 `publicPath: process.env.BUGFIX_PREVIEW_BASE || '/'` 한 줄이 필요합니다.
 
 ---
 

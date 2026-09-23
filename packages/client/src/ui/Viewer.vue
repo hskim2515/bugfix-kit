@@ -118,6 +118,15 @@
                   <div v-if="detail.fixPrUrl || detail.fixBranch" class="brv-ai__meta">
                     <a v-if="detail.fixPrUrl" class="brv-link brv-ai__pr" :href="detail.fixPrUrl" target="_blank" rel="noopener">PR #{{ prNumber }}</a>
                     <span v-if="detail.fixBranch" class="brv-ai__branch brv-selectable">{{ detail.fixBranch }}</span>
+                    <template v-if="detail.fixVersion != null">
+                      <span class="brv-ai__branch">v{{ detail.fixVersion }}</span>
+                      <template v-if="detail.preview">
+                        <a v-if="detail.preview.status === 'UP' && detail.preview.url" class="brv-link" :href="detail.preview.url" target="_blank" rel="noopener" title="이 수정본으로 띄운 앱(프론트+백엔드+DB 사본)">미리보기 열기 ↗</a>
+                        <span v-else-if="previewPending" class="brv-ai__hint"><span class="brv-spin brv-spin--sm"></span> 미리보기 준비 중({{ previewLabel }})</span>
+                        <button v-else-if="detail.preview.canPreview && fixable" class="brv-ai__tool" :disabled="fixBusy" @click="startPreview" title="이 수정본으로 프론트·백엔드·DB 사본을 띄워 직접 써 봅니다 (몇 분)">미리보기 띄우기</button>
+                        <span v-if="detail.preview.status === 'FAILED'" class="brv-ai__hint" :title="detail.preview.error || ''">미리보기 실패</span>
+                      </template>
+                    </template>
                   </div>
                   <div v-if="detail.fixSummary" class="brv-ai__summary brv-selectable">{{ detail.fixSummary }}</div>
 
@@ -459,6 +468,8 @@ export default {
     logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
     fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
     // 병합 뒤 배포(GitHub Actions) 추적이 아직 진행 중인가 - 로그에 끝났다는 줄이 없고 갱신이 최근(35분 안)이면
+    previewPending() { return ['QUEUED', 'BUILDING', 'STARTING'].includes(this.detail?.preview?.status); },
+    previewLabel() { return ({ QUEUED: '대기', BUILDING: '빌드', STARTING: '시작' })[this.detail?.preview?.status] || ''; },
     deployPending() {
       if (this.detail?.fixStatus !== 'MERGED') return false;
       const log = this.detail?.fixLog || '';
@@ -609,7 +620,7 @@ export default {
       } finally {
         this.detailLoading = false;
       }
-      if (this.fixInProgress || this.deployPending) this._startFixPolling(); else this._stopFixPolling();
+      if (this.fixInProgress || this.deployPending || this.previewPending) this._startFixPolling(); else this._stopFixPolling();
     },
 
     // 앱의 알림 훅(kit.notify)이 있으면 그쪽으로, 없으면 뷰어 안에 잠깐 표시
@@ -659,6 +670,13 @@ export default {
         this.showNotice('전송 실패', e?.message || '실패했습니다.', 'error');
       } finally { this.fixBusy = false; }
     },
+    async startPreview() {
+      if (!this.detail) return;
+      this.fixBusy = true;
+      try { const r = await this.kit.api.previewStart(this.detail.bugReportId); this.detail = { ...this.detail, ...r }; this._startFixPolling(); }
+      catch (e) { this.showNotice('미리보기 실패', e?.message || '실패했습니다.', 'error'); }
+      finally { this.fixBusy = false; }
+    },
     async refreshDetail() {
       if (!this.detail) return;
       const id = this.detail.bugReportId;
@@ -667,7 +685,7 @@ export default {
         // 진행 중엔 스크린샷·로그 없이 fix_* 만 주는 가벼운 API 로 자주 읽는다
         const r = this.detail.fixPrUrl && ['PR_OPENED', 'FAILED'].includes(this.detail.fixStatus)
           ? await this.kit.api.fixSync(id)
-          : (this.fixInProgress || this.deployPending ? await this.kit.api.fixState(id) : await this.kit.api.get(id));
+          : (this.fixInProgress || this.deployPending || this.previewPending ? await this.kit.api.fixState(id) : await this.kit.api.get(id));
         if (r && this.detail?.bugReportId === id) { this.detail = { ...this.detail, ...r }; this._syncListFix(r); }
       } catch (_) { /* ignore */ }
     },
@@ -680,7 +698,7 @@ export default {
       this._stopFixPolling();
       this.now = Date.now();
       this._fixTimer = setInterval(async () => {
-        if (!this.detail || !(this.fixInProgress || this.deployPending)) { this._stopFixPolling(); return; }
+        if (!this.detail || !(this.fixInProgress || this.deployPending || this.previewPending)) { this._stopFixPolling(); return; }
         if (this._fixPolling) return;              // 앞 요청이 늦으면 겹치지 않게
         this._fixPolling = true;
         try { await this.refreshDetail(); } finally { this._fixPolling = false; }

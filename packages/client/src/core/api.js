@@ -42,6 +42,8 @@ export function createApi({ endpoint, project, apiKey, user, adminKey }) {
     requestFix: (id) => call('POST', `/reports/${id}/request-fix`),
     fixChat: (id, message, mode) => call('POST', `/reports/${id}/fix-chat`, { message, mode }),
     fixSync: (id) => call('POST', `/reports/${id}/fix-sync`),
+    previewStart: (id) => call('POST', `/reports/${id}/preview`),
+    previewStop: (id) => call('DELETE', `/reports/${id}/preview`),
     /** 이 신고와 관련된 지식 그래프 부분 { nodes, edges, available } */
     knowledge: (id) => call('GET', `/reports/${id}/knowledge`),
     /** 스크린샷 → object URL (img src 로 쓰고, 다 쓰면 URL.revokeObjectURL) */

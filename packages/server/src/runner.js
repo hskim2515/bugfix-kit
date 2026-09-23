@@ -599,7 +599,11 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
     } catch (e) { this.log.warn(`[bugfix ${project.name}#${id}] 추천 개선 저장 실패: ${e.message}`); }
   }
 
-  allowedTools(project) { return [...new Set([...DEFAULT_TOOLS, ...(project.allowedTools || [])])]; }
+  /** 기본 도구 + 프로젝트 허용 도구 + 검증 명령의 첫 단어(./gradlew, mvn …) - Claude 가 고친 뒤 스스로 컴파일해 볼 수 있게(승인 요청으로 턴을 낭비하지 않게) */
+  allowedTools(project) {
+    const fromVerify = (project.modules || []).flatMap((m) => m.verify || []).map((c) => String(c).trim().split(/\s+/)[0]).filter((w) => w && !['sh', 'bash', 'sudo', 'docker', 'rm'].includes(w)).map((w) => `Bash(${w}:*)`);
+    return [...new Set([...DEFAULT_TOOLS, ...fromVerify, ...(project.allowedTools || [])])];
+  }
 
   prompt(project, r) {
     const mods = project.modules.length

@@ -190,7 +190,15 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     return r;
   };
 
-  pr.get('/reports/:id', wrap(load));
+  // 이 리포트의 수정본 버전 미리보기 상태(뷰어 표시용)
+  const withPreview = async (req, r) => {
+    if (!versions || !r || r.fixVersion == null) return r;
+    const v = await versions.get(req.project.name, r.fixVersion);
+    return { ...r, preview: v ? { status: v.preview?.status || 'NONE', url: v.preview?.url || null, error: v.preview?.error || null, canPreview: !!versions.recipe(req.project) } : null };
+  };
+  pr.get('/reports/:id', wrap(async (req) => withPreview(req, await load(req))));
+  pr.post('/reports/:id/preview', fixGuard, wrap(async (req) => { const r = await loadFixable(req); if (r.fixVersion == null) throw new HttpError(409, '아직 수정본 버전이 없습니다'); await versions.start(req.project, r.fixVersion); return withPreview(req, FileStore.fixState(await store.get(req.project.name, r.bugReportId))); }));
+  pr.delete('/reports/:id/preview', fixGuard, wrap(async (req) => { const r = await loadFixable(req); if (r.fixVersion == null) throw new HttpError(409, '수정본 버전이 없습니다'); await versions.stop(req.project, r.fixVersion); return withPreview(req, FileStore.fixState(await store.get(req.project.name, r.bugReportId))); }));
   // 이 신고와 관련된 지식 그래프 부분 - AI 가 프롬프트로 받는 것과 같은 선택. 그래프가 없으면 빈 목록
   pr.get('/reports/:id/knowledge', wrap(async (req) => {
     const r = await load(req);
@@ -199,7 +207,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     const { relevantGraph, hintsFromReport } = await import('./knowledge.js');
     return { ...relevantGraph(g, hintsFromReport(r)), available: true };
   }));
-  pr.get('/reports/:id/fix', wrap(async (req) => FileStore.fixState(await load(req))));
+  pr.get('/reports/:id/fix', wrap(async (req) => withPreview(req, FileStore.fixState(await load(req)))));
 
   pr.patch('/reports/:id/status', wrap(async (req, res) => {
     const st = req.body?.status;
