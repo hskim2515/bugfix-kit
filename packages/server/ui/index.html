@@ -113,7 +113,7 @@
 </head>
 <body>
 <header>
-  <h1>bugfix-kit</h1>
+  <h1 id="brand">bugfix-kit</h1>
   <span class="sub" id="meta">관리</span>
   <nav class="tabs" id="tabs">
     <button data-t="reports" class="on">리포트</button>
@@ -283,6 +283,8 @@
   const $ = (s) => document.querySelector(s);
   const KEY = 'bugfix-admin-key';
   let key = localStorage.getItem(KEY) || '';
+  // 한 서버가 여러 앱을 들 수 있다 - 콘솔을 연 주소(앱 도메인)가 어느 프로젝트의 cors 에 있으면 그 프로젝트만 보인다(헤더·제목·파비콘도 그 이름)
+  let scope = null, scopeReady = false;
   let data = null, settings = null, filter = 'all', q = '', kit = null, tab = 'reports', editing = null, secretProject = '';
 
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -303,11 +305,30 @@
     if (!key) return showLogin();
     try {
       data = await api('GET', '/admin/overview');
+      if (!scopeReady) await resolveScope(data.projects);
+      if (scope) data.projects = data.projects.filter((p) => p.name === scope);
       ensureKit(); renderReports();
       $('#login').hidden = true; $('#app').hidden = false;
       if (!quick) loadChecklist();
       $('#tick').textContent = `갱신 ${new Date().toLocaleTimeString()}`;
     } catch (e) { $('#tick').textContent = `연결 실패: ${e.message}`; }
+  }
+  async function resolveScope(projects) {
+    scopeReady = true;
+    let list = projects;
+    if (!list.some((p) => Array.isArray(p.cors))) { try { list = (await api('GET', '/admin/settings')).projects; } catch { list = projects; } }
+    const origin = location.origin.replace(/\/$/, '');
+    const hit = list.filter((p) => (p.cors || []).some((o) => String(o).replace(/\/$/, '') === origin));
+    scope = hit.length === 1 ? hit[0].name : null;
+    const name = scope || 'bugfix-kit';
+    $('#brand').innerHTML = scope ? `${esc(scope)} <span class="dim" style="font-weight:400;font-size:12px">bugfix-kit</span>` : 'bugfix-kit';
+    document.title = scope ? `${scope} · bugfix-kit` : 'bugfix-kit 관리';
+    // 파비콘: 프로젝트 이름 첫 글자 + 이름에서 뽑은 색 - 탭이 여럿 열려 있어도 어느 프로젝트인지 보이게
+    let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const hue = h % 360;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="hsl(${hue} 55% 42%)"/><text x="16" y="22" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="700" fill="#fff">${esc(name[0].toUpperCase())}</text></svg>`;
+    let link = document.querySelector('link[rel="icon"]'); if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.type = 'image/svg+xml'; link.href = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
   function ensureKit() {
     if (kit) return;
@@ -619,7 +640,7 @@
   }
 
   // ── 설정 공통 ──
-  async function loadSettings() { settings = await api('GET', '/admin/settings'); renderProjects(); renderSecrets(); renderServer(); renderChecks(); }
+  async function loadSettings() { settings = await api('GET', '/admin/settings'); if (scope) settings.projects = settings.projects.filter((p) => p.name === scope); renderProjects(); renderSecrets(); renderServer(); renderChecks(); }
   const lines = (s) => String(s || '').split('\n').map((x) => x.trim()).filter(Boolean);
   const csv = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
 

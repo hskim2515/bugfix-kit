@@ -74,7 +74,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
           if (!running || r.fixStatus === 'RUNNING') running = { project: p.name, bugReportId: r.bugReportId, fixStatus: r.fixStatus, problem: r.problem, logTail: tail, fixRequestedAt: full?.fixRequestedAt };
         }
       }
-      projects.push({ name: p.name, apiKey: p.apiKey || '', githubRepo: p.githubRepo, baseBranch: p.baseBranch, autoMerge: p.autoMerge, counts, reports: list.map((r) => ({ ...r, fixPrNumber: undefined })) });
+      projects.push({ name: p.name, apiKey: p.apiKey || '', githubRepo: p.githubRepo, baseBranch: p.baseBranch, autoMerge: p.autoMerge, cors: p.cors || [], host: p.host, counts, reports: list.map((r) => ({ ...r, fixPrNumber: undefined })) });
     }
     return { projects, running, queue: runner.pending, now: new Date().toISOString() };
   }));
