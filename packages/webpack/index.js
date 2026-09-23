@@ -36,6 +36,9 @@ class BugfixKitWebpackPlugin {
     if (!project) { try { project = JSON.parse(fs.readFileSync(path.join(compiler.context, 'package.json'), 'utf8')).name; } catch { project = 'app'; } }
     const auto = { endpoint, project, apiKey: key, restBase };
     const { webpack } = compiler;
+    // 버전 미리보기 빌드: 키트가 BUGFIX_PREVIEW_BASE=/…/v/{project}/{n}/ 를 주면 그 경로 아래에서 돌게 publicPath 를 맞춘다
+    // (Vue CLI 는 router 의 BASE_URL 도 publicPath 에서 오므로 vue.config.js 에 `publicPath: process.env.BUGFIX_PREVIEW_BASE || '/'` 한 줄이 필요)
+    if (env.BUGFIX_PREVIEW_BASE) compiler.options.output.publicPath = env.BUGFIX_PREVIEW_BASE;
 
     // 자동 마운트 값은 DefinePlugin 으로, 모듈은 EntryPlugin 으로 앱 엔트리 뒤에
     new webpack.DefinePlugin({ __BUGFIX_AUTO__: JSON.stringify(auto) }).apply(compiler);

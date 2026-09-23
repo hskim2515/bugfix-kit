@@ -34,9 +34,12 @@ export default function bugfixKit(opts = {}) {
       let project = opts.project || env.VITE_BUGFIX_PROJECT;
       if (!project) { try { project = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).name; } catch { project = 'app'; } }
       resolved = { endpoint, project, apiKey: opts.apiKey || env.VITE_BUGFIX_KEY || '', restBase, server, isServe };
+      // 버전 미리보기 빌드: 키트가 BUGFIX_PREVIEW_BASE=/…/v/{project}/{n}/ 를 주면 그 경로 아래에서 돌게 base 를 맞춘다
+      const previewBase = process.env.BUGFIX_PREVIEW_BASE || env.BUGFIX_PREVIEW_BASE;
+      const extra = previewBase ? { base: previewBase } : {};
       // 개발 서버: /bugfix → 인스턴스 (앱 백엔드를 안 거치므로 로컬에서도 바로 된다)
-      if (isServe && server) return { server: { proxy: { '/bugfix': { target: server, changeOrigin: true, rewrite: (p) => p.replace(/^\/bugfix/, '/api') } } } };
-      return {};
+      if (isServe && server) return { ...extra, server: { proxy: { '/bugfix': { target: server, changeOrigin: true, rewrite: (p) => p.replace(/^\/bugfix/, '/api') } } } };
+      return extra;
     },
     // 'pre': Vite 가 index.html 을 번들하기 전에 넣어야 이 인라인 모듈도 같이 번들된다(뒤에 넣으면 import 가 그대로 남아 브라우저가 못 푼다)
     transformIndexHtml: {

@@ -305,6 +305,17 @@ export class Runner {
     const L = (s) => this.logLine(project, id, s);
     const base = project.baseBranch;
     const mode = modeOverride || project.delivery || 'merge';
+    // 어느 모드든 커밋된 소스 상태는 키트가 버전으로 갖는다(태그 bugfix/v{n}) - 콘솔 '버전' 탭에서 미리보기·diff·내보내기
+    if (this.versions) {
+      try {
+        const sha = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
+        const baseSha = (await ex.execOut(wt, 1, ['git', 'merge-base', 'HEAD', `origin/${base}`])).trim() || (await ex.execOut(wt, 1, ['git', 'rev-parse', `origin/${base}`])).trim();
+        const files = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `${baseSha}..HEAD`])).trim().split(/\r?\n/).filter(Boolean);
+        const n = await this.versions.record(project, { reportId: id, branch, sha, base: baseSha, summary, files });
+        await this.updateFix(project, id, { fixVersion: n });
+        await L(`버전 v${n} 기록 (${sha.slice(0, 8)}) - 콘솔 '버전' 탭에서 미리보기·diff`);
+      } catch (e) { await L(`버전 기록 실패(계속): ${firstLine(e.message, 150)}`); }
+    }
     if (mode === 'local') {
       await this.updateFix(project, id, { fixStatus: 'READY', fixPushed: false });
       await L(`✓ 수정본 보관: 브랜치 ${branch} (키트 저장소 안에만 - 콘솔에서 '내보내기' 로 푸시·PR·병합)`);

@@ -4,6 +4,7 @@ import { Runner } from './runner.js';
 import { createApi } from './api.js';
 import { Insights } from './insights.js';
 import { Knowledge } from './knowledge.js';
+import { Versions } from './versions.js';
 
 export const defaultLog = {
   info: (...a) => console.log(new Date().toISOString(), ...a),
@@ -36,9 +37,11 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
   const runner = new Runner(cfg, store, log);
   const insights = new Insights(cfg, store, runner, log);
   const knowledge = new Knowledge(cfg, store, runner, log);
+  const versions = new Versions(cfg, store, runner, log);
   runner.knowledge = knowledge;
+  runner.versions = versions;
   insights.knowledge = knowledge;
-  const router = createApi(cfg, store, runner, log, insights, knowledge);
+  const router = createApi(cfg, store, runner, log, insights, knowledge, versions);
 
   /** 재시작으로 끊긴 작업을 다시 큐에 넣고 예약을 시작한다 */
   async function start() {
@@ -53,10 +56,12 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
     runner.resumeDeployWatch().catch((e) => log.warn('[bugfix] 배포 추적 재개 실패:', e.message));
     await insights.resetInterrupted();
     await knowledge.resetInterrupted();
+    await versions.resetInterrupted().catch((e) => log.warn('[preview] 상태 정리 실패:', e.message));
     insights.startSchedules();
     knowledge.startSchedules();
+    versions.startSweeper();
     if (!cfg.githubToken(Object.values(cfg.projects)[0])) log.warn('[bugfix] 저장소 토큰이 없습니다 - 리포트 저장은 되지만 자동 수정은 거부됩니다');
   }
-  function stop() { insights.stopSchedules(); knowledge.stopSchedules(); }
-  return { cfg, store, runner, insights, knowledge, router, log, start, stop };
+  function stop() { insights.stopSchedules(); knowledge.stopSchedules(); versions.stopSweeper(); }
+  return { cfg, store, runner, insights, knowledge, versions, router, log, start, stop };
 }
