@@ -14,7 +14,7 @@ import java.util.List;
 public class BugfixLogController {
 
     @GetMapping("${bugfix.logs-path:/debug/recent-logs}")
-    public List<BugfixLogAppender.Entry> recentLogs(@RequestParam(defaultValue = "WARN") String level, @RequestParam(defaultValue = "200") int limit) {
+    public List<BugfixLogAppender.Entry> recentLogs(@RequestParam(name = "level", defaultValue = "WARN") String level, @RequestParam(name = "limit", defaultValue = "200") int limit) {
         return BugfixLogAppender.recent(level, Math.min(Math.max(limit, 1), 500));
     }
 }

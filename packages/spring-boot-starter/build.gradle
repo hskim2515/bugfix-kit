@@ -8,7 +8,7 @@ version = (findProperty('kitVersion') ?: new groovy.json.JsonSlurper().parse(fil
 
 java { withSourcesJar() }
 // JDK 17 이상 어느 것으로 빌드해도 17 바이트코드로 (툴체인 강제 안 함 - JitPack 은 openjdk17)
-tasks.withType(JavaCompile).configureEach { options.release = 17 }
+tasks.withType(JavaCompile).configureEach { options.release = 17; options.compilerArgs << '-parameters' }   // Spring 6.1+ 는 파라미터 이름이 필요
 repositories { mavenCentral() }
 
 // 컴파일에만 Boot 3.4 를 쓰고 앱의 Boot 버전(3.x·4.x)에 따라간다 - 안정적인 API(AutoConfiguration·ConfigurationProperties·RestController·SmartLifecycle)만 쓴다

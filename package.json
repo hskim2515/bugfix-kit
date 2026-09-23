@@ -36,7 +36,7 @@
     "./webpack/bootstrap.js": "./packages/webpack/bootstrap.js",
     "./embed": "./packages/server/src/embed.js"
   },
-  "version": "0.1.55",
+  "version": "0.1.56",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs",
     "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"
