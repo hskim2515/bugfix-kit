@@ -80,7 +80,7 @@ export function loadConfig(file) {
       return { name: m.name || m.match.replace(/\/$/, ''), dir: m.dir || m.match.replace(/\/$/, ''), verify: [], nodeModulesCache: false, prebuild: [], ...m };
     });
   }
-  if (Object.keys(projects).length === 0) throw new Error('projects 가 비어 있습니다');
+  if (Object.keys(projects).length === 0) console.warn('[bugfix] projects 가 비어 있습니다 - 콘솔(/api/ui/)의 프로젝트 탭에서 채우세요');
 
   const cfgObj = {
     server,

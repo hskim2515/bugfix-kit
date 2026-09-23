@@ -26,8 +26,7 @@ cd ~/bugfix-kit && npm install
 cp packages/server/bugfix-kit.example.yml packages/server/bugfix-kit.yml   # 프로젝트 설정
 mkdir -p ~/.config/bugfix-kit && (umask 077; echo ghp_xxx > ~/.config/bugfix-kit/github-token)
 claude login                                                           # 실행 계정으로 한 번
-cp packages/server/deploy/bugfix-server.service ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now bugfix-server && loginctl enable-linger $USER
+packages/server/deploy/new-instance.sh myapp 8790     # 앱마다 인스턴스(bugfix-server@myapp, 설정 ~/.config/bugfix-kit/myapp/bugfix-kit.yml)
 curl -s localhost:8790/api/health
 ```
 

@@ -47,18 +47,20 @@ flowchart LR
     S["① 서버 켜기<br/>(한 번만, 5분)"] --> K["② 콘솔에서 설정<br/>키 넣고 · 프로젝트 추가 · 점검"] --> A["③ 앱에 두 줄<br/>SDK 설치"]
 ```
 
-### ① 서버 켜기
+### ① 서버 켜기 — **앱 하나에 인스턴스 하나**
+
+코드는 한 번만 받고, 앱마다 인스턴스(포트·데이터·콘솔이 따로)를 띄웁니다. 같은 개발서버에 앱이 여럿이면 인스턴스를 그만큼.
 
 ```bash
-git clone https://github.com/hskim2515/bugfix-kit.git ~/bugfix-kit && cd ~/bugfix-kit && npm install
-cp packages/server/bugfix-kit.example.yml packages/server/bugfix-kit.yml
+git clone https://github.com/hskim2515/bugfix-kit.git ~/bugfix-kit && cd ~/bugfix-kit && npm install   # 처음 한 번
 mkdir -p ~/.config/bugfix-kit && (umask 077; echo "ADMIN_KEY=$(openssl rand -hex 16)" > ~/.config/bugfix-kit/default.env)
 claude login                                                   # 터미널에서 한 번
 docker pull mcr.microsoft.com/playwright:v1.47.2-jammy
-cp packages/server/deploy/bugfix-server.service ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now bugfix-server && loginctl enable-linger $USER
+loginctl enable-linger $USER
+packages/server/deploy/new-instance.sh myapp 8790              # 앱마다: 이름·포트 → bugfix-server@myapp
 ```
-nginx: `location ^~ /bugfix/ { proxy_pass http://127.0.0.1:8790/api/; client_max_body_size 60m; }`
+앱 nginx: `location ^~ /bugfix/ { proxy_pass http://127.0.0.1:8790/api/; client_max_body_size 60m; }` (인스턴스 포트로)
+갱신: `packages/server/deploy/update.sh` 가 코드를 받고 인스턴스마다 큐가 비면 재시작합니다.
 
 ### ② 관리 콘솔 `https://앱주소/bugfix/ui/`
 
@@ -116,7 +118,7 @@ flowchart LR
 | 운영 서버에 영향은? | 없음. 개발 저장소·브랜치만 건드리고, front-check 는 운영 주소 요청을 차단 가능 |
 | 개인정보는? | 신고자·문제 원문은 PR 에 안 들어감. 인증값 마스킹, AI 에겐 추린 로그만 |
 | 서버를 재시작하면? | 끊긴 작업은 재시작 뒤 자동으로 다시 큐에 들어감(PR 을 올린 뒤면 그대로). 앱 서버 재배포와는 무관 |
-| 프론트/백엔드 저장소가 다르면? | 프로젝트 두 개로 등록하고 신고할 때 대상 선택 |
+| 앱이 여럿이면? | 앱마다 인스턴스(`new-instance.sh 이름 포트`). 콘솔·데이터·큐가 완전히 따로. 프론트/백엔드 저장소가 나뉜 한 앱은 한 인스턴스에 프로젝트 두 개로 등록해도 됨 |
 | 지식 그래프는 언제 갱신되나요? | 처음 연결될 때 자동 구축, 수정이 병합될 때마다 바뀐 파일만 갱신, 그리고 `knowledge.schedule: "04:00"` 같은 예약. 콘솔 지식 탭에서 검색·수동 갱신 |
 | 화면 확인 스크린샷은 어디에? | 수정 뒤 front-check 가 찍은 것은 그 리포트의 AI 자동 수정 칸에, 제안 분석 때 찍은 것은 제안 탭 위에. 서버 `{dataDir}/{project}/shots/` 에 최근 회차만 보관 |
 

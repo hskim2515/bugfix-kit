@@ -28,7 +28,7 @@
     "./front-check": "./packages/front-check/src/index.js",
     "./adapters/express": "./packages/adapters/express.js"
   },
-  "version": "0.1.44",
+  "version": "0.1.45",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs",
     "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"

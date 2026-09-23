@@ -1,0 +1,20 @@
+# 앱 하나 = bugfix-kit 인스턴스 하나. 인스턴스 이름(%i)마다 설정 ~/.config/bugfix-kit/<이름>/bugfix-kit.yml 을 읽는다.
+# 같은 개발서버에 앱이 여럿이면 인스턴스를 그만큼 띄운다(포트·데이터·콘솔이 각각). 만들기: deploy/new-instance.sh <이름> <포트>
+#   systemctl --user enable --now bugfix-server@myapp
+#   journalctl --user -u bugfix-server@myapp -f
+[Unit]
+Description=bugfix-kit server for %i (bug report API + Claude Code auto-fix)
+After=network.target
+
+[Service]
+WorkingDirectory=%h/bugfix-kit/packages/server
+Environment=BUGFIX_CONFIG=%h/.config/bugfix-kit/%i/bugfix-kit.yml
+# nvm 등 로그인 셸의 PATH 를 그대로 쓰기 위해 bash -lc 로 띄운다
+ExecStart=/bin/bash -lc 'exec node bin/bugfix-server.mjs'
+Restart=on-failure
+RestartSec=5
+# 진행 중이던 Claude 작업이 잘리지 않게 여유 있게 기다린다
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target
