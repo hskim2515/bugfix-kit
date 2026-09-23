@@ -111,6 +111,7 @@ flowchart LR
 
 | 질문 | 답 |
 |---|---|
+| 앱 nginx 를 꼭 고쳐야 하나요? | 아니요. 백엔드 어댑터가 `/bugfix/**` 프록시 라우트도 만들어 주므로(Spring·Express) 앱의 REST 경로 뒤에 `/bugfix` 를 붙여 닿습니다(예: `/rest/bugfix`). nginx 한 줄로 `/bugfix` 를 바로 넘기는 것도 됩니다 |
 | 백엔드 로그도 신고에 붙나요? | 네. 앱에 최근 로그 끝점 하나만 있으면 됩니다: Spring 은 `npx bugfix-adapter spring …`, Express 는 `bugfix-kit/adapters/express` ([adapters](packages/adapters)) |
 | GitHub 가 아니어도 되나요? | GitLab(셀프호스팅 포함)도 됩니다. 저장소 주소만 적으면 자동 판별, 토큰은 프로젝트 env 의 `GITLAB_TOKEN` (api·write_repository) |
 | 백엔드도 고치나요? | 네, 같은 저장소면 프론트·백엔드 다. 백엔드 검증은 컴파일·테스트까지 |

@@ -35,3 +35,25 @@ export function bugfixLogs({ max = 500, capture = true } = {}) {
 }
 
 function safeJson(v) { try { return JSON.stringify(v); } catch { return String(v); } }
+
+/**
+ * 앱 서버가 `/bugfix/*` 를 bugfix-kit 인스턴스로 넘긴다 - nginx 없이 '앱 주소/bugfix' 로 신고 서버·콘솔에 닿는다.
+ *   app.use('/bugfix', bugfixProxy('http://127.0.0.1:8790'));
+ * 본문(스크린샷 포함, 수 MB)을 그대로 흘려보내므로 body-parser 보다 앞에 두는 것이 좋다.
+ */
+export function bugfixProxy(server) {
+  const base = String(server).replace(/\/+$/, '') + '/api';
+  return async (req, res) => {
+    const http = await import(base.startsWith('https') ? 'node:https' : 'node:http');
+    const t = new URL(base + (req.url.startsWith('/') ? req.url : '/' + req.url));
+    const headers = { ...req.headers, host: t.host, 'x-forwarded-for': req.socket?.remoteAddress || '', 'x-forwarded-proto': req.protocol || 'http' };
+    delete headers['content-length']; delete headers.connection;
+    const up = http.request({ protocol: t.protocol, hostname: t.hostname, port: t.port, path: t.pathname + t.search, method: req.method, headers }, (ur) => {
+      res.writeHead(ur.statusCode || 502, ur.headers);
+      ur.pipe(res);
+    });
+    up.on('error', (e) => { if (!res.headersSent) res.writeHead(502); res.end(`bugfix proxy error: ${e.message}`); });
+    if (req.readableEnded || req.complete) { if (req.body != null) up.end(typeof req.body === 'string' || Buffer.isBuffer(req.body) ? req.body : JSON.stringify(req.body)); else up.end(); }
+    else req.pipe(up);
+  };
+}
