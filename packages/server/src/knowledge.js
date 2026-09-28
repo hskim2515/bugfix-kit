@@ -59,7 +59,8 @@ export class Knowledge {
     const s = await this.state(project);
     const byType = {};
     for (const n of s.nodes || []) byType[n.type] = (byType[n.type] || 0) + 1;
-    return { status: s.status, log: s.log || '', head: s.head, builtAt: s.builtAt, updatedAt: s.updatedAt, nodes: (s.nodes || []).length, edges: (s.edges || []).length, byType, lastScheduledDate: s.lastScheduledDate, pendingUpdate: s.pendingUpdate || null };
+    return { status: s.status, log: s.log || '', head: s.head, builtAt: s.builtAt, updatedAt: s.updatedAt, nodes: (s.nodes || []).length, edges: (s.edges || []).length, byType, lastScheduledDate: s.lastScheduledDate, pendingUpdate: s.pendingUpdate || null,
+      remoteHead: s.remoteHead || null, remoteSeenAt: s.remoteSeenAt || null, lastWatchAt: s.lastWatchAt || null, remotePending: s.remotePending || null, behind: !!(s.nodes?.length && s.head && s.remoteHead && s.head !== s.remoteHead) };
   }
 
   async resetInterrupted() {
@@ -219,6 +220,35 @@ ${schema}`;
   }
 
   // ── 예약: 매일 HH:MM 갱신 + 그래프가 없는 프로젝트는 자동 구축 ──
+  /**
+   * 원격 base 브랜치 head 를 watchMinutes 마다 확인(git ls-remote, 복제 불필요). 그래프가 만들어진 head 와 다르면 갱신을 예약한다.
+   * 잦은 푸시에 매번 Claude 를 돌리지 않게 자동 갱신 사이에는 minGapMinutes(기본 60) 를 둔다. knowledge.watchMinutes=0 이면 끔.
+   */
+  async watchRemote(project, st, now = new Date()) {
+    const every = Number(project.knowledge?.watchMinutes ?? this.cfg.server.knowledgeWatchMinutes ?? 10);
+    if (!(every > 0)) return st;
+    if (st.lastWatchAt && Date.parse(st.lastWatchAt) > now.getTime() - every * 60_000) return st;
+    const ex = this.runner.ex(project);
+    const gh = this.runner.gh(project);
+    // 토큰이 없으면(공개 저장소) 헤더 없이 - 빈 자격 증명 헤더는 git 이 사용자 이름을 묻다 실패한다
+    const auth = this.cfg.githubToken(project) ? ['-c', `http.extraheader=${gh.gitAuthHeader()}`] : [];
+    const out = await ex.execOut(this.cfg.server.workDir, 1, ['git', ...auth, '-c', 'credential.helper=', 'ls-remote', project.repo, `refs/heads/${project.baseBranch}`]);
+    const remoteHead = (out.trim().split(/\s+/)[0] || '').trim();
+    if (!/^[0-9a-f]{40}$/.test(remoteHead)) throw new Error(`ls-remote 응답을 읽지 못했습니다: ${out.trim().slice(0, 80)}`);
+    const patch = { lastWatchAt: now.toISOString(), remoteHead, remoteSeenAt: st.remoteHead === remoteHead ? (st.remoteSeenAt || now.toISOString()) : now.toISOString() };
+    st = await this.save(project.name, patch);
+    const behind = st.nodes?.length && st.head && st.head !== remoteHead;
+    if (!behind) return st;
+    const gap = Number(project.knowledge?.minGapMinutes ?? this.cfg.server.knowledgeMinGapMinutes ?? 60);
+    const lastAuto = st.lastAutoUpdateAt ? Date.parse(st.lastAutoUpdateAt) : 0;
+    if (now.getTime() - lastAuto < gap * 60_000) { if (!st.pendingUpdate) st = await this.save(project.name, { remotePending: `원격 ${project.baseBranch} ${remoteHead.slice(0, 7)} (${gap}분 간격 대기)` }); return st; }
+    try {
+      await this.enqueue(project, { mode: 'update', reason: `원격 ${project.baseBranch} 변경 감지 ${remoteHead.slice(0, 7)}` });
+      st = await this.save(project.name, { lastAutoUpdateAt: now.toISOString(), remotePending: null });
+    } catch (e) { if (e.status !== 409) this.log.warn(`[knowledge ${project.name}] 원격 변경 갱신 예약 실패: ${e.message}`); }
+    return st;
+  }
+
   startSchedules() {
     if (this.timer) return;
     this.timer = setInterval(() => { this.tick().catch((e) => this.log.warn(`[knowledge] 예약 확인 실패: ${e.message}`)); }, 60_000);
@@ -233,7 +263,10 @@ ${schema}`;
       const mins = now.getHours() * 60 + now.getMinutes();
       for (const p of Object.values(this.cfg.projects)) {
         if (p.knowledge?.enabled === false) continue;
-        const st = await this.state(p.name);
+        let st = await this.state(p.name);
+        if (['QUEUED', 'RUNNING'].includes(st.status)) continue;
+        // 원격 저장소 감시: 다른 사람이 base 브랜치에 푸시하면 그래프가 뒤처진다 - ls-remote 로 싸게 확인하고 갱신을 예약
+        st = await this.watchRemote(p, st, now).catch((e) => { this.log.warn(`[knowledge ${p.name}] 원격 확인 실패: ${e.message}`); return st; });
         if (['QUEUED', 'RUNNING'].includes(st.status)) continue;
         // 처음 연결된 프로젝트: 그래프가 없으면 한 번 자동 구축 (실패했으면 사람이 누를 때까지 두지 않고 하루 한 번 재시도)
         if (!st.nodes?.length && (st.status === 'NONE' || (st.status === 'FAILED' && st.lastScheduledDate !== today))) {

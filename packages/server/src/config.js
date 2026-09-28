@@ -8,7 +8,7 @@ import { detectHost } from './gitlab.js';
  * 설정 파일(bugfix-kit.yml) 을 읽고 기본값·환경변수를 합친다.
  *
  * server:   port · dataDir(리포트 저장) · workDir(저장소 사본·작업) · claudeBin · pathExtra · javaHome · model · maxTurns · timeoutMinutes · runAsUser · insightsSchedule · knowledgeSchedule(HH:MM)
- *           프로젝트별: insights.schedule · knowledge.schedule · knowledge.enabled(false 면 자동 구축 안 함) · frontCheck.config(기본 {cwd}/front-check.config.mjs)
+ *           프로젝트별: insights.schedule · knowledge.schedule · knowledge.enabled(false 면 자동 구축 안 함) · knowledge.watchMinutes(원격 base 감시 주기, 기본 10, 0=끔) · knowledge.minGapMinutes(자동 갱신 최소 간격, 기본 60) · frontCheck.config(기본 {cwd}/front-check.config.mjs)
  * github:   tokenFile (또는 환경변수 BUGFIX_GITHUB_TOKEN)
  * projects: 이름 → { apiKey, repo, githubRepo, baseBranch, autoMerge, cors, description, conventions, modules[], allowedTools[], env{} }
  *           host 는 repo 주소로 자동(github.com → github, 그 밖은 gitlab; 셀프호스팅 GitLab 은 주소 origin 이 API 주소). GitLab 토큰은 프로젝트 env GITLAB_TOKEN
