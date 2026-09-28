@@ -52,13 +52,15 @@ export class Runner {
     this.execs = new Map();
   }
   lane(name) {
-    if (!this.lanes.has(name)) this.lanes.set(name, { chain: Promise.resolve(), pending: 0, busy: false });
+    if (!this.lanes.has(name)) this.lanes.set(name, { queue: [], pending: 0, busy: false });
     return this.lanes.get(name);
   }
+  /** 이 레인에 사람이 넣은(낮은 우선순위가 아닌) 작업이 기다리고 있나 - 루프가 다음 작업을 넣기 전에 본다 */
+  userPending(laneName) { return this.lane(laneName).queue.some((q) => !q.low); }
   /** 대기 중인 작업 수(전체) - /health 와 콘솔이 본다 */
   get pending() { let n = 0; for (const l of this.lanes.values()) n += l.pending; return n; }
   get busy() { for (const l of this.lanes.values()) if (l.busy) return true; return false; }
-  laneState() { const o = {}; for (const [k, l] of this.lanes) o[k] = { pending: l.pending, busy: l.busy }; return o; }
+  laneState() { const o = {}; for (const [k, l] of this.lanes) o[k] = { pending: l.pending, busy: l.busy, low: l.queue.filter((q) => q.low).length }; return o; }
   /** 같은 키의 작업이 겹치지 않게 - 공유 저장소의 git 조작·node_modules 캐시처럼 레인이 달라도 같은 디스크를 만지는 곳에 */
   async mutex(key, fn) {
     const prev = this.mutexes.get(key) || Promise.resolve();
@@ -107,26 +109,40 @@ export class Runner {
   }
 
   // ── 큐 ──────────────────────────────────────────────────────────────────
-  submit(project, id, job, onError, laneName = 'fix') {
+  /**
+   * 레인 큐에 넣는다. low=true(루프가 만든 작업)는 사람이 넣은 작업 뒤로 - 나중에 들어온 사람 작업이 앞지른다.
+   * 돌려주는 값은 이 작업 앞에 있는 개수(등록 시점).
+   */
+  submit(project, id, job, onError, laneName = 'fix', { low = false } = {}) {
     const lane = this.lane(laneName);
-    const ahead = lane.pending++;
-    const p = lane.chain.then(async () => {
-      lane.pending--;
-      lane.busy = true;
-      try { await job(); }
-      catch (e) { this.log.error(`[bugfix ${project.name}#${id}] 실패`, e); await onError(e); }
-      finally { lane.busy = false; }
-    });
-    lane.chain = p.catch(() => {});
+    const item = { project: project.name, id, job, onError, low, at: Date.now() };
+    const ahead = lane.queue.length + (lane.busy ? 1 : 0);
+    lane.queue.push(item);
+    lane.pending = lane.queue.length;
+    this.pump(lane);
     return ahead;
   }
+  pump(lane) {
+    if (lane.busy || !lane.queue.length) return;
+    // 사람 작업(low=false) 먼저, 같은 등급이면 먼저 들어온 것
+    let idx = 0;
+    for (let i = 1; i < lane.queue.length; i++) if (!lane.queue[i].low && lane.queue[idx].low) { idx = i; break; }
+    const [item] = lane.queue.splice(idx, 1);
+    lane.pending = lane.queue.length;
+    lane.busy = true;
+    (async () => {
+      try { await item.job(); }
+      catch (e) { this.log.error(`[bugfix ${item.project}#${item.id}] 실패`, e); try { await item.onError(e); } catch { /* */ } }
+      finally { lane.busy = false; this.pump(lane); }
+    })();
+  }
 
-  async enqueue(project, id) {
+  async enqueue(project, id, { low = false } = {}) {
     const ahead = this.submit(project, id, () => this.run(project, id), async (e) => {
       await this.logLine(project, id, `✗ 실패: ${firstLine(e.message, 300)}`);
       await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: `실패: ${firstLine(e.message, 200)}` });
-    });
-    if (ahead > 0) await this.logLine(project, id, `▶ 대기열 등록 (앞에 수정 ${ahead}건, 수정은 한 번에 하나씩 실행)`);
+    }, 'fix', { low });
+    if (ahead > 0) await this.logLine(project, id, `▶ 대기열 등록 (앞에 수정 ${ahead}건, 수정은 한 번에 하나씩 실행${low ? ' · 루프 작업이라 사람 요청이 먼저' : ''})`);
   }
 
   async enqueueFollowUp(project, id, message, mode) {
@@ -482,7 +498,7 @@ export class Runner {
    * 새로고침(fix-sync)이 autoMerge 프로젝트의 열린 PR 에 대해 부르고, 큐에서 하나씩 돈다.
    */
   /** 내보내기·병합: mode 는 branch|pr|merge (기본 merge). READY(보관·푸시만) 리포트도 여기서 푸시·PR·병합까지 간다 */
-  async enqueueMerge(project, id, mode = 'merge') {
+  async enqueueMerge(project, id, mode = 'merge', { low = false } = {}) {
     const r = await this.store.get(project.name, id);
     if (!notBlank(r?.fixBranch) || !['READY', 'PR_OPENED', 'FAILED'].includes(r.fixStatus)) throw Object.assign(new Error('내보낼 수정본이 없습니다'), { status: 409 });
     if (r.fixStatus === 'FAILED' && r.fixPrNumber == null) throw Object.assign(new Error('내보낼 수정본이 없습니다'), { status: 409 });
@@ -491,7 +507,7 @@ export class Runner {
     const ahead = this.submit(project, id, () => this.runMerge(project, id, mode), async (e) => {
       await this.logLine(project, id, `✗ 내보내기·병합 실패: ${firstLine(e.message, 300)}`);
       await this.updateFix(project, id, { fixStatus: prev === 'FAILED' ? 'PR_OPENED' : prev });
-    });
+    }, 'fix', { low });
     await this.logLine(project, id, `▶ 내보내기(${mode}) 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
   }
 

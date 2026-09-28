@@ -75,7 +75,7 @@ export class Knowledge {
   /**
    * 큐에 넣는다(수정 작업과 같은 큐). mode: 'full' 전체 구축 | 'update' 마지막 구축 이후 바뀐 파일만 반영(그래프가 없으면 full)
    */
-  async enqueue(project, { mode = 'update', reason = '' } = {}) {
+  async enqueue(project, { mode = 'update', reason = '', low = false } = {}) {
     const cur = await this.state(project.name);
     if (['QUEUED', 'RUNNING'].includes(cur.status)) throw Object.assign(new Error('이미 구축·갱신이 진행 중입니다'), { status: 409 });
     const full = mode === 'full' || !cur.nodes?.length || !cur.head;
@@ -83,7 +83,7 @@ export class Knowledge {
     const ahead = this.runner.submit(project, 'knowledge', () => this.run(project, full), async (e) => {
       await this.logLine(project.name, `✗ 실패: ${firstLine(e.message, 300)}`);
       await this.save(project.name, (c) => ({ status: c.nodes?.length ? 'DONE' : 'FAILED' }));
-    }, 'knowledge');
+    }, 'knowledge', { low });
     await this.logLine(project.name, `▶ 대기열 등록 (${full ? '전체 구축' : '갱신'}${reason ? ` · ${reason}` : ''}${ahead > 0 ? ` · 앞에 ${ahead}건` : ''})`);
   }
 

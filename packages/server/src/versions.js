@@ -159,7 +159,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
   }
 
   // ── 미리보기 ────────────────────────────────────────────────────────────
-  async start(project, n) {
+  async start(project, n, { low = false } = {}) {
     const v = await this.get(project.name, n);
     if (!v) throw Object.assign(new Error('없는 버전'), { status: 404 });
     if (!this.recipe(project)) throw Object.assign(new Error('미리보기 레시피가 없습니다 - 콘솔 버전 탭에서 초안을 만들거나 프로젝트 설정 preview 를 적으세요'), { status: 409 });
@@ -173,7 +173,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const ahead = this.runner.submit(project, `preview-${n}`, () => this.run(project, n), async (e) => {
       await this.plog(project.name, n, `✗ 실패: ${firstLine(e.message, 300)}`);
       await this.update(project.name, n, (x) => ({ preview: { ...x.preview, status: 'FAILED', error: firstLine(e.message, 300) } }));
-    }, 'preview');
+    }, 'preview', { low });
     await this.plog(project.name, n, `▶ 미리보기 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
     return this.get(project.name, n);
   }

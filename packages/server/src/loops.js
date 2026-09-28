@@ -162,13 +162,13 @@ export class Loops {
         check();
         if (step.type === 'knowledge') {
           await L('지식 그래프 갱신…');
-          try { await this.knowledge.enqueue(project, { mode: 'update', reason: `루프 ${loop.name}` }); } catch (e) { if (e.status !== 409) throw e; }
+          try { await this.knowledge.enqueue(project, { mode: 'update', reason: `루프 ${loop.name}`, low: true }); } catch (e) { if (e.status !== 409) throw e; }
           const st = await waitUntil(async () => { const s = await this.knowledge.state(p); return ['QUEUED', 'RUNNING'].includes(s.status) ? null : s; });
           await L(`${st.status === 'DONE' ? '✓' : '✗'} 지식 그래프 ${st.status} (노드 ${(st.nodes || []).length})`);
         } else if (step.type === 'insights') {
           const focus = [scope ? `범위를 '${scope.label}' ${scope.type ? `(${scope.type})` : ''} 에 한정하세요. 이 범위의 파일: ${scope.files.slice(0, 30).join(', ') || '(그래프에 파일 없음 - 이름으로 찾으세요)'}. 이 범위 밖의 문제는 적지 마세요.` : '', step.focus || ''].filter(Boolean).join(' ');
           await L(`제안 분석…${scope ? ` (범위: ${scope.label})` : ''}${step.focus ? ` (${step.focus})` : ''}`);
-          try { await this.insights.enqueue(project, { focus }); } catch (e) { if (e.status !== 409) throw e; }
+          try { await this.insights.enqueue(project, { focus, low: true }); } catch (e) { if (e.status !== 409) throw e; }
           const st = await waitUntil(async () => { const s = await this.insights.state(p); return ['QUEUED', 'RUNNING'].includes(s.status) ? null : s; });
           await L(`${st.status === 'DONE' ? '✓' : '✗'} 제안 분석 ${st.status} - 항목 ${(st.items || []).filter((i) => !i.reportId).length}건`);
           if (st.status !== 'DONE') throw new Error('제안 분석 실패');
@@ -181,6 +181,7 @@ export class Loops {
           if (!cands.length) { await L(`수정 대상 없음 (${step.severity || 'HIGH'} 이상${scope ? ` · 범위 '${scope.label}' 안` : ''} 제안 없음)`); continue; }
           for (const item of cands) {
             check();
+            if (this.runner.userPending('fix') || this.runner.lane('fix').busy) { await L('사람이 요청한 수정이 먼저 - 끝나길 기다립니다'); await waitUntil(async () => !this.runner.userPending('fix') && !this.runner.lane('fix').busy, 10_000); }
             const rid = await this.insights.withLock(`report:${p}`, async () => {
               const cur = await this.insights.state(p);
               const it = (cur.items || []).find((x) => x.id === item.id);
@@ -203,7 +204,7 @@ export class Loops {
             const r = await this.store.get(p, rid);
             if (r?.fixVersion == null) continue;
             await L(`v${r.fixVersion} 미리보기 띄우는 중…`);
-            try { await this.versions.start(project, r.fixVersion); } catch (e) { if (e.status !== 409) { await L(`✗ 미리보기 실패: ${firstLine(e.message, 120)}`); continue; } }
+            try { await this.versions.start(project, r.fixVersion, { low: true }); } catch (e) { if (e.status !== 409) { await L(`✗ 미리보기 실패: ${firstLine(e.message, 120)}`); continue; } }
             const v = await waitUntil(async () => { const x = await this.versions.get(p, r.fixVersion); return ['QUEUED', 'BUILDING', 'STARTING'].includes(x?.preview?.status) ? null : x; });
             await L(`${v.preview?.status === 'UP' ? '✓' : '✗'} v${r.fixVersion} 미리보기 ${v.preview?.status}${v.preview?.url ? ` ${v.preview.url}` : ''}`);
           }
@@ -215,7 +216,7 @@ export class Loops {
             if (!r || !['READY', 'PR_OPENED'].includes(r.fixStatus)) continue;
             if (r.fixStatus === 'PR_OPENED' && mode !== 'merge') continue;
             await L(`#${rid} 내보내기(${mode})…`);
-            try { await this.runner.enqueueMerge(project, rid, mode); } catch (e) { await L(`✗ #${rid} 내보내기 실패: ${firstLine(e.message, 120)}`); continue; }
+            try { await this.runner.enqueueMerge(project, rid, mode, { low: true }); } catch (e) { await L(`✗ #${rid} 내보내기 실패: ${firstLine(e.message, 120)}`); continue; }
             const x = await waitUntil(async () => { const y = await this.store.get(p, rid); return ['QUEUED', 'RUNNING'].includes(y?.fixStatus) ? null : y; });
             await L(`${['MERGED', 'PR_OPENED', 'READY'].includes(x.fixStatus) ? '✓' : '✗'} #${rid} ${x.fixStatus}${x.fixPrUrl ? ` ${x.fixPrUrl}` : ''}`);
           }

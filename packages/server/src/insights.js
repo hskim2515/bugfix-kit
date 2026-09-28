@@ -69,14 +69,14 @@ export class Insights {
   }
 
   /** 큐에 넣는다(수정 작업과 같은 큐 - Claude 하나씩). focus: 사용자가 준 관심사(선택) */
-  async enqueue(project, { focus = '' } = {}) {
+  async enqueue(project, { focus = '', low = false } = {}) {
     const cur = await this.state(project.name);
     if (['QUEUED', 'RUNNING'].includes(cur.status)) throw Object.assign(new Error('이미 분석이 진행 중입니다'), { status: 409 });
     await this.save(project.name, { status: 'QUEUED', log: '', focus });
     const ahead = this.runner.submit(project, 'insights', () => this.run(project, focus), async (e) => {
       await this.logLine(project.name, `✗ 실패: ${firstLine(e.message, 300)}`);
       await this.save(project.name, { status: 'FAILED' });
-    }, 'insights');
+    }, 'insights', { low });
     await this.logLine(project.name, `▶ 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
   }
 
@@ -242,7 +242,7 @@ ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
     const saved = await this.store.save(project.name, { severity: item.severity, problem, reproSteps: '', expectedResult: item.proposal, reporter, contextJson: JSON.stringify({ source: 'insights', files: item.files }) });
     if (fix) {
       await this.store.update(project.name, saved.bugReportId, (c) => ({ ...c, fixStatus: 'QUEUED', fixLog: '', fixRequestedAt: nowIso(), status: 'IN_PROGRESS' }));
-      await this.runner.enqueue(project, saved.bugReportId);
+      await this.runner.enqueue(project, saved.bugReportId, { low: String(reporter).startsWith('loop:') });
     }
     return saved.bugReportId;
   }
