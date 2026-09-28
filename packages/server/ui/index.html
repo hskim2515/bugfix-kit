@@ -7,21 +7,21 @@
 <style>
   :root { color-scheme: dark; --bg: #151922; --panel: #1e2431; --line: rgba(255,255,255,0.09); --text: #dfe5ee; --dim: #8b97a8; --accent: #6ea0ff; --ok: #7fe0a4; --bad: #ff9aa8; --warn: #f2d16b; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.5 -apple-system, "Pretendard", "Noto Sans KR", system-ui, sans-serif; }
-  header { display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: #11151c; position: sticky; top: 0; z-index: 5; }
-  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 12.5px/1.45 -apple-system, "Pretendard", "Noto Sans KR", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 6px 16px; border-bottom: 1px solid var(--line); background: #11151c; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; }
   header .sub { color: var(--dim); font-size: 12px; }
   header .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
   nav.tabs { display: flex; gap: 2px; margin-left: 18px; }
-  nav.tabs button { border: 0; background: transparent; color: var(--dim); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  nav.tabs button { border: 0; background: transparent; color: var(--dim); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; }
   nav.tabs button.on { background: rgba(110,160,255,0.18); color: #fff; }
-  main { padding: 16px 20px 60px; max-width: 1400px; margin: 0 auto; }
-  h2 { font-size: 14px; margin: 18px 0 8px; font-weight: 600; }
+  main { padding: 10px 16px 48px; max-width: 1480px; margin: 0 auto; }
+  h2 { font-size: 13px; margin: 12px 0 6px; font-weight: 600; }
   h2 small { color: var(--dim); font-weight: 400; margin-left: 8px; font-size: 12px; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; margin-bottom: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
   .card h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 500; }
-  .card .big { font-size: 22px; font-weight: 600; }
+  .card .big { font-size: 18px; font-weight: 600; }
   .card .row { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--dim); }
   .running { background: linear-gradient(180deg, #1f2a44, #1a2030); border-color: rgba(110,160,255,0.35); grid-column: 1 / -1; }
   .shots { display: flex; gap: 10px; overflow-x: auto; padding: 6px 0 2px; }
@@ -30,7 +30,7 @@
   .shots figcaption { font-size: 11px; color: var(--dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .shotbig { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: zoom-out; }
   .shotbig img { max-width: 94vw; max-height: 86vh; border: 1px solid var(--line); border-radius: 6px; }
-  .kg { position: relative; padding: 0; overflow: hidden; height: 74vh; min-height: 480px; }
+  .kg { position: relative; padding: 0; overflow: hidden; height: 70vh; min-height: 440px; }
   #kGraph { width: 100%; height: 100%; background:
     radial-gradient(ellipse at 50% 45%, rgba(110,160,255,0.10) 0%, rgba(110,160,255,0.03) 35%, rgba(0,0,0,0) 70%),
     radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1.4px) 0 0 / 26px 26px,
@@ -51,25 +51,25 @@
   .ktree .hit > .kn { background: rgba(255,220,120,0.18); border-radius: 4px; padding: 0 3px; }
   .ktree details > summary { cursor: pointer; list-style: none; } .ktree details > summary::-webkit-details-marker { display: none; }
   .ktree details > summary::before { content: '▸ '; color: var(--dim); } .ktree details[open] > summary::before { content: '▾ '; }
-  pre.log { margin: 8px 0 0; max-height: 220px; overflow: auto; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #cfd8e6; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; }
+  pre.log { margin: 6px 0 0; max-height: 200px; overflow: auto; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #cfd8e6; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; }
   pre.log.tall { max-height: 60vh; }
   pre.log .bf-log, pre.log .bf-diff { white-space: normal; font: inherit; }
   pre.log .bf-log .ln { white-space: pre-wrap; }
-  .toolbar { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; flex-wrap: wrap; }
+  .toolbar { display: flex; gap: 6px; align-items: center; margin: 4px 0 6px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
   .seg button { border: 0; background: transparent; color: var(--dim); padding: 5px 12px; cursor: pointer; font-size: 12px; }
   .seg button + button { border-left: 1px solid var(--line); }
   .seg button.on { background: rgba(110,160,255,0.22); color: #fff; }
-  input, select, textarea { background: #10141b; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 12px; font-family: inherit; }
+  input, select, textarea { background: #10141b; border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 12px; font-family: inherit; }
   input[type=search] { min-width: 220px; }
   textarea { width: 100%; min-height: 70px; resize: vertical; }
-  button.btn { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 6px; padding: 5px 11px; cursor: pointer; font-size: 12px; }
+  button.btn { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 6px; padding: 3px 9px; cursor: pointer; font-size: 12px; }
   button.btn:hover { background: rgba(255,255,255,0.06); }
   button.btn.primary { background: rgba(110,160,255,0.25); border-color: rgba(110,160,255,0.5); color: #fff; }
   button.btn.danger { border-color: rgba(255,120,140,0.5); color: var(--bad); }
   button.btn:disabled { opacity: 0.4; cursor: default; }
   table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { font-size: 11px; color: var(--dim); font-weight: 500; background: #1a2030; }
   tr.r { cursor: pointer; } tr.r:hover { background: rgba(255,255,255,0.04); }
   td.prob { max-width: 520px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -83,11 +83,11 @@
   .empty { padding: 30px; text-align: center; color: var(--dim); }
   #login { max-width: 420px; margin: 80px auto; }
   .err { color: var(--bad); font-size: 12px; margin-top: 8px; }
-  .intro { margin: 4px 0 14px; color: var(--dim); font-size: 12.5px; }
+  .intro { margin: 2px 0 8px; color: var(--dim); font-size: 12px; }
   .intro b { color: var(--text); font-weight: 500; }
   .checklist { grid-column: 1 / -1; }
-  .checklist ol { margin: 6px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 14px; }
-  .checklist li { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; }
+  .checklist ol { margin: 4px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 3px 12px; }
+  .checklist li { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; }
   .checklist li .ic { width: 18px; text-align: center; flex-shrink: 0; }
   .checklist li a { color: var(--accent); text-decoration: none; }
   .checklist .done { color: var(--dim); }
@@ -96,8 +96,8 @@
   .steps span.s { background: rgba(110,160,255,0.12); border: 1px solid rgba(110,160,255,0.3); border-radius: 20px; padding: 3px 10px; color: var(--text); }
   .steps span.ar { color: #55617a; }
   /* 설정 폼 */
-  .form { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; align-items: start; }
-  .form label { color: var(--dim); font-size: 12px; padding-top: 6px; }
+  .form { display: grid; grid-template-columns: 150px 1fr; gap: 5px 10px; align-items: start; }
+  .form label { color: var(--dim); font-size: 12px; padding-top: 4px; }
   .form label small { display: block; color: #66727f; font-size: 11px; font-weight: 400; }
   .form input:not([type=checkbox]), .form select { width: 100%; }
   .form .inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -106,10 +106,10 @@
   .mod input { width: 100%; }
   .actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
   .actions .msg { color: var(--dim); font-size: 12px; }
-  .secret { display: grid; grid-template-columns: 150px 1fr 120px; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .secret { display: grid; grid-template-columns: 150px 1fr 120px; gap: 6px; align-items: center; margin-bottom: 4px; }
   .secret .state { font-size: 11px; color: var(--dim); }
   .plist { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-  .plist button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 8px 12px; cursor: pointer; text-align: left; min-width: 180px; }
+  .plist button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 5px 10px; cursor: pointer; text-align: left; min-width: 180px; }
   .plist button.on { border-color: var(--accent); }
   .plist .n { font-weight: 600; } .plist .d { color: var(--dim); font-size: 11px; }
   .checks .card { display: flex; gap: 12px; align-items: flex-start; }
@@ -121,10 +121,10 @@
   nav.tabs::-webkit-scrollbar { display: none; }
   nav.tabs button { white-space: nowrap; flex: 0 0 auto; }
   .toolbar input.wide { min-width: 320px; flex: 1 1 320px; max-width: 520px; }
-  .steps-list { display: flex; flex-direction: column; gap: 10px; }
-  .steps-list .step { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .steps-list { display: flex; flex-direction: column; gap: 6px; }
+  .steps-list .step { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
   .steps-list .step > label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
-  .steps-list .dim { margin: 4px 0 0 22px; line-height: 1.7; }
+  .steps-list .dim { margin: 2px 0 0 22px; line-height: 1.6; }
   .steps-list select, .steps-list input:not([type=checkbox]) { width: auto; display: inline-block; }
   .form .inline .w140 { width: 140px; } .form .inline .w120 { width: 120px; } .form .inline .grow { flex: 1 1 320px; min-width: 200px; }
   .shots .ph { width: 220px; height: 124px; background: #000; border-radius: 6px; }
@@ -213,6 +213,7 @@
   </nav>
   <div class="right">
     <span class="dim" id="tick"></span>
+    <span class="seg" id="langSeg" title="언어 / Language"><button data-lang="ko">한국어</button><button data-lang="en">EN</button></span>
     <button class="btn" id="logout" title="저장된 운영자 키 지우기">키 지우기</button>
   </div>
 </header>
@@ -437,6 +438,11 @@
   const mqR = matchMedia('(max-width: 720px)'), mqI = matchMedia('(max-width: 1000px)');
   const applyCardRows = () => { $('#rTable').classList.toggle('cardrows', mqR.matches); $('#iTable').classList.toggle('cardrows', mqI.matches); $('#vTable').classList.toggle('cardrows', mqI.matches); $('#lTable').classList.toggle('cardrows', mqI.matches); };
   mqR.addEventListener('change', applyCardRows); mqI.addEventListener('change', applyCardRows); applyCardRows();
+  const I18N = window.BugfixKit && BugfixKit.i18n;
+  const LANG = I18N ? I18N.detectLang() : 'ko';
+  document.documentElement.lang = LANG;
+  if (I18N) { I18N.translateTree(document.body, LANG); document.title = LANG === 'en' ? document.title.replace('관리', 'console') : document.title; }
+  document.querySelectorAll('#langSeg button').forEach((b) => { b.classList.toggle('on', b.dataset.lang === LANG); b.addEventListener('click', () => { if (b.dataset.lang !== LANG) { I18N && I18N.setLang(b.dataset.lang); location.reload(); } }); });
   const F = window.BugfixKit && BugfixKit.fmt;
   if (F) { const st = document.createElement('style'); st.textContent = F.FMT_CSS; document.head.appendChild(st); }
   const logHtml = (t) => (F ? F.logHtml(t) : null), mdLite = (t) => (F ? F.mdLite(t) : null), diffHtml = (p, st) => (F ? F.diffHtml(p, st) : null);
@@ -507,7 +513,7 @@
   }
   function ensureKit() {
     if (kit) return;
-    kit = BugfixKit.createBugfix({ endpoint: API, user: 'admin', adminKey: key, hotkeys: false, interceptors: { console: false }, projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })) }).mount();
+    kit = BugfixKit.createBugfix({ endpoint: API, user: 'admin', adminKey: key, hotkeys: false, lang: LANG, interceptors: { console: false }, projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })) }).mount();
   }
   // 시작 체크리스트 - 설정 상태와 빠른 점검으로 "남은 일" 을 보여 준다
   let quick = null;

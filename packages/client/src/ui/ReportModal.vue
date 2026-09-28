@@ -422,6 +422,8 @@ const SEVERITY_OPTIONS = [
   { value: 'LOW',      label: '낮음' },
 ];
 
+import * as i18n from '../core/i18n.js';
+
 export default {
   name: 'BugfixReportModal',
   components: { ScreenshotEditor },
@@ -430,6 +432,7 @@ export default {
   emits: ['open-viewer'],
   expose: ['open', 'close'],
   mounted() {
+    this.__i18nStop = i18n.translateTree(this.$el.getRootNode(), (this.kit && this.kit.options && this.kit.options.lang) || i18n.detectLang());
     this._onKeydown = (e) => {
       if (e.key !== 'Escape' || !this.isOpen) return;
       // 편집기가 열려 있으면 편집기만 닫는다 (그린 내용 때문에 신고 창까지 닫히지 않도록)
@@ -448,6 +451,7 @@ export default {
     window.addEventListener('paste', this._onPaste);
   },
   beforeUnmount() {
+    if (this.__i18nStop) this.__i18nStop();
     window.removeEventListener('keydown', this._onKeydown);
     window.removeEventListener('paste', this._onPaste);
   },

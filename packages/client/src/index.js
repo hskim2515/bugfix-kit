@@ -7,6 +7,7 @@ export { createBugfix };
 export { captureScreen } from './core/capture.js';
 export { reduxMiddleware, zustandSource } from './core/interceptors.js';
 export * as fmt from './core/fmt.js';
+export * as i18n from './core/i18n.js';
 
 /** Web Component 등록 - <bugfix-report-modal>, <bugfix-viewer>. 두 번 불러도 안전 */
 export function register() {

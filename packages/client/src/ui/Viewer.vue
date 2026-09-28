@@ -399,6 +399,8 @@ const STATUSES = [
 
 import * as fmt from '../core/fmt.js';
 
+import * as i18n from '../core/i18n.js';
+
 export default {
   name: 'BugfixViewer',
   props: { kit: { type: Object, default: null } },
@@ -553,7 +555,11 @@ export default {
       this.$nextTick(() => { const el = this.$refs.fixLogPre; if (el) el.scrollTop = el.scrollHeight; });
     },
   },
-  beforeUnmount() { this._stopFixPolling(); },
+  beforeUnmount() {
+    if (this.__i18nStop) this.__i18nStop(); this._stopFixPolling(); },
+  mounted() {
+    this.__i18nStop = i18n.translateTree(this.$el.getRootNode(), (this.kit && this.kit.options && this.kit.options.lang) || i18n.detectLang());
+  },
   methods: {
     md(t) { return fmt.mdLite(t); },
     logH(t) { return fmt.logHtml(t); },
