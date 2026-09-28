@@ -222,7 +222,7 @@ ${schema}`;
   // ── 예약: 매일 HH:MM 갱신 + 그래프가 없는 프로젝트는 자동 구축 ──
   /**
    * 원격 base 브랜치 head 를 watchMinutes 마다 확인(git ls-remote, 복제 불필요). 그래프가 만들어진 head 와 다르면 갱신을 예약한다.
-   * 잦은 푸시에 매번 Claude 를 돌리지 않게 자동 갱신 사이에는 minGapMinutes(기본 60) 를 둔다. knowledge.watchMinutes=0 이면 끔.
+   * 기본은 '원격이 앞섬' 표시만 하고 사람이 콘솔의 갱신을 누른다. knowledge.autoUpdate=true 면 minGapMinutes(기본 60) 간격으로 자동. knowledge.watchMinutes=0 이면 감시 끔.
    */
   async watchRemote(project, st, now = new Date()) {
     const every = Number(project.knowledge?.watchMinutes ?? this.cfg.server.knowledgeWatchMinutes ?? 10);
@@ -238,10 +238,13 @@ ${schema}`;
     const patch = { lastWatchAt: now.toISOString(), remoteHead, remoteSeenAt: st.remoteHead === remoteHead ? (st.remoteSeenAt || now.toISOString()) : now.toISOString() };
     st = await this.save(project.name, patch);
     const behind = st.nodes?.length && st.head && st.head !== remoteHead;
-    if (!behind) return st;
+    if (!behind) { if (st.remotePending) st = await this.save(project.name, { remotePending: null }); return st; }
+    // 기본은 표시만 - 콘솔의 '갱신' 을 누르면 그때 돈다(Claude 비용). knowledge.autoUpdate=true 면 minGapMinutes 간격으로 자동
+    const auto = project.knowledge?.autoUpdate ?? this.cfg.server.knowledgeAutoUpdate ?? false;
+    if (!auto) { if (st.remotePending !== remoteHead) st = await this.save(project.name, { remotePending: remoteHead }); return st; }
     const gap = Number(project.knowledge?.minGapMinutes ?? this.cfg.server.knowledgeMinGapMinutes ?? 60);
     const lastAuto = st.lastAutoUpdateAt ? Date.parse(st.lastAutoUpdateAt) : 0;
-    if (now.getTime() - lastAuto < gap * 60_000) { if (!st.pendingUpdate) st = await this.save(project.name, { remotePending: `원격 ${project.baseBranch} ${remoteHead.slice(0, 7)} (${gap}분 간격 대기)` }); return st; }
+    if (now.getTime() - lastAuto < gap * 60_000) { if (st.remotePending !== remoteHead) st = await this.save(project.name, { remotePending: remoteHead }); return st; }
     try {
       await this.enqueue(project, { mode: 'update', reason: `원격 ${project.baseBranch} 변경 감지 ${remoteHead.slice(0, 7)}` });
       st = await this.save(project.name, { lastAutoUpdateAt: now.toISOString(), remotePending: null });
