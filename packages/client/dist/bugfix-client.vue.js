@@ -5345,7 +5345,7 @@ function Lg(e, { max: A = 80, skip: t = [] } = {}) {
   const s = ye(A), r = new Set(t), n = e.emit.bind(e);
   return e.emit = (o, i) => (r.has(o) || s.push({ time: cA(), type: o }), n(o, i)), s.get;
 }
-function CQ() {
+function UQ() {
   const e = /* @__PURE__ */ new Set(), A = () => (t) => (s) => {
     const r = typeof s == "function" ? "(thunk)" : String((s == null ? void 0 : s.type) ?? "(unknown)");
     for (const n of e)
@@ -5357,7 +5357,7 @@ function CQ() {
   };
   return A.source = { subscribe: (t) => (e.add(t), () => e.delete(t)) }, A;
 }
-function UQ(e) {
+function FQ(e) {
   return {
     subscribe: (A) => e.subscribe((t, s) => {
       const r = Object.keys(t).filter((n) => t[n] !== (s == null ? void 0 : s[n]));
@@ -5413,7 +5413,7 @@ function vg(e) {
   };
 }
 const ie = () => [];
-function FQ(e = {}) {
+function pQ(e = {}) {
   var l;
   const A = { project: "default", hotkeys: { report: "Shift+F9", viewer: "Shift+F10" }, interceptors: { console: !0 }, ...e }, t = A.interceptors || {}, s = t.console === !1 ? ie : Eg(t.console === !0 ? {} : t.console), r = t.network ? Hg(t.network) : ie, n = t.mutation ? Ig(t.mutation) : ie, o = t.router ? xg(t.router === !0 ? null : t.router) : ie, i = t.events ? Lg(t.events.emitter || t.events, t.events.emitter ? t.events : {}) : ie, B = ((l = A.projects) != null && l.length ? A.projects : [{ key: A.project, label: A.project }]).map((c) => typeof c == "string" ? { key: c, label: c } : c), g = {
     options: A,
@@ -6619,7 +6619,7 @@ function bh(e, A, t, s, r, n) {
     ], 32)) : F("", !0)
   ]);
 }
-const pQ = /* @__PURE__ */ Hs(Pg, [["render", bh], ["__scopeId", "data-v-0b6144ab"]]), Ae = (e) => String(e ?? "").replace(/[&<>"']/g, (A) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[A]);
+const EQ = /* @__PURE__ */ Hs(Pg, [["render", bh], ["__scopeId", "data-v-0b6144ab"]]), Ae = (e) => String(e ?? "").replace(/[&<>"']/g, (A) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[A]);
 function _A(e) {
   let A = Ae(e);
   return A = A.replace(/`([^`]+)`/g, (t, s) => `<code>${s}</code>`), A = A.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>"), A = A.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'), A = A.replace(/(^|[\s(])((?:[\w.-]+\/)+[\w.-]+\.(?:java|js|ts|tsx|jsx|vue|py|xml|yml|yaml|json|properties|gradle|sql|md|scss|css|html)(?::\d+)?)(?=$|[\s,)])/g, (t, s, r) => t.includes("<code>") ? t : `${s}<code class="p">${r}</code>`), A;
@@ -6767,7 +6767,7 @@ const xh = `
   none: "요청 전",
   QUEUED: "대기 중",
   RUNNING: "AI 가 고치는 중",
-  READY: "수정본 준비 · 아직 내보내지 않음(콘솔에서 PR·병합)",
+  READY: "수정본 준비 · 작업 브랜치에 커밋됨, 아직 PR·병합 전(콘솔 버전 탭에서 내보내기)",
   PR_OPENED: "PR 올라옴 · 병합 안 됨(로그 확인)",
   MERGED: "병합 완료",
   FAILED: "실패 · 진행 로그 확인"
@@ -7304,94 +7304,94 @@ ${e}`) && this.sendChat("change", `추천 개선 실행: ${e}`);
 }, Ed = ["disabled"], bd = {
   key: 0,
   class: "brv-ai__meta"
-}, md = ["href"], Hd = {
-  key: 1,
-  class: "brv-ai__branch brv-selectable"
-}, yd = { class: "brv-ai__branch" }, Id = ["href"], xd = {
+}, md = ["href"], Hd = ["title"], yd = {
+  key: 2,
+  class: "brv-ai__hint"
+}, Id = { class: "brv-ai__branch" }, xd = ["href"], Ld = {
   key: 1,
   class: "brv-ai__hint"
-}, Ld = ["disabled"], vd = ["title"], Sd = ["innerHTML"], Kd = {
+}, vd = ["disabled"], Sd = ["title"], Kd = ["innerHTML"], Td = {
   key: 2,
   class: "brv-kg",
   open: ""
-}, Td = { class: "brv-kg__wrap" }, Dd = ["viewBox"], kd = ["x"], _d = ["d"], Od = ["transform", "onMouseenter"], Md = ["width", "height", "fill"], Rd = {
+}, Dd = { class: "brv-kg__wrap" }, kd = ["viewBox"], _d = ["x"], Od = ["d"], Md = ["transform", "onMouseenter"], Rd = ["width", "height", "fill"], Nd = {
   x: "6",
   y: "14",
   class: "brv-kg__label"
-}, Nd = {
+}, Gd = {
   key: 3,
   class: "brv-shots"
-}, Gd = { class: "brv-shots__title" }, Vd = { class: "brv-suggest__hint" }, Pd = { class: "brv-shots__strip" }, Xd = ["onClick"], Jd = ["src", "alt"], Wd = {
+}, Vd = { class: "brv-shots__title" }, Pd = { class: "brv-suggest__hint" }, Xd = { class: "brv-shots__strip" }, Jd = ["onClick"], Wd = ["src", "alt"], Yd = {
   key: 1,
   class: "brv-shots__ph"
-}, Yd = ["open"], Zd = { class: "brv-ai__count" }, jd = ["innerHTML"], zd = {
+}, Zd = ["open"], jd = { class: "brv-ai__count" }, zd = ["innerHTML"], qd = {
   key: 5,
   class: "brv-suggest"
-}, qd = ["innerHTML"], $d = ["disabled", "onClick"], Af = { class: "brv-chat" }, ef = { class: "brv-chat__who" }, tf = ["innerHTML"], sf = {
+}, $d = ["innerHTML"], Af = ["disabled", "onClick"], ef = { class: "brv-chat" }, tf = { class: "brv-chat__who" }, sf = ["innerHTML"], rf = {
   key: 0,
   class: "brv-chat__msg brv-chat__msg--assistant"
-}, rf = {
+}, nf = {
   key: 1,
   class: "brv-chat__compose"
-}, nf = ["disabled"], of = { class: "brv-chat__btns" }, lf = ["disabled"], Bf = ["disabled"], af = {
+}, of = ["disabled"], lf = { class: "brv-chat__btns" }, Bf = ["disabled"], af = ["disabled"], cf = {
   key: 2,
   class: "brv-ai__hint"
-}, cf = {
-  key: 2,
-  class: "brv-section"
 }, gf = {
+  key: 2,
+  class: "brv-section"
+}, uf = {
   key: 0,
   class: "brv-field"
-}, uf = ["innerHTML"], wf = {
+}, wf = ["innerHTML"], hf = {
   key: 1,
   class: "brv-field"
-}, hf = ["innerHTML"], df = {
+}, df = ["innerHTML"], ff = {
   key: 2,
   class: "brv-field"
-}, ff = ["innerHTML"], Qf = {
+}, Qf = ["innerHTML"], Cf = {
   key: 3,
   class: "brv-section"
-}, Cf = {
+}, Uf = {
   key: 0,
   class: "brv-row"
-}, Uf = { class: "brv-selectable" }, Ff = {
+}, Ff = { class: "brv-selectable" }, pf = {
   key: 1,
   class: "brv-row"
-}, pf = { class: "brv-selectable" }, Ef = {
+}, Ef = { class: "brv-selectable" }, bf = {
   key: 2,
   class: "brv-row"
-}, bf = { class: "brv-selectable" }, mf = {
+}, mf = { class: "brv-selectable" }, Hf = {
   key: 3,
   class: "brv-row"
-}, Hf = { class: "brv-selectable" }, yf = {
+}, yf = { class: "brv-selectable" }, If = {
   key: 4,
   class: "brv-row"
-}, If = { class: "brv-selectable" }, xf = { class: "brv-section" }, Lf = { class: "brv-label-row" }, vf = { class: "brv-log-tabs" }, Sf = ["onClick"], Kf = { class: "brv-log-filters" }, Tf = { class: "brv-filter-chip brv-filter-error" }, Df = { class: "brv-filter-chip brv-filter-warn" }, kf = { class: "brv-filter-chip brv-filter-log" }, _f = { class: "brv-log-list" }, Of = ["onClick"], Mf = { class: "brv-log-time brv-selectable" }, Rf = { class: "brv-log-lv" }, Nf = {
+}, xf = { class: "brv-selectable" }, Lf = { class: "brv-section" }, vf = { class: "brv-label-row" }, Sf = { class: "brv-log-tabs" }, Kf = ["onClick"], Tf = { class: "brv-log-filters" }, Df = { class: "brv-filter-chip brv-filter-error" }, kf = { class: "brv-filter-chip brv-filter-warn" }, _f = { class: "brv-filter-chip brv-filter-log" }, Of = { class: "brv-log-list" }, Mf = ["onClick"], Rf = { class: "brv-log-time brv-selectable" }, Nf = { class: "brv-log-lv" }, Gf = {
   key: 0,
   class: "brv-log-empty"
-}, Gf = { class: "brv-log-filters" }, Vf = { class: "brv-filter-chip brv-filter-error" }, Pf = { class: "brv-filter-chip brv-filter-warn" }, Xf = { class: "brv-filter-chip brv-filter-log" }, Jf = { class: "brv-log-list" }, Wf = ["onClick"], Yf = { class: "brv-log-time brv-selectable" }, Zf = { class: "brv-log-lv" }, jf = { class: "brv-log-logger brv-selectable" }, zf = {
+}, Vf = { class: "brv-log-filters" }, Pf = { class: "brv-filter-chip brv-filter-error" }, Xf = { class: "brv-filter-chip brv-filter-warn" }, Jf = { class: "brv-filter-chip brv-filter-log" }, Wf = { class: "brv-log-list" }, Yf = ["onClick"], Zf = { class: "brv-log-time brv-selectable" }, jf = { class: "brv-log-lv" }, zf = { class: "brv-log-logger brv-selectable" }, qf = {
   key: 0,
   class: "brv-log-empty"
-}, qf = { class: "brv-log-filters" }, $f = { class: "brv-filter-chip brv-filter-error" }, AQ = { class: "brv-filter-chip brv-filter-log" }, eQ = { class: "brv-log-list" }, tQ = ["onClick"], sQ = { class: "brv-net-method brv-selectable" }, rQ = { class: "brv-net-dur brv-selectable" }, nQ = { class: "brv-log-time brv-selectable" }, oQ = {
+}, $f = { class: "brv-log-filters" }, AQ = { class: "brv-filter-chip brv-filter-error" }, eQ = { class: "brv-filter-chip brv-filter-log" }, tQ = { class: "brv-log-list" }, sQ = ["onClick"], rQ = { class: "brv-net-method brv-selectable" }, nQ = { class: "brv-net-dur brv-selectable" }, oQ = { class: "brv-log-time brv-selectable" }, iQ = {
   key: 0,
   class: "brv-net-detail brv-selectable"
-}, iQ = { key: 0 }, lQ = { key: 1 }, BQ = { key: 2 }, aQ = {
+}, lQ = { key: 0 }, BQ = { key: 1 }, aQ = { key: 2 }, cQ = {
   key: 3,
   class: "brv-log--error"
-}, cQ = {
+}, gQ = {
   key: 0,
   class: "brv-log-empty"
-}, gQ = {
+}, uQ = {
   key: 3,
   class: "brv-log-list"
-}, uQ = ["onClick"], wQ = { class: "brv-log-time brv-selectable" }, hQ = {
+}, wQ = ["onClick"], hQ = { class: "brv-log-time brv-selectable" }, dQ = {
   key: 0,
   class: "brv-log-payload brv-selectable"
-}, dQ = {
+}, fQ = {
   key: 0,
   class: "brv-log-empty"
 };
-function fQ(e, A, t, s, r, n) {
+function QQ(e, A, t, s, r, n) {
   var o, i, B, g;
   return u(), w("div", Kh, [
     r.isOpen ? (u(), w("div", {
@@ -7529,9 +7529,14 @@ function fQ(e, A, t, s, r, n) {
                       target: "_blank",
                       rel: "noopener"
                     }, "PR #" + Q(n.prNumber), 9, md)) : F("", !0),
-                    r.detail.fixBranch ? (u(), w("span", Hd, Q(r.detail.fixBranch), 1)) : F("", !0),
-                    r.detail.fixVersion != null ? (u(), w(x, { key: 2 }, [
-                      a("span", yd, "v" + Q(r.detail.fixVersion), 1),
+                    r.detail.fixBranch ? (u(), w("span", {
+                      key: 1,
+                      class: "brv-ai__branch brv-selectable",
+                      title: r.detail.fixStatus === "READY" ? r.detail.fixPushed ? "AI 수정본이 담긴 작업 브랜치 - 원격 저장소에 같은 이름으로 올라가 있습니다 (PR 은 아직 없음)" : "AI 수정본이 담긴 작업 브랜치 - 아직 키트 서버 안에만 있고 원격에는 없습니다 (콘솔에서 내보내기)" : "AI 수정본이 담긴 작업 브랜치 (기준 브랜치는 건드리지 않음)"
+                    }, Q(r.detail.fixBranch), 9, Hd)) : F("", !0),
+                    r.detail.fixStatus === "READY" ? (u(), w("span", yd, Q(r.detail.fixPushed ? "원격에 브랜치만 있음 · PR 없음" : "키트 서버 안에만 있음 · 원격에 없음"), 1)) : F("", !0),
+                    r.detail.fixVersion != null ? (u(), w(x, { key: 3 }, [
+                      a("span", Id, "v" + Q(r.detail.fixVersion), 1),
                       r.detail.preview ? (u(), w(x, { key: 0 }, [
                         r.detail.preview.status === "UP" && r.detail.preview.url ? (u(), w("a", {
                           key: 0,
@@ -7540,7 +7545,7 @@ function fQ(e, A, t, s, r, n) {
                           target: "_blank",
                           rel: "noopener",
                           title: "이 수정본으로 띄운 앱(프론트+백엔드+DB 사본)"
-                        }, "미리보기 열기 ↗", 8, Id)) : n.previewPending ? (u(), w("span", xd, [
+                        }, "미리보기 열기 ↗", 8, xd)) : n.previewPending ? (u(), w("span", Ld, [
                           A[37] || (A[37] = a("span", { class: "brv-spin brv-spin--sm" }, null, -1)),
                           L(" 미리보기 준비 중(" + Q(n.previewLabel) + ")", 1)
                         ])) : r.detail.preview.canPreview && n.fixable ? (u(), w("button", {
@@ -7549,12 +7554,12 @@ function fQ(e, A, t, s, r, n) {
                           disabled: r.fixBusy,
                           onClick: A[7] || (A[7] = (...l) => n.startPreview && n.startPreview(...l)),
                           title: "이 수정본으로 프론트·백엔드·DB 사본을 띄워 직접 써 봅니다 (몇 분)"
-                        }, "미리보기 띄우기", 8, Ld)) : F("", !0),
+                        }, "미리보기 띄우기", 8, vd)) : F("", !0),
                         r.detail.preview.status === "FAILED" ? (u(), w("span", {
                           key: 3,
                           class: "brv-ai__hint",
                           title: r.detail.preview.error || ""
-                        }, "미리보기 실패", 8, vd)) : F("", !0)
+                        }, "미리보기 실패", 8, Sd)) : F("", !0)
                       ], 64)) : F("", !0)
                     ], 64)) : F("", !0)
                   ])) : F("", !0),
@@ -7562,13 +7567,13 @@ function fQ(e, A, t, s, r, n) {
                     key: 1,
                     class: "brv-ai__summary brv-selectable",
                     innerHTML: n.md(r.detail.fixSummary)
-                  }, null, 8, Sd)) : F("", !0),
-                  n.kgLayout ? (u(), w("details", Kd, [
+                  }, null, 8, Kd)) : F("", !0),
+                  n.kgLayout ? (u(), w("details", Td, [
                     A[38] || (A[38] = a("summary", null, [
                       L("관련 기능·파일 "),
                       a("span", { class: "brv-suggest__hint" }, "지식 그래프에서 이 신고와 이어진 부분 · 노란 테두리 = 신고 내용과 직접 맞는 것")
                     ], -1)),
-                    a("div", Td, [
+                    a("div", Dd, [
                       (u(), w("svg", {
                         viewBox: `0 0 ${n.kgLayout.w} ${n.kgLayout.h}`,
                         style: Kr({ width: n.kgLayout.w + "px", height: n.kgLayout.h + "px" }),
@@ -7579,12 +7584,12 @@ function fQ(e, A, t, s, r, n) {
                           x: l.x,
                           y: "12",
                           class: "brv-kg__col"
-                        }, Q(l.title), 9, kd))), 128)),
+                        }, Q(l.title), 9, _d))), 128)),
                         (u(!0), w(x, null, k(n.kgLayout.edges, (l, c) => (u(), w("path", {
                           key: "e" + c,
                           d: l.d,
                           class: T(["brv-kg__edge", "brv-kg__edge--" + l.rel, { "brv-kg__edge--dim": r.kgHover && l.from !== r.kgHover && l.to !== r.kgHover }])
-                        }, null, 10, _d))), 128)),
+                        }, null, 10, Od))), 128)),
                         (u(!0), w(x, null, k(n.kgLayout.nodes, (l) => (u(), w("g", {
                           key: l.id,
                           transform: `translate(${l.x},${l.y})`,
@@ -7601,18 +7606,18 @@ function fQ(e, A, t, s, r, n) {
                             height: l.h,
                             rx: "4",
                             fill: n.kgColor(l.type)
-                          }, null, 8, Md),
-                          a("text", Rd, Q(l.short), 1)
-                        ], 42, Od))), 128))
-                      ], 12, Dd))
+                          }, null, 8, Rd),
+                          a("text", Nd, Q(l.short), 1)
+                        ], 42, Md))), 128))
+                      ], 12, kd))
                     ])
                   ])) : F("", !0),
-                  n.fixShots.length ? (u(), w("div", Nd, [
-                    a("div", Gd, [
+                  n.fixShots.length ? (u(), w("div", Gd, [
+                    a("div", Vd, [
                       A[39] || (A[39] = L("화면 확인 ", -1)),
-                      a("span", Vd, Q(n.fixShots[n.fixShots.length - 1].label), 1)
+                      a("span", Pd, Q(n.fixShots[n.fixShots.length - 1].label), 1)
                     ]),
-                    a("div", Pd, [
+                    a("div", Xd, [
                       (u(!0), w(x, null, k(n.fixShots, (l) => (u(), w("figure", {
                         key: l.file,
                         class: "brv-shots__item",
@@ -7622,9 +7627,9 @@ function fQ(e, A, t, s, r, n) {
                           key: 0,
                           src: r.shotUrls[l.file],
                           alt: l.name
-                        }, null, 8, Jd)) : (u(), w("div", Wd, "…")),
+                        }, null, 8, Wd)) : (u(), w("div", Yd, "…")),
                         a("figcaption", null, Q(l.name.replace(/\.png$/i, "")), 1)
-                      ], 8, Xd))), 128))
+                      ], 8, Jd))), 128))
                     ])
                   ])) : F("", !0),
                   r.detail.fixLog ? (u(), w("details", {
@@ -7634,15 +7639,15 @@ function fQ(e, A, t, s, r, n) {
                   }, [
                     a("summary", null, [
                       A[40] || (A[40] = L("진행 로그 ", -1)),
-                      a("span", Zd, Q(n.logLineCount) + "줄", 1)
+                      a("span", jd, Q(n.logLineCount) + "줄", 1)
                     ]),
                     a("div", {
                       ref: "fixLogPre",
                       class: "brv-selectable brv-logbox",
                       innerHTML: n.logH(r.detail.fixLog)
-                    }, null, 8, jd)
-                  ], 8, Yd)) : F("", !0),
-                  n.fixSuggestions.length ? (u(), w("div", zd, [
+                    }, null, 8, zd)
+                  ], 8, Zd)) : F("", !0),
+                  n.fixSuggestions.length ? (u(), w("div", qd, [
                     A[41] || (A[41] = a("div", { class: "brv-suggest__title" }, [
                       L("추천 개선 "),
                       a("span", { class: "brv-suggest__hint" }, "실행을 누르면 그 내용으로 이어서 고칩니다")
@@ -7654,34 +7659,34 @@ function fQ(e, A, t, s, r, n) {
                       a("span", {
                         class: "brv-suggest__text brv-selectable",
                         innerHTML: n.md(l)
-                      }, null, 8, qd),
+                      }, null, 8, $d),
                       n.fixable ? (u(), w("button", {
                         key: 0,
                         class: "brv-fix-btn brv-fix-btn--ghost brv-suggest__run",
                         disabled: r.fixBusy || n.fixInProgress,
                         onClick: (d) => n.runSuggestion(l)
-                      }, "실행", 8, $d)) : F("", !0)
+                      }, "실행", 8, Af)) : F("", !0)
                     ]))), 128))
                   ])) : F("", !0),
-                  a("div", Af, [
+                  a("div", ef, [
                     (u(!0), w(x, null, k(n.fixChat, (l, c) => (u(), w("div", {
                       key: c,
                       class: T(["brv-chat__msg", `brv-chat__msg--${l.role}`])
                     }, [
-                      a("span", ef, Q(l.role === "user" ? "나" : "AI"), 1),
+                      a("span", tf, Q(l.role === "user" ? "나" : "AI"), 1),
                       a("div", {
                         class: "brv-chat__text brv-selectable",
                         innerHTML: n.md(l.text)
-                      }, null, 8, tf)
+                      }, null, 8, sf)
                     ], 2))), 128)),
-                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (u(), w("div", sf, [...A[42] || (A[42] = [
+                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (u(), w("div", rf, [...A[42] || (A[42] = [
                       a("span", { class: "brv-chat__who" }, "AI", -1),
                       a("div", { class: "brv-chat__text" }, [
                         a("span", { class: "brv-spin brv-spin--sm" }),
                         L(" 생각 중…")
                       ], -1)
                     ])])) : F("", !0),
-                    n.fixable ? (u(), w("div", rf, [
+                    n.fixable ? (u(), w("div", nf, [
                       W(a("textarea", {
                         "onUpdate:modelValue": A[9] || (A[9] = (l) => r.chatInput = l),
                         class: "brv-chat__input",
@@ -7692,25 +7697,25 @@ function fQ(e, A, t, s, r, n) {
                           A[10] || (A[10] = ys(le((l) => n.sendChat("ask"), ["ctrl", "prevent"]), ["enter"])),
                           A[11] || (A[11] = ys(le((l) => n.sendChat("ask"), ["meta", "prevent"]), ["enter"]))
                         ]
-                      }, null, 40, nf), [
+                      }, null, 40, of), [
                         [Ze, r.chatInput]
                       ]),
-                      a("div", of, [
+                      a("div", lf, [
                         a("button", {
                           class: "brv-fix-btn brv-fix-btn--ghost",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
                           onClick: A[12] || (A[12] = (l) => n.sendChat("ask")),
                           title: "코드는 바꾸지 않고 답만 합니다 (Ctrl+Enter)"
-                        }, "질문", 8, lf),
+                        }, "질문", 8, Bf),
                         a("button", {
                           class: "brv-fix-btn",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
                           onClick: A[13] || (A[13] = (l) => n.sendChat("change")),
                           title: "앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지"
-                        }, "수정 요청", 8, Bf)
+                        }, "수정 요청", 8, af)
                       ])
                     ])) : F("", !0),
-                    n.fixable ? (u(), w("div", af, "질문은 코드를 바꾸지 않고 답만, 수정 요청은 이어서 고쳐 검증·PR·병합까지 진행합니다.")) : F("", !0)
+                    n.fixable ? (u(), w("div", cf, "질문은 코드를 바꾸지 않고 답만, 수정 요청은 이어서 고쳐 검증·PR·병합까지 진행합니다.")) : F("", !0)
                   ])
                 ], 64)) : (u(), w("div", pd, [
                   a("button", {
@@ -7721,60 +7726,60 @@ function fQ(e, A, t, s, r, n) {
                   A[36] || (A[36] = a("span", { class: "brv-ai__hint" }, "서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.", -1))
                 ]))
               ]),
-              r.detail.problem || r.detail.reproSteps || r.detail.expectedResult ? (u(), w("div", cf, [
+              r.detail.problem || r.detail.reproSteps || r.detail.expectedResult ? (u(), w("div", gf, [
                 A[46] || (A[46] = a("div", { class: "brv-label" }, "내용", -1)),
-                r.detail.problem ? (u(), w("div", gf, [
+                r.detail.problem ? (u(), w("div", uf, [
                   A[43] || (A[43] = a("div", { class: "brv-field-label" }, "문제 상황", -1)),
                   a("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.problem)
-                  }, null, 8, uf)
+                  }, null, 8, wf)
                 ])) : F("", !0),
-                r.detail.reproSteps ? (u(), w("div", wf, [
+                r.detail.reproSteps ? (u(), w("div", hf, [
                   A[44] || (A[44] = a("div", { class: "brv-field-label" }, "재현 단계", -1)),
                   a("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.reproSteps)
-                  }, null, 8, hf)
+                  }, null, 8, df)
                 ])) : F("", !0),
-                r.detail.expectedResult ? (u(), w("div", df, [
+                r.detail.expectedResult ? (u(), w("div", ff, [
                   A[45] || (A[45] = a("div", { class: "brv-field-label" }, "기대 결과", -1)),
                   a("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.expectedResult)
-                  }, null, 8, ff)
+                  }, null, 8, Qf)
                 ])) : F("", !0)
               ])) : F("", !0),
-              n.parsedContext ? (u(), w("div", Qf, [
+              n.parsedContext ? (u(), w("div", Cf, [
                 A[52] || (A[52] = a("div", { class: "brv-label" }, "컨텍스트", -1)),
-                n.parsedContext.camera ? (u(), w("div", Cf, [
+                n.parsedContext.camera ? (u(), w("div", Uf, [
                   A[47] || (A[47] = a("span", null, "카메라", -1)),
-                  a("span", Uf, Q(n.parsedContext.camera.longitude) + "°, " + Q(n.parsedContext.camera.latitude) + "° · 고도 " + Q(n.parsedContext.camera.height) + "m · H" + Q(n.parsedContext.camera.heading) + "° P" + Q(n.parsedContext.camera.pitch) + "° ", 1)
+                  a("span", Ff, Q(n.parsedContext.camera.longitude) + "°, " + Q(n.parsedContext.camera.latitude) + "° · 고도 " + Q(n.parsedContext.camera.height) + "m · H" + Q(n.parsedContext.camera.heading) + "° P" + Q(n.parsedContext.camera.pitch) + "° ", 1)
                 ])) : F("", !0),
-                (i = n.parsedContext.menus) != null && i.header ? (u(), w("div", Ff, [
+                (i = n.parsedContext.menus) != null && i.header ? (u(), w("div", pf, [
                   A[48] || (A[48] = a("span", null, "상단 탭", -1)),
-                  a("span", pf, Q(n.parsedContext.menus.header), 1)
+                  a("span", Ef, Q(n.parsedContext.menus.header), 1)
                 ])) : F("", !0),
-                n.parsedContext.activeData ? (u(), w("div", Ef, [
+                n.parsedContext.activeData ? (u(), w("div", bf, [
                   A[49] || (A[49] = a("span", null, "데이터셋", -1)),
-                  a("span", bf, Q(((B = n.parsedContext.activeData.datasets) == null ? void 0 : B.map((l) => l._displayName).join(", ")) || "없음"), 1)
+                  a("span", mf, Q(((B = n.parsedContext.activeData.datasets) == null ? void 0 : B.map((l) => l._displayName).join(", ")) || "없음"), 1)
                 ])) : F("", !0),
-                (g = n.parsedContext.activeData) != null && g.terrain ? (u(), w("div", mf, [
+                (g = n.parsedContext.activeData) != null && g.terrain ? (u(), w("div", Hf, [
                   A[50] || (A[50] = a("span", null, "지형", -1)),
-                  a("span", Hf, Q(n.parsedContext.activeData.terrain), 1)
+                  a("span", yf, Q(n.parsedContext.activeData.terrain), 1)
                 ])) : F("", !0),
-                n.parsedContext.datetime ? (u(), w("div", yf, [
+                n.parsedContext.datetime ? (u(), w("div", If, [
                   A[51] || (A[51] = a("span", null, "발생 시각", -1)),
-                  a("span", If, Q(n.parsedContext.datetime), 1)
+                  a("span", xf, Q(n.parsedContext.datetime), 1)
                 ])) : F("", !0)
               ])) : F("", !0),
-              a("div", xf, [
-                a("div", Lf, [
+              a("div", Lf, [
+                a("div", vf, [
                   A[53] || (A[53] = a("div", {
                     class: "brv-label",
                     style: { "margin-bottom": "0" }
                   }, "로그", -1)),
-                  a("div", vf, [
+                  a("div", Sf, [
                     (u(!0), w(x, null, k(n.logTabs, (l) => (u(), w("button", {
                       key: l.id,
                       class: T(["brv-log-tab", { active: r.logTab === l.id }]),
@@ -7785,12 +7790,12 @@ function fQ(e, A, t, s, r, n) {
                         key: 0,
                         class: T(["brv-log-tab-count", l.countClass])
                       }, Q(l.count), 3)) : F("", !0)
-                    ], 10, Sf))), 128))
+                    ], 10, Kf))), 128))
                   ])
                 ]),
                 r.logTab === "front" ? (u(), w(x, { key: 0 }, [
-                  a("div", Kf, [
-                    a("label", Tf, [
+                  a("div", Tf, [
+                    a("label", Df, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[14] || (A[14] = (l) => r.showFE.error = l)
@@ -7799,7 +7804,7 @@ function fQ(e, A, t, s, r, n) {
                       ]),
                       L(" 오류 (" + Q(n.countFE("error")) + ") ", 1)
                     ]),
-                    a("label", Df, [
+                    a("label", kf, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[15] || (A[15] = (l) => r.showFE.warn = l)
@@ -7808,7 +7813,7 @@ function fQ(e, A, t, s, r, n) {
                       ]),
                       L(" 경고 (" + Q(n.countFE("warn")) + ") ", 1)
                     ]),
-                    a("label", kf, [
+                    a("label", _f, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[16] || (A[16] = (l) => r.showFE.log = l)
@@ -7818,7 +7823,7 @@ function fQ(e, A, t, s, r, n) {
                       L(" 로그 (" + Q(n.countFE("log")) + ") ", 1)
                     ])
                   ]),
-                  a("div", _f, [
+                  a("div", Of, [
                     (u(!0), w(x, null, k(n.filteredFrontLogs, (l, c) => {
                       var d;
                       return u(), w("div", {
@@ -7826,19 +7831,19 @@ function fQ(e, A, t, s, r, n) {
                         class: T(["brv-log-item", `brv-log--${l.level}`]),
                         onClick: (C) => n.toggleExpand("f" + c)
                       }, [
-                        a("span", Mf, Q((d = l.time) == null ? void 0 : d.slice(11, 23)), 1),
-                        a("span", Rf, Q(l.level), 1),
+                        a("span", Rf, Q((d = l.time) == null ? void 0 : d.slice(11, 23)), 1),
+                        a("span", Nf, Q(l.level), 1),
                         a("span", {
                           class: T(["brv-log-msg brv-selectable", { expanded: r.expanded.has("f" + c) }])
                         }, Q(l.message), 3)
-                      ], 10, Of);
+                      ], 10, Mf);
                     }), 128)),
-                    n.filteredFrontLogs.length === 0 ? (u(), w("div", Nf, "표시할 로그 없음")) : F("", !0)
+                    n.filteredFrontLogs.length === 0 ? (u(), w("div", Gf, "표시할 로그 없음")) : F("", !0)
                   ])
                 ], 64)) : F("", !0),
                 r.logTab === "back" ? (u(), w(x, { key: 1 }, [
-                  a("div", Gf, [
-                    a("label", Vf, [
+                  a("div", Vf, [
+                    a("label", Pf, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[17] || (A[17] = (l) => r.showBE.error = l)
@@ -7847,7 +7852,7 @@ function fQ(e, A, t, s, r, n) {
                       ]),
                       L(" ERROR (" + Q(n.countBE("ERROR")) + ") ", 1)
                     ]),
-                    a("label", Pf, [
+                    a("label", Xf, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[18] || (A[18] = (l) => r.showBE.warn = l)
@@ -7856,7 +7861,7 @@ function fQ(e, A, t, s, r, n) {
                       ]),
                       L(" WARN (" + Q(n.countBE("WARN")) + ") ", 1)
                     ]),
-                    a("label", Xf, [
+                    a("label", Jf, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[19] || (A[19] = (l) => r.showBE.info = l)
@@ -7866,7 +7871,7 @@ function fQ(e, A, t, s, r, n) {
                       L(" INFO (" + Q(n.countBE("INFO")) + ") ", 1)
                     ])
                   ]),
-                  a("div", Jf, [
+                  a("div", Wf, [
                     (u(!0), w(x, null, k(n.filteredBackLogs, (l, c) => {
                       var d, C;
                       return u(), w("div", {
@@ -7874,20 +7879,20 @@ function fQ(e, A, t, s, r, n) {
                         class: T(["brv-log-item", `brv-log--${(d = l.level) == null ? void 0 : d.toLowerCase()}`]),
                         onClick: (f) => n.toggleExpand("b" + c)
                       }, [
-                        a("span", Yf, Q((C = l.time) == null ? void 0 : C.slice(11, 23)), 1),
-                        a("span", Zf, Q(l.level), 1),
-                        a("span", jf, Q(n.shortLogger(l.logger)), 1),
+                        a("span", Zf, Q((C = l.time) == null ? void 0 : C.slice(11, 23)), 1),
+                        a("span", jf, Q(l.level), 1),
+                        a("span", zf, Q(n.shortLogger(l.logger)), 1),
                         a("span", {
                           class: T(["brv-log-msg brv-selectable", { expanded: r.expanded.has("b" + c) }])
                         }, Q(l.message), 3)
-                      ], 10, Wf);
+                      ], 10, Yf);
                     }), 128)),
-                    n.filteredBackLogs.length === 0 ? (u(), w("div", zf, "표시할 로그 없음")) : F("", !0)
+                    n.filteredBackLogs.length === 0 ? (u(), w("div", qf, "표시할 로그 없음")) : F("", !0)
                   ])
                 ], 64)) : F("", !0),
                 r.logTab === "net" ? (u(), w(x, { key: 2 }, [
-                  a("div", qf, [
-                    a("label", $f, [
+                  a("div", $f, [
+                    a("label", AQ, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[20] || (A[20] = (l) => r.showNet.error = l)
@@ -7896,7 +7901,7 @@ function fQ(e, A, t, s, r, n) {
                       ]),
                       L(" 에러 (" + Q(n.networkLogs.filter((l) => l.error || l.status >= 400).length) + ") ", 1)
                     ]),
-                    a("label", AQ, [
+                    a("label", eQ, [
                       W(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[21] || (A[21] = (l) => r.showNet.ok = l)
@@ -7906,7 +7911,7 @@ function fQ(e, A, t, s, r, n) {
                       L(" 성공 (" + Q(n.networkLogs.filter((l) => !l.error && l.status < 400).length) + ") ", 1)
                     ])
                   ]),
-                  a("div", eQ, [
+                  a("div", tQ, [
                     (u(!0), w(x, null, k(n.filteredNetLogs, (l, c) => {
                       var d;
                       return u(), w("div", {
@@ -7917,52 +7922,52 @@ function fQ(e, A, t, s, r, n) {
                         a("span", {
                           class: T(["brv-net-status", n.statusClass(l.status)])
                         }, Q(l.status || "ERR"), 3),
-                        a("span", sQ, Q(l.method), 1),
+                        a("span", rQ, Q(l.method), 1),
                         a("span", {
                           class: T(["brv-log-msg brv-selectable", { expanded: r.expanded.has("n" + c) }])
                         }, Q(l.url), 3),
-                        a("span", rQ, Q(l.duration) + "ms", 1),
-                        a("span", nQ, Q((d = l.time) == null ? void 0 : d.slice(11, 19)), 1)
-                      ], 10, tQ);
+                        a("span", nQ, Q(l.duration) + "ms", 1),
+                        a("span", oQ, Q((d = l.time) == null ? void 0 : d.slice(11, 19)), 1)
+                      ], 10, sQ);
                     }), 128)),
                     (u(!0), w(x, null, k(n.filteredNetLogs, (l, c) => (u(), w(x, {
                       key: "d" + c
                     }, [
-                      r.expanded.has("n" + c) ? (u(), w("div", oQ, [
-                        l.params ? (u(), w("div", iQ, [
+                      r.expanded.has("n" + c) ? (u(), w("div", iQ, [
+                        l.params ? (u(), w("div", lQ, [
                           A[54] || (A[54] = a("b", null, "Params:", -1)),
                           L(" " + Q(l.params), 1)
                         ])) : F("", !0),
-                        l.requestBody ? (u(), w("div", lQ, [
+                        l.requestBody ? (u(), w("div", BQ, [
                           A[55] || (A[55] = a("b", null, "Request:", -1)),
                           L(" " + Q(l.requestBody), 1)
                         ])) : F("", !0),
-                        l.responseBody ? (u(), w("div", BQ, [
+                        l.responseBody ? (u(), w("div", aQ, [
                           A[56] || (A[56] = a("b", null, "Response:", -1)),
                           L(" " + Q(l.responseBody), 1)
                         ])) : F("", !0),
-                        l.error ? (u(), w("div", aQ, [
+                        l.error ? (u(), w("div", cQ, [
                           A[57] || (A[57] = a("b", null, "Error:", -1)),
                           L(" " + Q(l.error), 1)
                         ])) : F("", !0)
                       ])) : F("", !0)
                     ], 64))), 128)),
-                    n.filteredNetLogs.length === 0 ? (u(), w("div", cQ, "표시할 요청 없음")) : F("", !0)
+                    n.filteredNetLogs.length === 0 ? (u(), w("div", gQ, "표시할 요청 없음")) : F("", !0)
                   ])
                 ], 64)) : F("", !0),
-                r.logTab === "mutation" ? (u(), w("div", gQ, [
+                r.logTab === "mutation" ? (u(), w("div", uQ, [
                   (u(!0), w(x, null, k(n.parsedMutationLog, (l, c) => (u(), w("div", {
                     key: c,
                     class: "brv-log-item",
                     onClick: (d) => n.toggleExpand("m" + c)
                   }, [
-                    a("span", wQ, Q(l.time), 1),
+                    a("span", hQ, Q(l.time), 1),
                     a("span", {
                       class: T(["brv-log-msg brv-mutation brv-selectable", { expanded: r.expanded.has("m" + c) }])
                     }, Q(l.type), 3),
-                    l.payload !== null ? (u(), w("span", hQ, Q(n.formatPayload(l.payload)), 1)) : F("", !0)
-                  ], 8, uQ))), 128)),
-                  n.parsedMutationLog.length === 0 ? (u(), w("div", dQ, "기록된 mutation 없음")) : F("", !0)
+                    l.payload !== null ? (u(), w("span", dQ, Q(n.formatPayload(l.payload)), 1)) : F("", !0)
+                  ], 8, wQ))), 128)),
+                  n.parsedMutationLog.length === 0 ? (u(), w("div", fQ, "기록된 mutation 없음")) : F("", !0)
                 ])) : F("", !0)
               ])
             ], 64)) : F("", !0)
@@ -8006,12 +8011,12 @@ function fQ(e, A, t, s, r, n) {
     ], 32)) : F("", !0)
   ]);
 }
-const EQ = /* @__PURE__ */ Hs(Sh, [["render", fQ], ["__scopeId", "data-v-91fdca04"]]);
+const bQ = /* @__PURE__ */ Hs(Sh, [["render", QQ], ["__scopeId", "data-v-27d7e9b3"]]);
 export {
-  pQ as ReportModal,
-  EQ as Viewer,
+  EQ as ReportModal,
+  bQ as Viewer,
   Ug as captureScreen,
-  FQ as createBugfix,
-  CQ as reduxMiddleware,
-  UQ as zustandSource
+  pQ as createBugfix,
+  UQ as reduxMiddleware,
+  FQ as zustandSource
 };

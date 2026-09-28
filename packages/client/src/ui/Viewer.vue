@@ -118,7 +118,8 @@
                 <template v-else>
                   <div v-if="detail.fixPrUrl || detail.fixBranch" class="brv-ai__meta">
                     <a v-if="detail.fixPrUrl" class="brv-link brv-ai__pr" :href="detail.fixPrUrl" target="_blank" rel="noopener">PR #{{ prNumber }}</a>
-                    <span v-if="detail.fixBranch" class="brv-ai__branch brv-selectable">{{ detail.fixBranch }}</span>
+                    <span v-if="detail.fixBranch" class="brv-ai__branch brv-selectable" :title="detail.fixStatus === 'READY' ? (detail.fixPushed ? 'AI 수정본이 담긴 작업 브랜치 - 원격 저장소에 같은 이름으로 올라가 있습니다 (PR 은 아직 없음)' : 'AI 수정본이 담긴 작업 브랜치 - 아직 키트 서버 안에만 있고 원격에는 없습니다 (콘솔에서 내보내기)') : 'AI 수정본이 담긴 작업 브랜치 (기준 브랜치는 건드리지 않음)'">{{ detail.fixBranch }}</span>
+                    <span v-if="detail.fixStatus === 'READY'" class="brv-ai__hint">{{ detail.fixPushed ? '원격에 브랜치만 있음 · PR 없음' : '키트 서버 안에만 있음 · 원격에 없음' }}</span>
                     <template v-if="detail.fixVersion != null">
                       <span class="brv-ai__branch">v{{ detail.fixVersion }}</span>
                       <template v-if="detail.preview">
@@ -379,7 +380,7 @@ const FIX_LABELS = {
   none:      '요청 전',
   QUEUED:    '대기 중',
   RUNNING:   'AI 가 고치는 중',
-  READY:     '수정본 준비 · 아직 내보내지 않음(콘솔에서 PR·병합)',
+  READY:     '수정본 준비 · 작업 브랜치에 커밋됨, 아직 PR·병합 전(콘솔 버전 탭에서 내보내기)',
   PR_OPENED: 'PR 올라옴 · 병합 안 됨(로그 확인)',
   MERGED:    '병합 완료',
   FAILED:    '실패 · 진행 로그 확인',

@@ -285,7 +285,7 @@
             <label class="dim"><input type="checkbox" id="l_s_insights" checked> 제안 분석 <input id="l_focus" placeholder="특히 볼 것(선택)" style="width:220px;margin-left:6px"></label>
             <label class="dim"><input type="checkbox" id="l_s_fix"> 자동 수정: 심각도 <select id="l_sev"><option>CRITICAL</option><option selected>HIGH</option><option>MEDIUM</option><option>LOW</option></select> 이상 · 최대 <input id="l_max" type="number" value="1" min="1" max="10" style="width:60px"> 건 · 종류 <input id="l_kinds" placeholder="bug,risk (비우면 전부)" style="width:170px"></label>
             <label class="dim"><input type="checkbox" id="l_s_preview"> 수정본 미리보기 띄우기</label>
-            <label class="dim"><input type="checkbox" id="l_s_export"> 내보내기 <select id="l_mode"><option value="pr">PR 까지</option><option value="merge">병합까지</option><option value="branch">브랜치 푸시만</option></select></label>
+            <label class="dim"><input type="checkbox" id="l_s_export"> 내보내기 <select id="l_mode"><option value="pr">PR 까지</option><option value="merge">병합까지</option><option value="branch">브랜치 푸시만</option></select> <span class="dim">- 이 실행에서 만든 수정본 브랜치(<code>claude/bugfix-…</code>)를 원격에 올림 / +PR / +자동 병합. 끄면 프로젝트의 내보내기 설정대로</span></label>
           </div>
           <label>제한 시간 <small>분</small></label><input id="l_max_min" type="number" value="180" style="width:100px">
           <label>켜기</label><div class="inline"><input type="checkbox" id="l_enabled" checked></div>
@@ -331,6 +331,13 @@
             <option value="branch">원격 브랜치 푸시만 (PR 없음)</option>
             <option value="local">보관만 - 키트 저장소 안 브랜치 (원격에 안 올림)</option>
           </select></div>
+          <label></label><div class="dim" id="p_delivery_help" style="line-height:1.6">
+            AI 가 고친 코드는 항상 <code>claude/bugfix-&lt;리포트번호&gt;-&lt;날짜시각&gt;</code> 이름의 <b>작업 브랜치</b>에 커밋됩니다(기준 브랜치는 건드리지 않음). 어디까지 내보낼지:<br>
+            · <b>보관만</b> - 키트 저장소 안에만 둡니다. 원격(GitHub/GitLab)엔 아무것도 안 생깁니다. 콘솔 버전 탭에서 미리보기로 확인한 뒤 내보내기.<br>
+            · <b>브랜치 푸시만</b> - 그 작업 브랜치를 원격에 올립니다. PR/MR 은 안 만듭니다. 팀원이 브랜치를 받아 직접 검토·병합할 때.<br>
+            · <b>PR 까지</b> - 브랜치를 올리고 기준 브랜치로 향하는 PR/MR 을 만듭니다. 병합은 사람이.<br>
+            · <b>자동 병합</b> - PR 을 만든 뒤 기준 브랜치와 합쳐 재검증하고 통과하면 병합, 배포까지 추적합니다.
+          </div>
           <label>수정 요청 <small>누가 할 수 있나</small></label><div class="inline"><select id="p_fixFrom"><option value="app">앱 사용자 + 관리 콘솔</option><option value="admin">관리 콘솔에서만 (앱은 신고만)</option></select></div>
           <label>앱 주소 <small>쉼표 구분</small></label><input id="p_cors" placeholder="https://dev.myapp.com, http://localhost:3000">
           <label>API 키 <small>프론트에 넣는 공개 키</small></label><input id="p_apiKey" placeholder="(선택)">
@@ -552,7 +559,7 @@
     }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
     $('#rows').innerHTML = rows.map((r) => { const st = r.fixStatus || 'NONE';
       const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
-      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 푸시됨' : ' · 키트 안'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
+      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px" title="AI 수정본이 담긴 작업 브랜치. '푸시됨' 이면 원격 저장소에 같은 이름으로 있고, '키트 안' 이면 아직 이 서버에만 있습니다">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 원격에 푸시됨(PR 없음)' : ' · 키트 저장소 안(원격에 없음)'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
     $('#empty').hidden = rows.length > 0;
   }
 
@@ -649,7 +656,7 @@
     const pt = e.target.closest('[data-pstop]'); if (pt) { try { await api('DELETE', `/admin/versions/${vProject}/${pt.dataset.pstop}/preview`); await loadVersions(); } catch (x) { alert(x.message); } return; }
     const vd = e.target.closest('[data-vdiff]'); if (vd) { try { const d = await api('GET', `/admin/versions/${vProject}/${vd.dataset.vdiff}/diff`); $('#vDiff').hidden = false; $('#vDiffHead').textContent = `v${d.n} 변경`; { const h = diffHtml(d.patch, d.stat); if (h != null) $('#vDiffBody').innerHTML = h; else $('#vDiffBody').textContent = `${d.stat}\n\n${d.patch}`; } $('#vDiff').scrollIntoView({ behavior: 'smooth' }); } catch (x) { alert(x.message); } return; }
     const vl = e.target.closest('[data-vlog]'); if (vl) { try { const r = await api('GET', `/admin/versions/${vProject}`); const v = (r.versions || []).find((x) => String(x.n) === vl.dataset.vlog); if (v) showVLog(v); } catch (x) { alert(x.message); } return; }
-    const ve = e.target.closest('[data-vexport]'); if (ve) { const mode = prompt('어디까지 내보낼까요? branch(푸시만) / pr / merge', 'merge'); if (!mode || !['branch', 'pr', 'merge'].includes(mode)) return; try { await api('POST', `/p/${vProject}/reports/${ve.dataset.r}/merge`, { mode }); alert('내보내기를 시작했습니다 - 리포트 탭에서 진행을 볼 수 있습니다'); } catch (x) { alert(x.message); } return; }
+    const ve = e.target.closest('[data-vexport]'); if (ve) { const mode = prompt('이 수정본 브랜치(claude/bugfix-…)를 어디까지 내보낼까요?\n\n  branch - 원격에 브랜치만 올림 (PR 없음, 팀원이 직접 검토)\n  pr     - 브랜치 + 기준 브랜치로 향하는 PR/MR (병합은 사람이)\n  merge  - PR 만들고 재검증 뒤 자동 병합·배포 추적\n\n입력:', 'merge'); if (!mode || !['branch', 'pr', 'merge'].includes(mode)) return; try { await api('POST', `/p/${vProject}/reports/${ve.dataset.r}/merge`, { mode }); alert('내보내기를 시작했습니다 - 리포트 탭에서 진행을 볼 수 있습니다'); } catch (x) { alert(x.message); } return; }
     const vx = e.target.closest('[data-vdel]'); if (vx) { if (!confirm(`v${vx.dataset.vdel} 을 지울까요? 미리보기·태그도 함께 지웁니다 (원격에 올린 것은 남습니다)`)) return; try { await api('DELETE', `/admin/versions/${vProject}/${vx.dataset.vdel}`); await loadVersions(); } catch (x) { alert(x.message); } return; }
     const op = e.target.closest('[data-open]'); if (op && kit) { e.preventDefault(); kit.setProject(vProject); kit.openViewer(Number(op.dataset.open)); return; }
   });
