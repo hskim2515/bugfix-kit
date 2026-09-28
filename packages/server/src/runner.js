@@ -297,10 +297,18 @@ export class Runner {
           + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. '
           + 'git 커밋·푸시는 하지 마세요. 마지막 답변은 무엇을 바꿨는지 한국어로 간단히.\n\n요청: '
         : '사용자의 질문입니다. 코드를 바꾸지 말고 한국어로 간결하게 답하세요. 필요하면 파일을 읽어 근거를 대세요.\n\n질문: ';
-      const out = await this.claudeResume(project, ex, id, wt, r.fixSessionId, preface + message, allowed, allowChange ? 40 : 15);
-      const sid = sessionIdOf(out);
+      let out = await this.claudeResume(project, ex, id, wt, r.fixSessionId, preface + message, allowed, allowChange ? 40 : 20);
+      let sid = sessionIdOf(out);
       if (sid) await this.updateFix(project, id, { fixSessionId: sid });
-      const answer = resultTextOf(out);
+      let answer = resultTextOf(out);
+      // 위임·대기로 끝난 답(하위 에이전트를 기다리다 턴이 끝남)이면 한 번 더 이어서 결론을 받는다
+      if (/delegat|subagent|will resume|waiting for|기다리|위임/i.test(answer) && answer.length < 600) {
+        await L('답이 "기다리는 중" 으로 끝나 이어서 결론을 요청합니다');
+        out = await this.claudeResume(project, ex, id, wt, sid || r.fixSessionId, '기다리지 말고 직접 확인해서 지금 결론을 한국어로 답하세요. 하위 에이전트는 쓰지 마세요.' + (allowChange ? ' 고칠 것이 있으면 바로 고치세요.' : ''), allowed, allowChange ? 30 : 15);
+        sid = sessionIdOf(out) || sid;
+        if (sid) await this.updateFix(project, id, { fixSessionId: sid });
+        answer = resultTextOf(out);
+      }
       await this.appendChat(project, id, 'assistant', notBlank(answer) ? answer : '(답변 없음)');
       await L(`Claude 답변: ${firstLine(answer, 200)}`);
 

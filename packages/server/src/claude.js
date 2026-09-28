@@ -13,7 +13,8 @@ import { firstLine, tail } from './util.js';
  * @param {(line: string) => void} onProgress
  */
 export async function runClaudeStream(ex, cwd, timeoutMin, args, onProgress) {
-  const cmd = [...args, '--output-format', 'stream-json', '--verbose'];
+  // 하위 에이전트(Task/Agent)는 금지 - 위임해 두고 "기다리는 중" 으로 턴을 끝내 버리는 일이 있다. 직접 읽고 직접 고치게
+  const cmd = [...args, ...(args.includes('--disallowedTools') ? [] : ['--disallowedTools', 'Task,Agent']), '--output-format', 'stream-json', '--verbose'];
   const { child, describe } = await ex.start(cwd, cmd);
   child.stdin.end();
   let raw = '';
