@@ -68,7 +68,9 @@ function safeBody(url, v) {
 }
 
 export function installNetwork({ max = 50, axios = [], fetch: patchFetch = false, xhr = false, ignore = [] } = {}) {
-  const reqs = ring(max);
+  // 최근 요청(폴링이 많으면 금방 밀려남) + 실패 요청은 따로(최근 30건) - 신고 때 합쳐서 준다
+  const recent = ring(max), failed = ring(30);
+  const reqs = { push(e) { recent.push(e); if (e && (e.error || Number(e.status) >= 400)) failed.push(e); }, get() { const r = recent.get(); const seen = new Set(r); const f = failed.get().filter((e) => !seen.has(e)); return [...f, ...r].sort((a, b) => String(a.time).localeCompare(String(b.time))); } };
   const skip = (url) => ignore.some((p) => (p instanceof RegExp ? p.test(url) : String(url).includes(p)));
 
   // axios: [instance] 또는 [{ instance, label }]

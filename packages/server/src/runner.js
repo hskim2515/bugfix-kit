@@ -236,9 +236,12 @@ export class Runner {
       await ex.exec(wt, 1, ['git', 'add', '-A']);
       await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '-F', '-'], { stdin: commitMsg });
       await this.updateFix(project, id, { fixBranch: branch, fixSummary: summary, fixPushed: false });
+      const n = await this.recordVersion(project, id, ex, wt, branch, base, summary, L);
+      const repro = await this.afterFix(project, id, ex, wt, branch, base, summary, n, mods, sessionIdOf(out));
       // 보고자·문제 원문은 저장소를 보는 모든 사람에게 공개되므로 PR 본문에 넣지 않는다 - 번호로 앱 안에서 찾아본다
-      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 bugfix-kit 이 Claude Code 를 돌려 만들었습니다. `;
-      await this.deliver(project, ex, gh, id, wt, branch, auth, { summary, prBody, existingPr: null }, mods);
+      const latest = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
+      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}${repro.ran ? `\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 bugfix-kit 이 Claude Code 를 돌려 만들었습니다. `;
+      await this.deliver(project, ex, gh, id, wt, branch, auth, { summary: latest.title || summary, prBody, existingPr: null }, mods);
     } finally {
       await this.removeWorktree(ex, repo, wt);
     }
@@ -294,7 +297,7 @@ export class Runner {
       const preface = allowChange
         ? '사용자의 추가 요청입니다. 앞서 고친 내용 위에 아래 요청을 반영하세요. 고친 뒤 검증 명령을 통과시키고, '
           + '`.bugfix/result.md` 를 같은 형식(# 한 줄 요약 / ## 원인 / ## 고친 내용 / ## 검증 / ## 확인이 필요한 점 / ## 추천 개선)으로 다시 쓰세요. '
-          + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. '
+          + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. `.bugfix/repro.json`(재현 절차: api·steps)도 맞게 두세요 - 고친 뒤 서버가 미리보기에서 그 절차를 돌려 확인합니다. '
           + 'git 커밋·푸시는 하지 마세요. 마지막 답변은 무엇을 바꿨는지 한국어로 간단히.\n\n요청: '
         : '사용자의 질문입니다. 코드를 바꾸지 말고 한국어로 간결하게 답하세요. 필요하면 파일을 읽어 근거를 대세요.\n\n질문: ';
       let out = await this.claudeResume(project, ex, id, wt, r.fixSessionId, preface + message, allowed, allowChange ? 40 : 20);
@@ -334,12 +337,155 @@ export class Runner {
       await ex.exec(wt, 1, ['git', 'add', '-A']);
       await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '-F', '-'], { stdin: commitMsg });
       await this.updateFix(project, id, { fixBranch: branch, fixSummary: summary });
-      const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 bugfix-kit 이 만들었습니다.`;
+      const n = await this.recordVersion(project, id, ex, wt, branch, base, summary, L);
+      const repro = await this.afterFix(project, id, ex, wt, branch, base, summary, n, mods, sid || r.fixSessionId);
+      const latest = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
+      const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}${repro.ran ? `\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 bugfix-kit 이 만들었습니다.`;
       const existingPr = prOpen && r.fixPrNumber != null ? { number: r.fixPrNumber, url: r.fixPrUrl } : null;
-      await this.deliver(project, ex, gh, id, wt, branch, auth, { summary, prBody, existingPr }, mods);
+      await this.deliver(project, ex, gh, id, wt, branch, auth, { summary: latest.title || summary, prBody, existingPr }, mods);
     } finally {
       await this.removeWorktree(ex, repo, wt);
     }
+  }
+
+  /** 수정 커밋 뒤: 재현 검증(켜져 있고 레시피가 있으면) 아니면 미리보기 자동 생성 */
+  async afterFix(project, id, ex, wt, branch, base, summary, n, mods, sessionId) {
+    const none = { ran: false, passed: null, rounds: 0, note: '' };
+    if (n == null || !this.versions?.recipe(project)) return none;
+    if (project.reproCheck !== false) {
+      try { return await this.reproLoop(project, id, ex, wt, branch, base, summary, n, mods, sessionId); }
+      catch (e) { await this.logLine(project, id, `재현 검증 오류(계속): ${firstLine(e.message, 200)}`); return none; }
+    }
+    if (project.previewAuto !== false) { await this.logLine(project, id, `미리보기 v${n} 자동 생성 예약`); this.versions.start(project, n, { low: true }).catch(() => {}); }
+    return none;
+  }
+
+  /** HEAD 를 버전으로 기록(같은 sha 면 기존 번호). 돌려주는 값은 버전 번호(없으면 null) */
+  async recordVersion(project, id, ex, wt, branch, base, summary, L) {
+    if (!this.versions) return null;
+    try {
+      const sha = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
+      const dup = (await this.versions.list(project.name)).find((v) => v.sha === sha);
+      if (dup) { await L(`버전 v${dup.n} (${sha.slice(0, 8)}) 그대로`); return dup.n; }
+      const baseSha = (await ex.execOut(wt, 1, ['git', 'merge-base', 'HEAD', `origin/${base}`])).trim() || (await ex.execOut(wt, 1, ['git', 'rev-parse', `origin/${base}`])).trim();
+      const files = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `${baseSha}..HEAD`])).trim().split(/\r?\n/).filter(Boolean);
+      const n = await this.versions.record(project, { reportId: id, branch, sha, base: baseSha, summary, files });
+      await this.updateFix(project, id, { fixVersion: n });
+      await L(`버전 v${n} 기록 (${sha.slice(0, 8)}) - 콘솔 '버전' 탭에서 미리보기·diff`);
+      return n;
+    } catch (e) { await L(`버전 기록 실패(계속): ${firstLine(e.message, 150)}`); return null; }
+  }
+
+  /**
+   * 재현 검증: 수정본 미리보기를 띄우고 신고된 요청(api)·화면 절차(steps)를 다시 돌려 고쳐졌는지 본다.
+   * 여전히 실패하면 응답·미리보기 백엔드 로그·절차 실패를 증거로 Claude 를 이어 돌려 다시 고치고(최대 reproRounds 회) 검증·커밋·버전 갱신·미리보기 재시작.
+   * 돌려주는 값: { ran, passed, rounds, note }
+   */
+  async reproLoop(project, id, ex, wt, branch, base, summary, n, mods, sessionId) {
+    const L = (s) => this.logLine(project, id, s);
+    const out = { ran: false, passed: null, rounds: 0, note: '' };
+    if (!this.versions || n == null) return out;
+    const recipe = this.versions.recipe(project);
+    if (!recipe) { await L('재현 검증 건너뜀 - 미리보기 레시피가 없습니다(프로젝트 탭)'); return out; }
+    let repro = null;
+    try { repro = JSON.parse(await readIfExists(path.join(wt, '.bugfix/repro.json')) || 'null'); } catch { repro = null; }
+    const r = await this.store.get(project.name, id);
+    // Claude 가 안 썼으면 신고된 실패 요청으로 만든다
+    if (!repro || (!repro.api?.length && !repro.steps?.length)) {
+      let net = []; try { net = JSON.parse(r.networkLogs || '[]'); } catch { /* */ }
+      const bad = net.filter((x) => x && (x.error || (Number(x.status) >= 500) || (Number(x.status) >= 400 && ![401, 403, 404].includes(Number(x.status)))));
+      const seen = new Set();
+      const api = [];
+      for (const x of bad.slice(-10)) {
+        const key = `${x.method} ${String(x.url).split('?')[0]}`; if (seen.has(key)) continue; seen.add(key);
+        let body = null; try { body = x.requestBody ? JSON.parse(x.requestBody) : null; } catch { body = x.requestBody || null; }
+        api.push({ method: x.method || 'GET', path: String(x.url), body, note: `신고된 ${x.status || x.error} 요청` });
+      }
+      repro = { api, steps: [] };
+    }
+    if (!repro.api?.length && !repro.steps?.length) { await L('재현 검증 건너뜀 - 재현할 요청·절차가 없습니다(신고에 실패 요청이 없고 repro.json 도 비어 있음)'); return out; }
+    out.ran = true;
+    const maxRounds = Number(project.reproRounds) > 0 ? Number(project.reproRounds) : 2;
+    let sid = sessionId;
+    for (let round = 1; round <= maxRounds + 1; round++) {
+      await L(`▶ 재현 검증 ${round}회: 미리보기 v${n} 준비…`);
+      await this.versions.start(project, n).catch((e) => { if (e.status !== 409) throw e; });
+      const deadline = Date.now() + 15 * 60_000;
+      let v;
+      for (;;) { v = await this.versions.get(project.name, n); if (!['QUEUED', 'BUILDING', 'STARTING'].includes(v?.preview?.status)) break; if (Date.now() > deadline) break; await sleep(8000); }
+      if (v?.preview?.status !== 'UP') { out.note = `미리보기가 뜨지 않아 재현 검증을 못 했습니다(${v?.preview?.status || '?'}: ${firstLine(v?.preview?.error || '', 120)})`; await L(`✗ ${out.note}`); return out; }
+      const evid = [];
+      let failed = false;
+      // 1) API 재실행 - 미리보기 백엔드로 직접
+      const backBase = `http://${recipe.host}:${v.preview.port}`;
+      const prefixes = [...new Set([project.restBase, '/rest', '/api', '/lhdt-rest', ''].filter((x) => x != null))];
+      for (const a of (repro.api || []).slice(0, 8)) {
+        let p = String(a.path || '').replace(/^https?:\/\/[^/]+/, '');
+        const m = p.match(/\/v\/[^/]+\/\d+\/back(\/.*)$/); if (m) p = m[1];
+        const cands = [p, ...prefixes.filter((pf) => pf && p.startsWith(pf + '/')).map((pf) => p.slice(pf.length))];
+        let res = null;
+        for (const cp of [...new Set(cands)]) {
+          try {
+            const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 60_000);
+            const resp = await fetch(backBase + cp, { method: a.method || 'GET', headers: { 'Content-Type': 'application/json', ...(a.headers || {}) }, body: a.body != null && !['GET', 'HEAD'].includes(String(a.method).toUpperCase()) ? (typeof a.body === 'string' ? a.body : JSON.stringify(a.body)) : undefined, signal: ctl.signal });
+            clearTimeout(t);
+            const text = (await resp.text().catch(() => '')).slice(0, 400);
+            res = { path: cp, status: resp.status, text };
+            if (resp.status !== 404) break;
+          } catch (e) { res = { path: cp, status: 'ERR', text: e.message }; }
+        }
+        const ok = res && typeof res.status === 'number' && res.status < 500 && !(a.expect?.status && res.status !== a.expect.status) && !(a.expect?.statusLt && res.status >= a.expect.statusLt);
+        if (!ok) failed = true;
+        evid.push(`${ok ? '✓' : '✗'} ${a.method || 'GET'} ${res?.path || p} → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
+      }
+      // 2) 화면 절차 - front-check 로 공개 미리보기 주소에서
+      if (repro.steps?.length) {
+        const appUrl = this.notifier?.appUrl(project) || (project.cors || [])[0] || '';
+        const url = appUrl ? `${appUrl}${v.preview.url}` : null;
+        if (!url) evid.push('- 화면 절차: 앱 주소(프로젝트 탭)가 없어 건너뜀');
+        else {
+          try {
+            const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
+            const outDir = path.join(wt, '.bugfix', 'repro-out');
+            const txt = await ex.exec(wt, 10, ['node', bin, 'check', '--url', url, '--no-serve', '--json', '--out', outDir, '--steps', JSON.stringify(repro.steps.slice(0, 30))], { env: { ...process.env, ...(project.env || {}) } });
+            const i = txt.indexOf('{'); const j = i >= 0 ? JSON.parse(txt.slice(i)) : null;
+            const c = j?.collected || {};
+            const bad = (j?.failures || []).length > 0 || (c.pageErrors || 0) > 0;
+            if (bad) failed = true;
+            evid.push(`${bad ? '✗' : '✓'} 화면 절차: 절차 실패 ${(j?.failures || []).length} · 페이지 예외 ${c.pageErrors || 0} · 실패 요청 ${c.failedRequests || 0}`, ...(j?.failures || []).slice(0, 3).map((f) => `  - ${firstLine(f, 160)}`));
+            await this.keepShots(project, id, j, wt, `재현 검증 ${round}회`).catch(() => []);
+          } catch (e) { evid.push(`- 화면 절차 실행 실패: ${firstLine(e.message, 160)}`); }
+        }
+      }
+      out.rounds = round;
+      await L(`재현 검증 ${round}회 결과:\n${evid.join('\n')}`);
+      if (!failed) { out.passed = true; out.note = evid.join('\n'); await L('✓ 재현 검증 통과 - 신고된 실패가 재현되지 않습니다'); await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: true, rounds: round, evidence: evid }) }); return out; }
+      if (round > maxRounds) { out.passed = false; out.note = evid.join('\n'); await L(`✗ 재현 검증 실패 - ${maxRounds}회 다시 고쳤지만 여전히 실패합니다. 사람이 봐야 합니다`); await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: false, rounds: round, evidence: evid }) }); return out; }
+      // 3) 증거 모아 다시 고치기
+      const logs = (await ex.execOut(wt, 1, ['docker', 'logs', '--tail', '300', v.preview.container])).split(/\r?\n/);
+      const errLines = logs.filter((l) => /exception|error|caused by|\tat /i.test(l)).slice(-60);
+      const msg = `재현 검증 ${round}회에서 **여전히 실패**했습니다. 수정본을 실제로 띄워(미리보기 v${n}) 신고된 요청·절차를 다시 돌린 결과입니다:\n${evid.join('\n')}\n\n미리보기 백엔드 로그(오류 부분):\n${errLines.join('\n').slice(0, 6000) || '(오류 줄 없음)'}\n\n증상 은폐(오류 메시지만 고치기)가 아니라 **실제 원인**을 찾아 고치세요. 필요하면 로그의 스택트레이스를 따라가세요. 고친 뒤 검증 명령을 통과시키고 \`.bugfix/result.md\` 를 갱신하고, 재현 절차가 잘못됐으면 \`.bugfix/repro.json\` 도 고치세요. git 커밋은 하지 마세요.`;
+      await L(`Claude 에게 증거를 주고 다시 고칩니다 (${round}/${maxRounds})…`);
+      const o2 = await this.claudeResume(project, ex, id, wt, sid, msg, this.allowedTools(project), 40);
+      sid = sessionIdOf(o2) || sid; if (sid) await this.updateFix(project, id, { fixSessionId: sid });
+      await L(`Claude 답변: ${firstLine(resultTextOf(o2), 200)}`);
+      await this.revertProtected(project, ex, wt, L);
+      const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
+      if (!changed) { out.passed = false; out.note = 'AI 가 더 고칠 곳을 찾지 못했습니다'; await L(`✗ ${out.note}`); await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: false, rounds: round, evidence: evid, note: out.note }) }); return out; }
+      await L(`변경 파일:\n${changed}`);
+      const mods2 = uniqBy([...mods, ...this.changedModules(project, changed)], (m) => m.name);
+      await L('검증…'); await this.verify(project, ex, wt, mods2); await L('✓ 검증 통과');
+      const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
+      await this.saveSuggestions(project, id, result.body, (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim() + '\n' + changed);
+      await ex.exec(wt, 1, ['git', 'add', '-A']);
+      await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '-F', '-'], { stdin: `fix: ${result.title || summary} (버그 #${id} · 재현 검증 ${round}회 뒤 수정)\n\n${result.body || ''}\n\nCo-Authored-By: Claude <noreply@anthropic.com>` });
+      const sha = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
+      const files = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim().split(/\r?\n/).filter(Boolean);
+      await this.versions.retag(project, n, sha, files);
+      if (result.title) await this.updateFix(project, id, { fixSummary: result.title });
+      await L(`버전 v${n} 을 새 커밋 ${sha.slice(0, 8)} 으로 갱신`);
+    }
+    return out;
   }
 
   // ── 내보내기: 프로젝트 delivery 모드만큼 (local 보관 · branch 푸시 · pr · merge) ─────────────
@@ -348,21 +494,7 @@ export class Runner {
     const base = project.baseBranch;
     const mode = modeOverride || project.delivery || 'merge';
     // 어느 모드든 커밋된 소스 상태는 키트가 버전으로 갖는다(태그 bugfix/v{n}) - 콘솔 '버전' 탭에서 미리보기·diff·내보내기
-    if (this.versions) {
-      try {
-        const sha = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
-        // 같은 커밋이 이미 버전으로 있으면(보관해 둔 것을 나중에 내보낼 때) 다시 기록하지 않는다
-        const dup = (await this.versions.list(project.name)).find((v) => v.sha === sha);
-        if (dup) await L(`버전 v${dup.n} (${sha.slice(0, 8)}) 그대로 내보냅니다`);
-        else {
-          const baseSha = (await ex.execOut(wt, 1, ['git', 'merge-base', 'HEAD', `origin/${base}`])).trim() || (await ex.execOut(wt, 1, ['git', 'rev-parse', `origin/${base}`])).trim();
-          const files = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `${baseSha}..HEAD`])).trim().split(/\r?\n/).filter(Boolean);
-          const n = await this.versions.record(project, { reportId: id, branch, sha, base: baseSha, summary, files });
-          await this.updateFix(project, id, { fixVersion: n });
-          await L(`버전 v${n} 기록 (${sha.slice(0, 8)}) - 콘솔 '버전' 탭에서 미리보기·diff`);
-        }
-      } catch (e) { await L(`버전 기록 실패(계속): ${firstLine(e.message, 150)}`); }
-    }
+    await this.recordVersion(project, id, ex, wt, branch, base, summary, L);
     if (mode === 'local') {
       await this.updateFix(project, id, { fixStatus: 'READY', fixPushed: false });
       await L(`✓ 수정본 보관: 브랜치 ${branch} (키트 저장소 안에만 - 콘솔에서 '내보내기' 로 푸시·PR·병합)`);
@@ -754,7 +886,15 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
      앱 쪽에 우회 코드를 덧대지 마세요 - 그 패키지의 저장소에서 고칩니다.
   3. 최소 범위로 고칩니다.
   4. 고친 모듈의 검증 명령이 통과해야 합니다. 통과하지 못하면 고치거나 되돌리세요. (바깥에서 한 번 더 검증합니다)
-  5. 마지막에 \`.bugfix/result.md\` 를 아래 형식으로 씁니다. 첫 줄이 PR 제목이 됩니다(한 줄, 60자 이내, 한국어).
+  5. \`.bugfix/repro.json\` 에 **재현 절차**를 씁니다. 고친 뒤 서버가 수정본을 실제로 띄워(미리보기) 이 절차를 돌려 고쳐졌는지 확인하고,
+     여전히 실패하면 증거(응답·서버 로그)를 주고 다시 고치게 합니다. 형식:
+     \`\`\`
+     { "api": [ { "method": "POST", "path": "/network/import/ktdb/save", "body": {…}, "note": "신고된 500 요청 - network-logs.json 그대로" } ],
+       "steps": [ { "goto": "/some/route" }, { "click": { "text": "가져오기" } }, { "waitFor": 2000 }, { "expect": { "selector": ".toast-error", "count": 0 } } ] }
+     \`\`\`
+     - api: 신고된 실패 요청(network-logs.json 의 status ≥ 400 항목)을 그대로. path 는 앱 REST 접두 경로(/rest, /api 등)를 뺀 경로. 실패 요청이 없으면 [].
+     - steps: 화면에서 재현할 수 있으면 front-check 절차(goto/click/fill/waitFor/expect). 확실하지 않으면 [].
+  6. 마지막에 \`.bugfix/result.md\` 를 아래 형식으로 씁니다. 첫 줄이 PR 제목이 됩니다(한 줄, 60자 이내, 한국어).
      \`\`\`
      # <한 줄 요약>
      ## 원인

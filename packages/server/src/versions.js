@@ -87,6 +87,14 @@ export class Versions {
     return n;
   }
 
+  /** 같은 리포트의 재시도 커밋으로 버전을 옮긴다(재현 검증 루프) - 태그도 새 sha 로 */
+  async retag(project, n, sha, files = null) {
+    await this.update(project.name, n, (v) => ({ sha, ...(files ? { files: files.slice(0, 200) } : {}), retaggedAt: nowIso() }));
+    const ex = this.runner.ex(project);
+    const { repo } = this.runner.paths(project, 0);
+    await this.runner.mutex(this.runner.repoKey(project), () => ex.exec(repo, 1, ['git', 'tag', '-f', `bugfix/v${n}`, sha])).catch((e) => this.log.warn(`[versions ${project.name}] 태그 갱신 실패: ${e.message}`));
+  }
+
   /** base 와 이 버전 사이의 변경 - 통계 + 패치(크기 제한) */
   async diff(project, n) {
     const v = await this.get(project.name, n);

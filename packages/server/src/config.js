@@ -70,6 +70,11 @@ export function loadConfig(file) {
       githubRepo: p.githubRepo || hostInfo.gitlabProject || '',   // 표시·프롬프트용 저장소 이름
       // 수정본을 어디까지 내보내나: local(키트 저장소 안 브랜치에 보관만) · branch(원격 브랜치 푸시) · pr(푸시+PR) · merge(푸시+PR+자동 병합)
       delivery: ['local', 'branch', 'pr', 'merge'].includes(p.delivery) ? p.delivery : (p.autoMerge === false ? 'pr' : 'merge'),
+      // 수정 뒤 미리보기 자동 생성 · 재현 검증(미리보기에 신고된 요청/절차를 다시 돌려 고쳐졌는지 확인, 실패하면 증거를 주고 다시 고침) · 재시도 횟수 · 앱 REST 접두 경로(요청 경로 변환용)
+      previewAuto: p.previewAuto !== false,
+      reproCheck: p.reproCheck !== false,
+      reproRounds: Number(p.reproRounds) > 0 ? Number(p.reproRounds) : 2,
+      restBase: typeof p.restBase === 'string' ? p.restBase.replace(/\/+$/, '') : '',
       env: { ...fileEnv, ...(p.env || {}) },
       apiKey: notBlank(envKey) ? envKey : (p.apiKey || fileEnv.BUGFIX_API_KEY || ''),
       // 프로젝트별 GitHub 토큰(선택) - 없으면 서버 공용 토큰
