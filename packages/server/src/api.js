@@ -92,7 +92,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   // ── 지식 그래프(Knowledge): 메뉴·기능 → 파일·API 온톨로지 ──
   app.get('/admin/knowledge/:project', admin, wrap(async (req) => knowledge ? knowledge.summary(proj(req).name) : { status: 'NONE' }));
   app.get('/admin/knowledge/:project/graph', admin, wrap(async (req) => { const s = knowledge ? await knowledge.state(proj(req).name) : {}; return { nodes: s.nodes || [], edges: s.edges || [], head: s.head || null }; }));
-  app.post('/admin/notify/:project/test', admin, wrap(async (req) => notifier.test(proj(req))));
+  app.post('/admin/notify/:project/test', admin, wrap(async (req) => notifier.test(proj(req), { webhook: String(req.body?.webhook || '').trim(), mention: req.body?.mention })));
   app.get('/admin/notify/events', admin, wrap(async () => (await import('./notifier.js')).EVENTS));
   // ── 루프(되풀이 자동화) ──
   app.get('/admin/loops/:project', admin, wrap(async (req) => (loops ? loops.list(proj(req)) : { loops: [], runs: [] })));

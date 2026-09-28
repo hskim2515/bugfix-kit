@@ -56,9 +56,11 @@ export class Notifier {
     } finally { clearTimeout(t); }
   }
   /** 콘솔 '테스트 보내기' */
-  async test(project) {
+  async test(project, override = {}) {
+    // 콘솔이 지금 입력한(아직 저장 안 한) 값을 같이 보내면 그것으로 - 저장 전에도 확인할 수 있게
+    if (override.webhook) project = { ...project, notify: { ...(project.notify || {}), webhook: override.webhook, ...(override.mention != null ? { mention: override.mention } : {}) } };
     const st = this.settings(project);
-    if (!st.webhook) throw Object.assign(new Error('웹훅 주소가 없습니다 - 프로젝트 탭의 알림 웹훅 또는 키·계정 탭의 NOTIFY_WEBHOOK'), { status: 400 });
+    if (!st.webhook) throw Object.assign(new Error('웹훅 주소가 비어 있습니다 - 위 칸에 Slack incoming webhook(https://hooks.slack.com/services/…) 또는 JSON 을 받을 URL 을 넣으세요'), { status: 400 });
     const saved = st.events; this.cfg.__testAll = true;
     try {
       const ok = await this.send({ ...project, notify: { ...(project.notify || {}), webhook: st.webhook, events: '*' } }, 'report.new', { title: '알림 테스트', lines: [`콘솔: ${this.consoleUrl(project) || '(앱 주소 미설정 - 프로젝트 탭의 앱 주소)'}`, `받는 이벤트: ${saved.map((e) => EVENTS[e] || e).join(', ')}`], level: 'info' });

@@ -681,7 +681,7 @@
     if (!e.target.closest('#notifyTest')) return;
     const name = $('#p_name').value.trim(); if (!name) { $('#notifyMsg').textContent = '프로젝트를 먼저 저장하세요'; return; }
     $('#notifyMsg').textContent = '보내는 중…';
-    try { await api('POST', `/admin/notify/${name}/test`); $('#notifyMsg').textContent = '✓ 보냈습니다 (저장된 설정 기준 - 방금 바꿨으면 먼저 저장)'; } catch (x) { $('#notifyMsg').textContent = `✗ ${x.message}`; }
+    try { await api('POST', `/admin/notify/${name}/test`, { webhook: $('#p_notify_webhook').value.trim(), mention: $('#p_notify_mention').value.trim() }); $('#notifyMsg').textContent = '✓ 보냈습니다 - 채널을 확인하세요. 계속 받으려면 저장을 누르세요'; } catch (x) { $('#notifyMsg').textContent = `✗ ${x.message}`; }
   });
   // ── 루프 ──
   let lTimer = null, lProject = null, lEditing = null;
