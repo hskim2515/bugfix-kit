@@ -29,9 +29,13 @@ public class BugfixProxyController {
     private final String path;
     private final Supplier<String> target;
 
-    public BugfixProxyController(String path, Supplier<String> target) {
+    private final java.util.function.BooleanSupplier starting;
+
+    public BugfixProxyController(String path, Supplier<String> target) { this(path, target, () -> false); }
+    public BugfixProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting) {
         this.path = path.replaceAll("/+$", "");
         this.target = target;
+        this.starting = starting;
     }
 
     @RequestMapping("${bugfix.path:/bugfix}/**")
@@ -39,10 +43,13 @@ public class BugfixProxyController {
         String server = target.get();
         if (server == null || server.isBlank()) {
             boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
-            String msg = win
+            String msg = starting.getAsBoolean()
+                ? "bugfix-kit 워커가 시작 중입니다 (앱 재배포 직후 10초~1분). 잠시 뒤 자동으로 다시 시도합니다."
+                : win
                 ? "bugfix-kit: Windows 에서는 로컬 워커를 띄우지 않습니다. 로컬 프로파일에 bugfix.server=http://<개발서버>:<워커 포트> 를 적어 개발서버 워커를 쓰거나, WSL2 에서 앱을 실행하세요."
                 : "bugfix-kit 이 아직 준비되지 않았습니다 - 워커가 시작 중이거나(앱 로그의 [bugfix-kit] 줄 확인) bugfix.server 가 비어 있고 node 가 없습니다. 로컬에서는 bugfix.server=http://<개발서버>:<워커 포트> 가 가장 간단합니다.";
-            return ResponseEntity.status(503).contentType(org.springframework.http.MediaType.TEXT_PLAIN).body(msg.getBytes(StandardCharsets.UTF_8));
+            String json = "{\"message\":\"" + msg.replace("\"", "'") + "\",\"starting\":" + starting.getAsBoolean() + "}";
+            return ResponseEntity.status(503).header("Retry-After", "5").contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(json.getBytes(StandardCharsets.UTF_8));
         }
         String uri = req.getRequestURI().substring(req.getContextPath().length());
         String rest = uri.startsWith(path) ? uri.substring(path.length()) : uri;

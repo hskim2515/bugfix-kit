@@ -75,6 +75,17 @@ public class BugfixWorker implements SmartLifecycle {
         supervisor.start();
     }
 
+    /** 워커가 응답하나 (GET /api/health) */
+    private boolean healthy(String base) {
+        try {
+            HttpResponse<Void> r = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
+                .send(HttpRequest.newBuilder(URI.create(base + "/api/health")).timeout(Duration.ofSeconds(2)).GET().build(), HttpResponse.BodyHandlers.discarding());
+            return r.statusCode() == 200;
+        } catch (Exception e) { return false; }
+    }
+    /** 시작 중이면 true (프로세스는 떠 있는데 아직 응답 전) */
+    public boolean starting() { Process p = process; return p != null && p.isAlive() && url.isEmpty(); }
+
     private void supervise() {
         try {
             String node = findNode();
@@ -95,9 +106,13 @@ public class BugfixWorker implements SmartLifecycle {
                 env.putIfAbsent("BUGFIX_CONFIG", yml.toString());
                 Process p = pb.start();
                 process = p;
-                url = "http://127.0.0.1:" + port;
                 log.info("[bugfix-kit] 워커 시작 pid={} port={} config={}", p.pid(), port, yml);
                 pipe(p);
+                // 포트가 열려 응답할 때까지는 url 을 비워 둔다 - 프록시가 '시작 중' 503 을 주고 콘솔이 잠시 뒤 다시 시도한다
+                String candidate = "http://127.0.0.1:" + port;
+                long t0 = System.currentTimeMillis();
+                while (running && p.isAlive() && !healthy(candidate)) { Thread.sleep(500); if (System.currentTimeMillis() - t0 > 120_000) break; }
+                if (p.isAlive()) { url = candidate; log.info("[bugfix-kit] 워커 준비됨 ({}초)", (System.currentTimeMillis() - t0) / 1000); }
                 int code = p.waitFor();
                 process = null;
                 if (!running) break;

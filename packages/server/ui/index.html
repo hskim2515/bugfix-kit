@@ -218,6 +218,9 @@
     </div>
   </section>
 
+  <section id="waiting" hidden style="max-width:520px;margin:80px auto">
+    <div class="card"><h3>⏳ 잠시만요</h3><div id="waitMsg" style="margin:6px 0"></div><div class="dim" id="waitFor"></div><div class="dim" style="margin-top:8px">입력한 키는 그대로 둡니다. 계속 이 화면이면 앱 로그의 [bugfix-kit] 줄이나 콘솔 '점검' 탭을 보세요.</div></div>
+  </section>
   <section id="app" hidden>
     <!-- 리포트 -->
     <div data-tab="reports">
@@ -400,11 +403,21 @@
   async function api(method, path, body) {
     const r = await fetch(`${API}${path}`, { method, headers: H(), body: body === undefined ? undefined : JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401 || r.status === 503) { showLogin(j.message || `HTTP ${r.status}`); throw new Error(j.message || `HTTP ${r.status}`); }
+    if (r.status === 401) { showLogin(j.message || '운영자 키가 맞지 않습니다'); throw new Error(j.message || `HTTP ${r.status}`); }
+    if (r.status === 503 || r.status === 502 || r.status === 504) { showWaiting(j.message || (r.status === 503 ? '워커가 시작 중입니다 (앱 재배포 직후 10초~1분)' : '앱이 재시작 중입니다')); throw new Error(j.message || `HTTP ${r.status}`); }
     if (!r.ok) throw new Error(j.message || `HTTP ${r.status}`);
     return j.content;
   }
-  function showLogin(msg) { $('#app').hidden = true; $('#login').hidden = false; $('#loginErr').textContent = msg || ''; }
+  function showLogin(msg) { clearTimeout(waitTimer); $('#app').hidden = true; $('#login').hidden = false; $('#loginErr').textContent = msg || ''; $('#waiting').hidden = true; }
+  // 워커·앱 재시작 중(503/502/504): 키는 그대로 두고 5초마다 다시 붙는다 - 키가 틀린 게 아니라는 걸 보여 준다
+  let waitTimer = null, waitSince = 0;
+  function showWaiting(msg) {
+    if (!waitSince) waitSince = Date.now();
+    $('#login').hidden = true; $('#waiting').hidden = false;
+    $('#waitMsg').textContent = msg; $('#waitFor').textContent = `${Math.round((Date.now() - waitSince) / 1000)}초째 기다리는 중 · 5초마다 다시 시도`;
+    clearTimeout(waitTimer); waitTimer = setTimeout(() => load(), 5000);
+  }
+  function hideWaiting() { if (!$('#waiting').hidden) { $('#waiting').hidden = true; waitSince = 0; clearTimeout(waitTimer); } }
 
   // ── 리포트 ──
   async function load() {
@@ -414,7 +427,7 @@
       if (!scopeReady) await resolveScope(data.projects);
       if (scope) data.projects = data.projects.filter((p) => p.name === scope);
       ensureKit(); renderReports();
-      $('#login').hidden = true; $('#app').hidden = false;
+      $('#login').hidden = true; $('#app').hidden = false; hideWaiting();
       if (!quick) loadChecklist();
       $('#tick').textContent = `갱신 ${new Date().toLocaleTimeString()}`;
     } catch (e) { $('#tick').textContent = `연결 실패: ${e.message}`; }

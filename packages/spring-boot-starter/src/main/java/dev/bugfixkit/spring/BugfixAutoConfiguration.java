@@ -40,7 +40,7 @@ public class BugfixAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public BugfixProxyController bugfixProxyController(BugfixProperties props, BugfixWorker worker) {
-        return new BugfixProxyController(props.getPath(), () -> props.getServer().isBlank() ? worker.url() : props.getServer());
+        return new BugfixProxyController(props.getPath(), () -> props.getServer().isBlank() ? worker.url() : props.getServer(), worker::starting);
     }
 
     static String starterVersion() {
