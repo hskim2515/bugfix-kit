@@ -5,6 +5,7 @@
       @mousedown="backdropPressed = $event.target === $event.currentTarget"
       @click.self="backdropPressed && close()">
       <div class="brv-modal">
+        <component :is="'style'" v-text="fmtCss"></component>
 
         <!-- 헤더 -->
         <div class="brv-header">
@@ -128,7 +129,7 @@
                       </template>
                     </template>
                   </div>
-                  <div v-if="detail.fixSummary" class="brv-ai__summary brv-selectable">{{ detail.fixSummary }}</div>
+                  <div v-if="detail.fixSummary" class="brv-ai__summary brv-selectable" v-html="md(detail.fixSummary)"></div>
 
                   <!-- 이 신고와 관련된 지식 그래프 부분 - AI 가 참고한 것과 같은 선택. 화면 → 기능 → 파일 → API → 백엔드 층으로 -->
                   <details v-if="kgLayout" class="brv-kg" open>
@@ -160,14 +161,14 @@
 
                   <details v-if="detail.fixLog" class="brv-fix-log" :open="fixInProgress || deployPending">
                     <summary>진행 로그 <span class="brv-ai__count">{{ logLineCount }}줄</span></summary>
-                    <pre ref="fixLogPre" class="brv-selectable">{{ detail.fixLog }}</pre>
+                    <div ref="fixLogPre" class="brv-selectable brv-logbox" v-html="logH(detail.fixLog)"></div>
                   </details>
 
                   <!-- AI 가 남긴 추천 개선: 누르면 그 내용을 그대로 '수정 요청' 으로 보낸다 -->
                   <div v-if="fixSuggestions.length" class="brv-suggest">
                     <div class="brv-suggest__title">추천 개선 <span class="brv-suggest__hint">실행을 누르면 그 내용으로 이어서 고칩니다</span></div>
                     <div v-for="(s, i) in fixSuggestions" :key="i" class="brv-suggest__item">
-                      <span class="brv-suggest__text brv-selectable">{{ s }}</span>
+                      <span class="brv-suggest__text brv-selectable" v-html="md(s)"></span>
                       <button v-if="fixable" class="brv-fix-btn brv-fix-btn--ghost brv-suggest__run" :disabled="fixBusy || fixInProgress" @click="runSuggestion(s)">실행</button>
                     </div>
                   </div>
@@ -176,7 +177,7 @@
                   <div class="brv-chat">
                     <div v-for="(m, i) in fixChat" :key="i" :class="['brv-chat__msg', `brv-chat__msg--${m.role}`]">
                       <span class="brv-chat__who">{{ m.role === 'user' ? '나' : 'AI' }}</span>
-                      <div class="brv-chat__text brv-selectable">{{ m.text }}</div>
+                      <div class="brv-chat__text brv-selectable" v-html="md(m.text)"></div>
                     </div>
                     <div v-if="fixInProgress && fixChat.length && fixChat[fixChat.length - 1].role === 'user'" class="brv-chat__msg brv-chat__msg--assistant">
                       <span class="brv-chat__who">AI</span>
@@ -201,15 +202,15 @@
                 <div class="brv-label">내용</div>
                 <div v-if="detail.problem" class="brv-field">
                   <div class="brv-field-label">문제 상황</div>
-                  <div class="brv-text brv-selectable">{{ detail.problem }}</div>
+                  <div class="brv-text brv-selectable" v-html="md(detail.problem)"></div>
                 </div>
                 <div v-if="detail.reproSteps" class="brv-field">
                   <div class="brv-field-label">재현 단계</div>
-                  <div class="brv-text brv-selectable">{{ detail.reproSteps }}</div>
+                  <div class="brv-text brv-selectable" v-html="md(detail.reproSteps)"></div>
                 </div>
                 <div v-if="detail.expectedResult" class="brv-field">
                   <div class="brv-field-label">기대 결과</div>
-                  <div class="brv-text brv-selectable">{{ detail.expectedResult }}</div>
+                  <div class="brv-text brv-selectable" v-html="md(detail.expectedResult)"></div>
                 </div>
               </div>
 
@@ -392,12 +393,15 @@ const STATUSES = [
   { value: 'CLOSED',      label: '보류' },
 ];
 
+import * as fmt from '../core/fmt.js';
+
 export default {
   name: 'BugfixViewer',
   props: { kit: { type: Object, default: null } },
   expose: ['open', 'close'],
   data() {
     return {
+      fmtCss: fmt.FMT_CSS,
       STATUSES,
       isOpen: false,
       backdropPressed: false,
@@ -547,6 +551,8 @@ export default {
   },
   beforeUnmount() { this._stopFixPolling(); },
   methods: {
+    md(t) { return fmt.mdLite(t); },
+    logH(t) { return fmt.logHtml(t); },
     async open(id) {
       this.isOpen = true;
       this.selected = null;
@@ -832,7 +838,7 @@ export default {
 .brv-chat__btns { display: flex; flex-direction: column; gap: 6px; justify-content: center; }
 .brv-chat__btns .brv-fix-btn { white-space: nowrap; }
 .brv-chat__input { font-family: inherit; }
-.brv-chat__text { color: #d0d6de; }
+.brv-chat__text { color: #d0d6de; white-space: normal; }
 .brv-chat__msg--user .brv-chat__text { color: #e6ebf2; }
 .brv-notice { margin: 0 16px; padding: 8px 12px; border-radius: 6px; font-size: 12px; background: #eef4ff; color: #1e3a8a; }
 .brv-notice--error { background: #fdecec; color: #8a1c1c; }
@@ -955,7 +961,7 @@ export default {
 .brv-fix-log { margin-top: 8px; font-size: 11px; }
 .brv-fix-log summary { cursor: pointer; color: #445; }
 /* 배경을 직접 칠하므로 글자색도 직접 - 어두운 테마에서 글자색이 밝게 상속되어 안 보였다 */
-.brv-fix-log pre { margin: 6px 0 0; max-height: 260px; overflow: auto; padding: 8px; background: #1f2530; color: #d8dee6; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: 11px; line-height: 1.45; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.brv-fix-log pre, .brv-logbox { margin: 6px 0 0; max-height: 260px; overflow: auto; padding: 8px; background: #1f2530; color: #d8dee6; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: 11px; line-height: 1.45; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .brv-fix-summary { color: inherit; }
 .brv-suggest { margin-top: 10px; border-top: 1px dashed #c9d0d8; padding-top: 8px; }
 .brv-suggest__title { font-size: 12px; font-weight: 600; color: #334; margin-bottom: 4px; }
@@ -990,7 +996,7 @@ export default {
 .brv-field-label { font-size: 10px; color: #445566; margin-bottom: 3px; }
 .brv-text {
   font-size: 11px; color: #c8d8e8; line-height: 1.6;
-  white-space: pre-wrap; background: rgba(0,0,0,0.2);
+  white-space: normal; background: rgba(0,0,0,0.2);
   padding: 8px; border-radius: 4px;
 }
 

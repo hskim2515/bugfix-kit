@@ -50,6 +50,8 @@
   .ktree details > summary::before { content: '▸ '; color: var(--dim); } .ktree details[open] > summary::before { content: '▾ '; }
   pre.log { margin: 8px 0 0; max-height: 220px; overflow: auto; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #cfd8e6; background: rgba(0,0,0,0.25); padding: 8px 10px; border-radius: 6px; white-space: pre-wrap; }
   pre.log.tall { max-height: 60vh; }
+  pre.log .bf-log, pre.log .bf-diff { white-space: normal; font: inherit; }
+  pre.log .bf-log .ln { white-space: pre-wrap; }
   .toolbar { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; flex-wrap: wrap; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
   .seg button { border: 0; background: transparent; color: var(--dim); padding: 5px 12px; cursor: pointer; font-size: 12px; }
@@ -386,6 +388,10 @@
   const mqR = matchMedia('(max-width: 720px)'), mqI = matchMedia('(max-width: 1000px)');
   const applyCardRows = () => { $('#rTable').classList.toggle('cardrows', mqR.matches); $('#iTable').classList.toggle('cardrows', mqI.matches); $('#vTable').classList.toggle('cardrows', mqI.matches); };
   mqR.addEventListener('change', applyCardRows); mqI.addEventListener('change', applyCardRows); applyCardRows();
+  const F = window.BugfixKit && BugfixKit.fmt;
+  if (F) { const st = document.createElement('style'); st.textContent = F.FMT_CSS; document.head.appendChild(st); }
+  const logHtml = (t) => (F ? F.logHtml(t) : null), mdLite = (t) => (F ? F.mdLite(t) : null), diffHtml = (p, st) => (F ? F.diffHtml(p, st) : null);
+  const setLog = (el, text) => { const h = logHtml(text); if (h != null) el.innerHTML = h; else el.textContent = text; };
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
   const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패' };
@@ -521,7 +527,7 @@
     const busy = states.some(({ st }) => isBusy(st));
     $('#iRun').disabled = states.every(({ st }) => isBusy(st));
     $('#iState').textContent = states.map(({ name, st }) => `${multi ? name + ': ' : ''}${isBusy(st) ? (st.status === 'QUEUED' ? '대기 중…' : '분석 중…') : st.ranAt ? `마지막 분석 ${ago(st.ranAt)}` : '분석 전'}`).join(' · ');
-    $('#iLog').textContent = states.filter(({ st }) => st.log).map(({ name, st }) => (multi ? `── ${name} ──\n` : '') + st.log).join('\n');
+    setLog($('#iLog'), states.filter(({ st }) => st.log).map(({ name, st }) => (multi ? `── ${name} ──\n` : '') + st.log).join('\n'));
     $('#iLogWrap').open = busy; if (busy) $('#iLog').scrollTop = $('#iLog').scrollHeight;
     const withShots = states.filter(({ st }) => st.shots?.length);
     $('#iShotsWrap').hidden = !withShots.length;
@@ -539,7 +545,7 @@
     items.sort((a, b) => (order[a.severity] ?? 9) - (order[b.severity] ?? 9));
     $('#iEmpty').hidden = items.length > 0 || busy;
     $('#iRows').innerHTML = items.map((it) => `<tr data-ip="${esc(it.project)}"><td>${sevPill(it.severity)}<div class="dim">${esc(it.kind)}</div></td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(it.project)}</td>
-      <td><div>${esc(it.title)}</div><div class="dim" style="white-space:pre-wrap;margin-top:4px">${esc(it.evidence)}</div><div style="margin-top:4px;color:#b9c3d0">→ ${esc(it.proposal)}</div></td>
+      <td><div><b>${esc(it.title)}</b></div><div class="dim" style="margin-top:4px">${mdLite(it.evidence) ?? esc(it.evidence)}</div><div style="margin-top:6px;color:#b9c3d0;border-left:2px solid rgba(110,160,255,0.5);padding-left:8px">${mdLite(it.proposal) ?? esc(it.proposal)}</div></td>
       <td class="dim" style="font-family:ui-monospace,Menlo,monospace;font-size:11px;word-break:break-all">${it.files.map(esc).join('<br>')}${it.shots?.length ? `<div>📷 ${it.shots.map(esc).join(', ')}</div>` : ''}</td>
       <td class="dim">${Math.round((it.confidence || 0) * 100)}%</td>
       <td><button class="btn" data-ireport="${it.id}">리포트로</button> <button class="btn primary" data-ifix="${it.id}">바로 수정</button> <button class="btn" data-idel="${it.id}" title="이 제안을 지웁니다. 다음 분석에서 같은 내용은 다시 나오지 않습니다">삭제</button></td></tr>`).join('');
@@ -584,7 +590,7 @@
     else if (!$('#vLogWrap').hidden && $('#vLogWrap').dataset.v) { const cur = vs.find((v) => String(v.n) === $('#vLogWrap').dataset.v); if (cur) showVLog(cur, false); }
     clearInterval(vTimer); if (busyAny) vTimer = setInterval(loadVersions, 4000);
   }
-  function showVLog(v, open = true) { $('#vLogWrap').hidden = false; $('#vLogWrap').dataset.v = v.n; if (open) $('#vLogWrap').open = true; $('#vLogHead').textContent = `v${v.n} 미리보기 로그 (${pvLabel[v.preview?.status || 'NONE']})`; $('#vLog').textContent = v.preview?.log || '(없음)'; $('#vLog').scrollTop = $('#vLog').scrollHeight; }
+  function showVLog(v, open = true) { $('#vLogWrap').hidden = false; $('#vLogWrap').dataset.v = v.n; if (open) $('#vLogWrap').open = true; $('#vLogHead').textContent = `v${v.n} 미리보기 로그 (${pvLabel[v.preview?.status || 'NONE']})`; setLog($('#vLog'), v.preview?.log || '(없음)'); $('#vLog').scrollTop = $('#vLog').scrollHeight; }
   async function saveRecipe() {
     let recipe; const t = $('#vRecipe').value.trim();
     try { recipe = t ? JSON.parse(t) : null; } catch (e) { $('#vMsg').textContent = `JSON 오류: ${e.message}`; return; }
@@ -597,7 +603,7 @@
     if (e.target.closest('#vDiffClose')) { $('#vDiff').hidden = true; return; }
     const ps = e.target.closest('[data-pstart]'); if (ps) { ps.disabled = true; try { await api('POST', `/admin/versions/${vProject}/${ps.dataset.pstart}/preview`); await loadVersions(); } catch (x) { alert(x.message); ps.disabled = false; } return; }
     const pt = e.target.closest('[data-pstop]'); if (pt) { try { await api('DELETE', `/admin/versions/${vProject}/${pt.dataset.pstop}/preview`); await loadVersions(); } catch (x) { alert(x.message); } return; }
-    const vd = e.target.closest('[data-vdiff]'); if (vd) { try { const d = await api('GET', `/admin/versions/${vProject}/${vd.dataset.vdiff}/diff`); $('#vDiff').hidden = false; $('#vDiffHead').textContent = `v${d.n} 변경`; $('#vDiffBody').textContent = `${d.stat}\n\n${d.patch}`; $('#vDiff').scrollIntoView({ behavior: 'smooth' }); } catch (x) { alert(x.message); } return; }
+    const vd = e.target.closest('[data-vdiff]'); if (vd) { try { const d = await api('GET', `/admin/versions/${vProject}/${vd.dataset.vdiff}/diff`); $('#vDiff').hidden = false; $('#vDiffHead').textContent = `v${d.n} 변경`; { const h = diffHtml(d.patch, d.stat); if (h != null) $('#vDiffBody').innerHTML = h; else $('#vDiffBody').textContent = `${d.stat}\n\n${d.patch}`; } $('#vDiff').scrollIntoView({ behavior: 'smooth' }); } catch (x) { alert(x.message); } return; }
     const vl = e.target.closest('[data-vlog]'); if (vl) { try { const r = await api('GET', `/admin/versions/${vProject}`); const v = (r.versions || []).find((x) => String(x.n) === vl.dataset.vlog); if (v) showVLog(v); } catch (x) { alert(x.message); } return; }
     const ve = e.target.closest('[data-vexport]'); if (ve) { const mode = prompt('어디까지 내보낼까요? branch(푸시만) / pr / merge', 'merge'); if (!mode || !['branch', 'pr', 'merge'].includes(mode)) return; try { await api('POST', `/p/${vProject}/reports/${ve.dataset.r}/merge`, { mode }); alert('내보내기를 시작했습니다 - 리포트 탭에서 진행을 볼 수 있습니다'); } catch (x) { alert(x.message); } return; }
     const vx = e.target.closest('[data-vdel]'); if (vx) { if (!confirm(`v${vx.dataset.vdel} 을 지울까요? 미리보기·태그도 함께 지웁니다 (원격에 올린 것은 남습니다)`)) return; try { await api('DELETE', `/admin/versions/${vProject}/${vx.dataset.vdel}`); await loadVersions(); } catch (x) { alert(x.message); } return; }
@@ -761,7 +767,7 @@
     const busy = all.some(({ s }) => isBusy(s));
     $('#kUpdate').disabled = busy; $('#kFull').disabled = busy;
     $('#kState').textContent = all.map(({ name, s }) => `${multi ? name + ': ' : ''}${isBusy(s) ? (s.status === 'QUEUED' ? '대기 중…' : '구축 중…') : s.nodes ? `노드 ${s.nodes} · 관계 ${s.edges} · ${s.builtAt ? '구축 ' + ago(s.builtAt) : ''}${s.updatedAt ? ' · 갱신 ' + ago(s.updatedAt) : ''}${s.pendingUpdate ? ' · 갱신 대기' : ''}` : (s.status === 'FAILED' ? '구축 실패 - 로그 확인' : '아직 없음')}`).join(' · ');
-    $('#kLog').textContent = all.filter(({ s }) => s.log).map(({ name, s }) => (multi ? `── ${name} ──\n` : '') + s.log).join('\n');
+    setLog($('#kLog'), all.filter(({ s }) => s.log).map(({ name, s }) => (multi ? `── ${name} ──\n` : '') + s.log).join('\n'));
     $('#kLogWrap').open = busy; if (busy) $('#kLog').scrollTop = $('#kLog').scrollHeight;
     // 그래프는 head 가 바뀌었을 때만 다시 받는다(4초 폴링 중 재배치 방지)
     const key = all.map(({ name, s }) => `${name}@${s.head}:${s.nodes}`).join('|');
@@ -914,7 +920,7 @@
   }
 
   // ── 로그 ──
-  async function loadLogs() { try { const r = await api('GET', '/admin/logs?n=300'); $('#logs').textContent = r.text; $('#logsrc').textContent = r.source; $('#logs').scrollTop = $('#logs').scrollHeight; } catch (e) { $('#logs').textContent = e.message; } }
+  async function loadLogs() { try { const r = await api('GET', '/admin/logs?n=300'); setLog($('#logs'), r.text); $('#logsrc').textContent = r.source; $('#logs').scrollTop = $('#logs').scrollHeight; } catch (e) { $('#logs').textContent = e.message; } }
 
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
