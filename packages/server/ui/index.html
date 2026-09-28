@@ -121,6 +121,11 @@
   nav.tabs::-webkit-scrollbar { display: none; }
   nav.tabs button { white-space: nowrap; flex: 0 0 auto; }
   .toolbar input.wide { min-width: 320px; flex: 1 1 320px; max-width: 520px; }
+  .steps-list { display: flex; flex-direction: column; gap: 10px; }
+  .steps-list .step { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .steps-list .step > label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .steps-list .dim { margin: 4px 0 0 22px; line-height: 1.7; }
+  .steps-list select, .steps-list input:not([type=checkbox]) { width: auto; display: inline-block; }
   .form .inline .w140 { width: 140px; } .form .inline .w120 { width: 120px; } .form .inline .grow { flex: 1 1 320px; min-width: 200px; }
   .shots .ph { width: 220px; height: 124px; background: #000; border-radius: 6px; }
   .row.kv { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; font-size: 12px; }
@@ -257,7 +262,7 @@
 
     <!-- 버전 · 미리보기 -->
     <div data-tab="versions" hidden>
-      <div class="intro">AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 <b>버전</b>으로 갖고 있습니다(키트 저장소 태그 bugfix/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워 <b>접속</b>해 보고, 마음에 들면 내보냅니다(브랜치·PR·병합).</div>
+      <div class="intro">AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 <b>버전</b>으로 갖고 있습니다(키트 저장소 태그 bugfix/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워 <b>접속</b>해 보고, 마음에 들면 <b>원격으로 보냅니다</b>(브랜치만 / PR·MR / 자동 병합).</div>
       <details class="card" id="vRecipeWrap" style="margin-bottom:12px"><summary class="dim">미리보기 레시피 <span id="vRecipeState"></span></summary>
         <div class="dim" style="margin:6px 0">프론트 빌드·백엔드 실행·DB 복제 방법. 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}. db.mode: template(기본, 템플릿 DB 에서 초 단위 복제) · clone(매번 라이브에서, 느림) · shared(사본 없이 개발 DB 공유). maxUp(동시 개수, 기본 2) · ttlHours(미사용 자동 중지, 기본 12)</div>
         <textarea id="vRecipe" style="min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea>
@@ -280,12 +285,12 @@
           <label>이름</label><input id="l_name" placeholder="야간 점검">
           <label>대상 기능 <small>비우면 전체</small></label><div class="inline"><input id="l_scope" list="l_scope_list" placeholder="화면·메뉴·기능 이름 (지식 그래프)" style="flex:1;min-width:220px"><datalist id="l_scope_list"></datalist><button class="btn" id="l_scope_clear" type="button">전체</button></div>
           <label>시점</label><div class="inline"><select id="l_kind"><option value="manual">수동(지금 실행만)</option><option value="push">원격에 새 커밋이 보이면</option><option value="interval">N시간마다</option><option value="daily">매일 정해진 시각</option></select><input id="l_val" placeholder="6 (시간) / 03:00" style="width:120px"></div>
-          <label>단계 <small>순서대로</small></label><div class="inline" style="flex-direction:column;align-items:flex-start;gap:6px">
-            <label class="dim"><input type="checkbox" id="l_s_knowledge" checked> 지식 그래프 갱신</label>
-            <label class="dim"><input type="checkbox" id="l_s_insights" checked> 제안 분석 <input id="l_focus" placeholder="특히 볼 것(선택)" style="width:220px;margin-left:6px"></label>
-            <label class="dim"><input type="checkbox" id="l_s_fix"> 자동 수정: 심각도 <select id="l_sev"><option>CRITICAL</option><option selected>HIGH</option><option>MEDIUM</option><option>LOW</option></select> 이상 · 최대 <input id="l_max" type="number" value="1" min="1" max="10" style="width:60px"> 건 · 종류 <input id="l_kinds" placeholder="bug,risk (비우면 전부)" style="width:170px"></label>
-            <label class="dim"><input type="checkbox" id="l_s_preview"> 수정본 미리보기 띄우기</label>
-            <label class="dim"><input type="checkbox" id="l_s_export"> 내보내기 <select id="l_mode"><option value="pr">PR 까지</option><option value="merge">병합까지</option><option value="branch">브랜치 푸시만</option></select> <span class="dim">- 이 실행에서 만든 수정본 브랜치(<code>claude/bugfix-…</code>)를 원격에 올림 / +PR / +자동 병합. 끄면 프로젝트의 내보내기 설정대로</span></label>
+          <label>단계 <small>순서대로 · 켠 것만</small></label><div class="steps-list">
+            <div class="step"><label><input type="checkbox" id="l_s_knowledge" checked> <b>1. 지식 그래프 갱신</b></label><div class="dim">바뀐 코드를 읽어 화면·기능·파일 관계를 최신으로 맞춥니다. 뒤 단계의 AI 가 이 그래프를 참고합니다.</div></div>
+            <div class="step"><label><input type="checkbox" id="l_s_insights" checked> <b>2. 제안 분석</b></label><div class="dim">코드·최근 리포트·헤드리스 화면 확인을 바탕으로 고칠 점(버그·위험·정리)을 찾아 "제안" 탭에 쌓습니다. <input id="l_focus" placeholder="특히 볼 것 (선택)" style="width:220px"></div></div>
+            <div class="step"><label><input type="checkbox" id="l_s_fix"> <b>3. 자동 수정</b></label><div class="dim">2 에서 찾은 제안 중 심각도 <select id="l_sev"><option>CRITICAL</option><option selected>HIGH</option><option>MEDIUM</option><option>LOW</option></select> 이상을 심각한 순으로 최대 <input id="l_max" type="number" value="1" min="1" max="10" style="width:56px"> 건, AI 가 고쳐 검증한 뒤 작업 브랜치(<code>claude/bugfix-…</code>)에 커밋합니다. 종류 제한: <input id="l_kinds" placeholder="bug,risk (비우면 전부)" style="width:170px"><br>고친 결과가 원격 저장소로 어디까지 가는지는 5 단계 또는(5 를 끄면) 프로젝트 설정 <b id="l_delivery_now">-</b> 을 따릅니다.</div></div>
+            <div class="step"><label><input type="checkbox" id="l_s_preview"> <b>4. 미리보기</b></label><div class="dim">3 에서 만든 수정본마다 프론트+백엔드+DB 사본을 띄워 접속 주소를 만듭니다(버전 탭·뷰어에서 열기). 레시피가 없으면 건너뜁니다.</div></div>
+            <div class="step"><label><input type="checkbox" id="l_s_export"> <b>5. 원격 저장소로 보내기</b></label><div class="dim">3 의 수정본 브랜치를 <select id="l_mode"><option value="branch">원격에 브랜치만 올리기 (PR 없음)</option><option value="pr" selected>PR/MR 까지 만들기 (병합은 사람이)</option><option value="merge">재검증 뒤 자동 병합·배포까지</option></select><br>끄면 3 단계가 프로젝트 설정대로 처리합니다(보관만이면 이 서버에만 남고, 버전 탭에서 나중에 보낼 수 있음).</div></div>
           </div>
           <label>제한 시간 <small>분</small></label><input id="l_max_min" type="number" value="180" style="width:100px">
           <label>켜기</label><div class="inline"><input type="checkbox" id="l_enabled" checked></div>
@@ -325,7 +330,7 @@
           <label>저장소 URL</label><input id="p_repo" placeholder="https://github.com/org/myapp.git">
           <label>GitHub owner/repo</label><input id="p_githubRepo" placeholder="org/myapp">
           <label>기준 브랜치</label><input id="p_baseBranch" placeholder="develop">
-          <label>수정본 내보내기 <small>AI 가 고친 뒤 어디까지</small></label><div class="inline"><select id="p_delivery">
+          <label>수정본을 원격에 <small>AI 가 고친 뒤 어디까지 보낼지</small></label><div class="inline"><select id="p_delivery">
             <option value="merge">푸시 + PR + 자동 병합 (검증 통과 시)</option>
             <option value="pr">푸시 + PR 만 (병합은 사람이)</option>
             <option value="branch">원격 브랜치 푸시만 (PR 없음)</option>
@@ -436,7 +441,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
   const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패' };
-  const deliveryLabel = { merge: '자동 병합', pr: 'PR 까지', branch: '브랜치 푸시', local: '보관만' };
+  const deliveryLabel = { merge: '자동 병합까지', pr: 'PR/MR 까지', branch: '원격 브랜치만', local: '보관만(이 서버)' };
   const H = () => ({ 'X-Bugfix-Admin': key, 'Content-Type': 'application/json' });
   async function api(method, path, body) {
     const r = await fetch(`${API}${path}`, { method, headers: H(), body: body === undefined ? undefined : JSON.stringify(body) });
@@ -635,7 +640,7 @@
       return `<tr data-v="${v.n}"><td><b>v${v.n}</b><div class="dim">${ago(v.createdAt)}</div></td>
       <td><div>${esc(v.summary || '')}</div><div class="dim">리포트 <a href="#" data-open="${v.reportId}">#${v.reportId}</a> · ${esc(String(v.sha || '').slice(0, 8))} · 파일 ${(v.files || []).length}개 · ${esc(v.branch || '')}</div>${v.preview?.error ? `<div class="bad" style="font-size:11px">${esc(v.preview.error)}</div>` : ''}</td>
       <td><span class="pill ${pvClass[st] || 'p-NONE'}">${pvLabel[st] || st}</span>${st === 'UP' && v.preview?.url ? `<div style="margin-top:4px"><a href="${esc(v.preview.url)}" target="_blank">열기 ↗</a></div>` : ''}${busy ? '<div class="dim" style="font-size:11px">진행 로그 아래</div>' : ''}</td>
-      <td>${busy ? '' : `<button class="btn primary" data-pstart="${v.n}" ${r.recipe ? '' : 'disabled title="레시피가 먼저 필요합니다"'}>${st === 'UP' ? '다시 띄우기' : '미리보기 띄우기'}</button>`} ${st === 'UP' ? `<button class="btn" data-pstop="${v.n}">중지</button>` : ''} <button class="btn" data-vdiff="${v.n}">diff</button> <button class="btn" data-vlog="${v.n}">로그</button> <button class="btn" data-vexport="${v.n}" data-r="${v.reportId}">내보내기</button> <button class="btn danger" data-vdel="${v.n}">삭제</button></td></tr>`; }).join('');
+      <td>${busy ? '' : `<button class="btn primary" data-pstart="${v.n}" ${r.recipe ? '' : 'disabled title="레시피가 먼저 필요합니다"'}>${st === 'UP' ? '다시 띄우기' : '미리보기 띄우기'}</button>`} ${st === 'UP' ? `<button class="btn" data-pstop="${v.n}">중지</button>` : ''} <button class="btn" data-vdiff="${v.n}">diff</button> <button class="btn" data-vlog="${v.n}">로그</button> <button class="btn" data-vexport="${v.n}" data-r="${v.reportId}">원격으로 보내기</button> <button class="btn danger" data-vdel="${v.n}">삭제</button></td></tr>`; }).join('');
     const busyAny = vs.some((v) => ['QUEUED', 'BUILDING', 'STARTING'].includes(v.preview?.status));
     if (busyAny) { const b = vs.find((v) => ['QUEUED', 'BUILDING', 'STARTING'].includes(v.preview?.status)); showVLog(b); }
     else if (!$('#vLogWrap').hidden && $('#vLogWrap').dataset.v) { const cur = vs.find((v) => String(v.n) === $('#vLogWrap').dataset.v); if (cur) showVLog(cur, false); }
@@ -663,7 +668,7 @@
 
   // ── 루프 ──
   let lTimer = null, lProject = null, lEditing = null;
-  const stepLabel = (st) => ({ knowledge: '지식 갱신', insights: `제안 분석${st.focus ? `(${st.focus})` : ''}`, fix: `자동 수정 ${st.severity || 'HIGH'}↑ 최대 ${st.max || 1}건${st.kinds?.length ? ` [${st.kinds.join(',')}]` : ''}`, preview: '미리보기', export: `내보내기(${st.mode || 'pr'})` })[st.type] || st.type;
+  const stepLabel = (st) => ({ knowledge: '지식 갱신', insights: `제안 분석${st.focus ? `(${st.focus})` : ''}`, fix: `자동 수정 ${st.severity || 'HIGH'} 이상 최대 ${st.max || 1}건${st.kinds?.length ? ` [${st.kinds.join(',')}]` : ''}`, preview: '미리보기', export: `원격으로: ${({ branch: '브랜치만', pr: 'PR/MR', merge: '자동 병합' })[st.mode] || st.mode || 'PR/MR'}` })[st.type] || st.type;
   const everyLabel = (e) => { const s = String(e || 'manual'); if (s === 'manual') return '수동'; if (s === 'push') return '원격 새 커밋'; const m = s.match(/^(\d+)\s*([mh])$/); if (m) return `${m[1]}${m[2] === 'h' ? '시간' : '분'}마다`; const d = s.match(/^daily\s+(\S+)/); return d ? `매일 ${d[1]}` : s; };
   const runPill = { RUNNING: 'p-RUNNING', DONE: 'p-MERGED', FAILED: 'p-FAILED', STOPPED: 'p-NONE' };
   async function loadLoops() {
@@ -705,6 +710,7 @@
     $('#l_s_preview').checked = !!st('preview'); $('#l_s_export').checked = !!st('export'); $('#l_mode').value = st('export')?.mode || 'pr';
     $('#l_max_min').value = l?.maxMinutes || 180; $('#l_enabled').checked = l ? l.enabled !== false : true;
     $('#l_scope').value = l?.scope?.label || '';
+    api('GET', '/admin/settings').then((st) => { const pj = (st.projects || []).find((x) => x.name === lProject); $('#l_delivery_now').textContent = pj ? `"${deliveryLabel[pj.delivery] || pj.delivery || '자동 병합'}"` : '-'; }).catch(() => {});
   }
   // 지식 그래프의 화면·메뉴·기능 노드를 datalist 로 (있을 때만)
   let lScopeNodes = [];
