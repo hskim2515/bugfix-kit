@@ -6,6 +6,7 @@ import { firstLine, hhmmss, nowIso, sleep } from './util.js';
  * 루프 = 사람이 정한 순서로 되풀이 도는 자동화. 프로젝트 설정 `loops[]` 에 저장(콘솔 '루프' 탭에서 편집).
  *   { name, enabled, every, steps[], maxMinutes }
  *   every:  "manual" | "push"(원격 base 브랜치에 새 커밋이 보이면) | "6h" | "30m" | "daily 03:00"
+ *   scope:  { id, label }  (선택) 지식 그래프의 화면·메뉴·기능 노드 - 그 노드와 이어진 파일들로 제안 분석을 한정하고, 자동 수정도 그 범위의 제안만 고른다
  *   steps:  { type: 'knowledge' }                              지식 그래프 갱신(없으면 전체 구축)
  *           { type: 'insights', focus }                         제안 분석
  *           { type: 'fix', severity: 'HIGH', max: 2, kinds }    제안 중 심각도 이상을 리포트로 만들어 AI 수정(프로젝트 delivery 대로)
@@ -114,6 +115,24 @@ export class Loops {
     return this.list(project);
   }
 
+  /** 루프 범위(지식 그래프 노드) → 이어진 노드·파일. 노드가 없으면 라벨 검색으로 찾는다 */
+  async resolveScope(project, scope) {
+    if (!scope || (!scope.id && !scope.label)) return null;
+    const g = await this.knowledge.graph(project.name).catch(() => null);
+    if (!g?.nodes?.length) return { label: scope.label || scope.id, files: [], nodes: [], missing: true };
+    let root = scope.id ? g.nodes.find((n) => n.id === scope.id) : null;
+    if (!root && scope.label) { const q = String(scope.label).toLowerCase(); root = g.nodes.find((n) => String(n.label).toLowerCase() === q) || g.nodes.find((n) => String(n.label).toLowerCase().includes(q)); }
+    if (!root) return { label: scope.label || scope.id, files: [], nodes: [], missing: true };
+    // 2단계까지 이어진 노드(포함·호출·읽기/쓰기·이동 모두)
+    const adj = new Map();
+    for (const e of g.edges || []) { const a = e.source ?? e.from, b = e.target ?? e.to; if (!adj.has(a)) adj.set(a, new Set()); if (!adj.has(b)) adj.set(b, new Set()); adj.get(a).add(b); adj.get(b).add(a); }
+    const seen = new Set([root.id]); let frontier = [root.id];
+    for (let d = 0; d < 2; d++) { const next = []; for (const id of frontier) for (const nb of adj.get(id) || []) if (!seen.has(nb)) { seen.add(nb); next.push(nb); } frontier = next; }
+    const nodes = g.nodes.filter((n) => seen.has(n.id));
+    const files = [...new Set(nodes.map((n) => n.path).filter(Boolean))].slice(0, 60);
+    return { id: root.id, label: root.label, type: root.type, files, nodes: nodes.map((n) => n.label).slice(0, 40), missing: false };
+  }
+
   async run(project, loop, trigger, sha = null) {
     const p = project.name;
     const id = `${Date.now().toString(36)}`;
@@ -127,6 +146,18 @@ export class Loops {
     const made = [];
     try {
       await L(`▶ 루프 '${loop.name}' 시작 (${trigger}) - 단계 ${(loop.steps || []).map((s) => s.type).join(' → ') || '없음'}`);
+      let scope = null;
+      if (loop.scope) {
+        scope = await this.resolveScope(project, loop.scope);
+        if (scope?.missing) await L(`⚠ 범위 '${scope.label}' 를 지식 그래프에서 찾지 못했습니다 - 이름으로만 거릅니다`);
+        else if (scope) await L(`범위: ${scope.type ? `[${scope.type}] ` : ''}${scope.label} - 이어진 노드 ${scope.nodes.length}개 · 파일 ${scope.files.length}개`);
+      }
+      const inScope = (files = [], text = '') => {
+        if (!scope) return true;
+        const t = String(text).toLowerCase();
+        if (scope.label && t.includes(String(scope.label).toLowerCase())) return true;
+        return (files || []).some((f) => scope.files.some((sf) => String(f).includes(sf) || sf.includes(String(f).split(':')[0])));
+      };
       for (const step of loop.steps || []) {
         check();
         if (step.type === 'knowledge') {
@@ -135,8 +166,9 @@ export class Loops {
           const st = await waitUntil(async () => { const s = await this.knowledge.state(p); return ['QUEUED', 'RUNNING'].includes(s.status) ? null : s; });
           await L(`${st.status === 'DONE' ? '✓' : '✗'} 지식 그래프 ${st.status} (노드 ${(st.nodes || []).length})`);
         } else if (step.type === 'insights') {
-          await L(`제안 분석…${step.focus ? ` (${step.focus})` : ''}`);
-          try { await this.insights.enqueue(project, { focus: step.focus || '' }); } catch (e) { if (e.status !== 409) throw e; }
+          const focus = [scope ? `범위를 '${scope.label}' ${scope.type ? `(${scope.type})` : ''} 에 한정하세요. 이 범위의 파일: ${scope.files.slice(0, 30).join(', ') || '(그래프에 파일 없음 - 이름으로 찾으세요)'}. 이 범위 밖의 문제는 적지 마세요.` : '', step.focus || ''].filter(Boolean).join(' ');
+          await L(`제안 분석…${scope ? ` (범위: ${scope.label})` : ''}${step.focus ? ` (${step.focus})` : ''}`);
+          try { await this.insights.enqueue(project, { focus }); } catch (e) { if (e.status !== 409) throw e; }
           const st = await waitUntil(async () => { const s = await this.insights.state(p); return ['QUEUED', 'RUNNING'].includes(s.status) ? null : s; });
           await L(`${st.status === 'DONE' ? '✓' : '✗'} 제안 분석 ${st.status} - 항목 ${(st.items || []).filter((i) => !i.reportId).length}건`);
           if (st.status !== 'DONE') throw new Error('제안 분석 실패');
@@ -144,9 +176,9 @@ export class Loops {
           const st = await this.insights.state(p);
           const thr = SEV[String(step.severity || 'HIGH').toUpperCase()] ?? 1;
           const kinds = Array.isArray(step.kinds) && step.kinds.length ? new Set(step.kinds) : null;
-          const cands = (st.items || []).filter((i) => !i.reportId && (SEV[i.severity] ?? 9) <= thr && (!kinds || kinds.has(i.kind)))
+          const cands = (st.items || []).filter((i) => !i.reportId && (SEV[i.severity] ?? 9) <= thr && (!kinds || kinds.has(i.kind)) && inScope(i.files, `${i.title} ${i.evidence || ''}`))
             .sort((a, b) => (SEV[a.severity] ?? 9) - (SEV[b.severity] ?? 9) || (b.confidence || 0) - (a.confidence || 0)).slice(0, Number(step.max) > 0 ? Number(step.max) : 1);
-          if (!cands.length) { await L(`수정 대상 없음 (${step.severity || 'HIGH'} 이상 제안 없음)`); continue; }
+          if (!cands.length) { await L(`수정 대상 없음 (${step.severity || 'HIGH'} 이상${scope ? ` · 범위 '${scope.label}' 안` : ''} 제안 없음)`); continue; }
           for (const item of cands) {
             check();
             const rid = await this.insights.withLock(`report:${p}`, async () => {

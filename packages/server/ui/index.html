@@ -271,13 +271,14 @@
 
     <!-- 루프 -->
     <div data-tab="loops" hidden>
-      <div class="intro">정해 둔 순서를 되풀이 돕니다: <b>지식 갱신 → 제안 분석 → 심각도 이상 자동 수정 → 미리보기 → 내보내기</b> 중 원하는 단계만. 시점은 수동 · 원격에 새 커밋이 보일 때 · N시간마다 · 매일 HH:MM. 수정은 프로젝트의 내보내기 설정(보관만/브랜치/PR/병합)을 따르고, 한 번에 최대 건수를 둡니다(Claude 비용).</div>
+      <div class="intro">정해 둔 순서를 되풀이 돕니다: <b>지식 갱신 → 제안 분석 → 심각도 이상 자동 수정 → 미리보기 → 내보내기</b> 중 원하는 단계만. 시점은 수동 · 원격에 새 커밋이 보일 때 · N시간마다 · 매일 HH:MM. <b>대상 기능</b>을 정하면(지식 그래프의 화면·메뉴·기능) 그 기능에 이어진 파일들로 분석·수정을 한정합니다. 수정은 프로젝트의 내보내기 설정(보관만/브랜치/PR/병합)을 따르고, 한 번에 최대 건수를 둡니다(Claude 비용).</div>
       <table id="lTable"><thead><tr><th style="width:150px">루프</th><th>단계</th><th style="width:150px">시점</th><th style="width:170px">마지막 · 다음</th><th style="width:250px"></th></tr></thead><tbody id="lRows"></tbody></table>
       <div class="empty" id="lEmpty" hidden>루프가 없습니다 - 아래에서 만드세요</div>
       <div class="card" style="margin-top:12px">
         <h3 id="lFormTitle">새 루프</h3>
         <div class="form" id="lform">
           <label>이름</label><input id="l_name" placeholder="야간 점검">
+          <label>대상 기능 <small>비우면 전체</small></label><div class="inline"><input id="l_scope" list="l_scope_list" placeholder="화면·메뉴·기능 이름 (지식 그래프)" style="flex:1;min-width:220px"><datalist id="l_scope_list"></datalist><button class="btn" id="l_scope_clear" type="button">전체</button></div>
           <label>시점</label><div class="inline"><select id="l_kind"><option value="manual">수동(지금 실행만)</option><option value="push">원격에 새 커밋이 보이면</option><option value="interval">N시간마다</option><option value="daily">매일 정해진 시각</option></select><input id="l_val" placeholder="6 (시간) / 03:00" style="width:120px"></div>
           <label>단계 <small>순서대로</small></label><div class="inline" style="flex-direction:column;align-items:flex-start;gap:6px">
             <label class="dim"><input type="checkbox" id="l_s_knowledge" checked> 지식 그래프 갱신</label>
@@ -663,7 +664,7 @@
     let r; try { r = await api('GET', `/admin/loops/${lProject}`); } catch (e) { $('#lEmpty').hidden = false; $('#lEmpty').textContent = e.message; return; }
     const loops = r.loops || [];
     $('#lEmpty').hidden = loops.length > 0;
-    $('#lRows').innerHTML = loops.map((l) => `<tr data-l="${esc(l.name)}"><td><b>${esc(l.name)}</b>${l.enabled === false ? ' <span class="pill p-NONE">꺼짐</span>' : ''}</td>
+    $('#lRows').innerHTML = loops.map((l) => `<tr data-l="${esc(l.name)}"><td><b>${esc(l.name)}</b>${l.enabled === false ? ' <span class="pill p-NONE">꺼짐</span>' : ''}${l.scope?.label ? `<div class="dim">범위: ${esc(l.scope.label)}</div>` : ''}</td>
       <td>${(l.steps || []).map((st) => `<span class="pill">${esc(stepLabel(st))}</span>`).join(' → ') || '<span class="dim">단계 없음</span>'}</td>
       <td>${esc(everyLabel(l.every))}</td>
       <td class="dim">${l.last?.at ? `마지막 ${ago(l.last.at)}` : '실행 전'}${l.nextAt ? `<br>다음 ${new Date(l.nextAt).toLocaleString()}` : ''}</td>
@@ -671,6 +672,7 @@
     const runs = r.runs || [];
     $('#lRuns').innerHTML = runs.length ? runs.map((x) => `<details class="card" style="margin-bottom:8px" ${x.status === 'RUNNING' ? 'open' : ''}><summary><span class="pill ${runPill[x.status] || ''}">${esc(x.status)}</span> <b>${esc(x.loop)}</b> <span class="dim">${esc(x.trigger)} · ${ago(x.startedAt)}${x.endedAt ? ` · ${Math.round((new Date(x.endedAt) - new Date(x.startedAt)) / 60000)}분` : ''}${x.made?.length ? ` · 리포트 ${x.made.map((m) => '#' + m).join(' ')}` : ''}</span>${x.status === 'RUNNING' ? ' <button class="btn" data-lstop="1">중지</button>' : ''}</summary><pre class="log">${logHtml(x.log || '') ?? esc(x.log || '')}</pre></details>`).join('') : '<div class="dim">아직 실행한 적 없음</div>';
     clearInterval(lTimer); if (r.running) lTimer = setInterval(loadLoops, 5000);
+    if (!lScopeNodes.length) loadScopeList();
   }
   function loopFromForm() {
     const kind = $('#l_kind').value, val = $('#l_val').value.trim();
@@ -681,7 +683,10 @@
     if ($('#l_s_fix').checked) steps.push({ type: 'fix', severity: $('#l_sev').value, max: Number($('#l_max').value) || 1, kinds: $('#l_kinds').value.split(',').map((x) => x.trim()).filter(Boolean) });
     if ($('#l_s_preview').checked) steps.push({ type: 'preview' });
     if ($('#l_s_export').checked) steps.push({ type: 'export', mode: $('#l_mode').value });
-    return { name: $('#l_name').value.trim(), every, steps, maxMinutes: Number($('#l_max_min').value) || 180, enabled: $('#l_enabled').checked };
+    const scopeText = $('#l_scope').value.trim();
+    const scopeNode = lScopeNodes.find((n) => n.text === scopeText) || lScopeNodes.find((n) => n.label === scopeText);
+    const scope = scopeText ? (scopeNode ? { id: scopeNode.id, label: scopeNode.label } : { label: scopeText }) : null;
+    return { name: $('#l_name').value.trim(), every, steps, maxMinutes: Number($('#l_max_min').value) || 180, enabled: $('#l_enabled').checked, scope };
   }
   function loopToForm(l) {
     lEditing = l ? l.name : null; $('#lFormTitle').textContent = l ? `루프 편집: ${l.name}` : '새 루프'; $('#lNew').hidden = !l;
@@ -692,6 +697,17 @@
     $('#l_s_fix').checked = !!st('fix'); $('#l_sev').value = st('fix')?.severity || 'HIGH'; $('#l_max').value = st('fix')?.max || 1; $('#l_kinds').value = (st('fix')?.kinds || []).join(',');
     $('#l_s_preview').checked = !!st('preview'); $('#l_s_export').checked = !!st('export'); $('#l_mode').value = st('export')?.mode || 'pr';
     $('#l_max_min').value = l?.maxMinutes || 180; $('#l_enabled').checked = l ? l.enabled !== false : true;
+    $('#l_scope').value = l?.scope?.label || '';
+  }
+  // 지식 그래프의 화면·메뉴·기능 노드를 datalist 로 (있을 때만)
+  let lScopeNodes = [];
+  async function loadScopeList() {
+    try {
+      const g = await api('GET', `/admin/knowledge/${lProject}/graph`);
+      const L2 = { screen: '화면', menu: '메뉴', feature: '기능', module: '모듈' };
+      lScopeNodes = (g.nodes || []).filter((n) => ['screen', 'menu', 'feature', 'module'].includes(n.type)).map((n) => ({ id: n.id, label: n.label, text: `${n.label}  [${L2[n.type]}]` }));
+      $('#l_scope_list').innerHTML = lScopeNodes.map((n) => `<option value="${esc(n.text)}"></option>`).join('');
+    } catch { lScopeNodes = []; }
   }
   async function saveLoops(mutate) {
     const s = await api('GET', '/admin/settings'); const p = (s.projects || []).find((x) => x.name === lProject); if (!p) throw new Error('프로젝트 설정을 못 읽었습니다');
@@ -702,6 +718,7 @@
     if (e.target.closest('#lSave')) { const l = loopFromForm(); if (!l.name) { $('#lMsg').textContent = '이름을 적어 주세요'; return; } if (!l.steps.length) { $('#lMsg').textContent = '단계를 하나 이상 고르세요'; return; }
       try { await saveLoops((arr) => { const i = arr.findIndex((x) => x.name === (lEditing || l.name)); if (i >= 0) arr[i] = l; else arr.push(l); return arr; }); $('#lMsg').textContent = '저장됨'; loopToForm(null); await loadLoops(); } catch (x) { $('#lMsg').textContent = x.message; } return; }
     if (e.target.closest('#lNew')) { loopToForm(null); return; }
+    if (e.target.closest('#l_scope_clear')) { $('#l_scope').value = ''; return; }
     const ed = e.target.closest('[data-ledit]'); if (ed) { try { const r = await api('GET', `/admin/loops/${lProject}`); const l = (r.loops || []).find((x) => x.name === ed.dataset.ledit); if (l) { loopToForm(l); $('#lform').scrollIntoView({ behavior: 'smooth' }); } } catch (x) { alert(x.message); } return; }
     const dl = e.target.closest('[data-ldel]'); if (dl) { if (!confirm(`루프 '${dl.dataset.ldel}' 을 지울까요?`)) return; try { await saveLoops((arr) => arr.filter((x) => x.name !== dl.dataset.ldel)); await loadLoops(); } catch (x) { alert(x.message); } return; }
     const rn = e.target.closest('[data-lrun]'); if (rn) { if (!confirm(`루프 '${rn.dataset.lrun}' 을 지금 실행할까요? (단계에 따라 Claude 비용이 듭니다)`)) return; try { await api('POST', `/admin/loops/${lProject}/${encodeURIComponent(rn.dataset.lrun)}/run`); await loadLoops(); } catch (x) { alert(x.message); } return; }
