@@ -37,7 +37,13 @@ public class BugfixProxyController {
     @RequestMapping("${bugfix.path:/bugfix}/**")
     public ResponseEntity<byte[]> proxy(HttpServletRequest req) throws IOException, InterruptedException {
         String server = target.get();
-        if (server == null || server.isBlank()) return ResponseEntity.status(503).body("bugfix-kit 이 아직 준비되지 않았습니다(워커 시작 중이거나 bugfix.server 미설정)".getBytes(StandardCharsets.UTF_8));
+        if (server == null || server.isBlank()) {
+            boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
+            String msg = win
+                ? "bugfix-kit: Windows 에서는 로컬 워커를 띄우지 않습니다. 로컬 프로파일에 bugfix.server=http://<개발서버>:<워커 포트> 를 적어 개발서버 워커를 쓰거나, WSL2 에서 앱을 실행하세요."
+                : "bugfix-kit 이 아직 준비되지 않았습니다 - 워커가 시작 중이거나(앱 로그의 [bugfix-kit] 줄 확인) bugfix.server 가 비어 있고 node 가 없습니다. 로컬에서는 bugfix.server=http://<개발서버>:<워커 포트> 가 가장 간단합니다.";
+            return ResponseEntity.status(503).contentType(org.springframework.http.MediaType.TEXT_PLAIN).body(msg.getBytes(StandardCharsets.UTF_8));
+        }
         String uri = req.getRequestURI().substring(req.getContextPath().length());
         String rest = uri.startsWith(path) ? uri.substring(path.length()) : uri;
         String url = server.replaceAll("/+$", "") + "/api" + (rest.isEmpty() ? "/" : rest) + (req.getQueryString() != null ? "?" + req.getQueryString() : "");

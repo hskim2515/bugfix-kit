@@ -55,7 +55,7 @@ app.use('/bugfix', bugfixKit());          // 신고 API · 콘솔(/bugfix/ui/) �
 ```
 package.json 한 줄 + 이 한 줄. 프로젝트 이름·저장소·브랜치·검증 명령은 package.json 과 git remote 에서 알아서 읽고, 설정은 `.bugfix-data/`(gitignore) 에 둔다.
 그 기계에 git·Claude Code CLI(로그인)·빌드 도구가 있으면 된다. 저장소 토큰은 `BUGFIX_GITHUB_TOKEN` / `GITLAB_TOKEN` 환경변수. 프론트는 아래 ③ 의 플러그인 한 줄(endpoint 는 `/bugfix`).
-Spring 백엔드는 **스타터 한 줄**: `implementation 'com.github.hskim2515:bugfix-kit:v0.1.70'` (JitPack). 최근 로그 끝점·`/bugfix/**` 프록시·보안 허용이 자동으로 붙고, 그 호스트에 Node 가 있으면 bugfix-kit 워커까지 앱과 같이 띄운다([spring-boot-starter](packages/spring-boot-starter)). Node 가 없는 컨테이너 배포는 `bugfix.server` 로 ①② 의 인스턴스를 가리킨다.
+Spring 백엔드는 **스타터 한 줄**: `implementation 'com.github.hskim2515:bugfix-kit:v0.1.71'` (JitPack). 최근 로그 끝점·`/bugfix/**` 프록시·보안 허용이 자동으로 붙고, 그 호스트에 Node 가 있으면 bugfix-kit 워커까지 앱과 같이 띄운다([spring-boot-starter](packages/spring-boot-starter)). Node 가 없는 컨테이너 배포는 `bugfix.server` 로 ①② 의 인스턴스를 가리킨다.
 
 ### ① 서버 켜기 — **앱 하나에 인스턴스 하나**
 
@@ -109,6 +109,15 @@ module.exports = { configureWebpack: { plugins: [bugfixKit({ project: 'myapp', r
 플러그인 없이 직접 붙이려면 `createBugfix(...)`([client](packages/client)).
 
 끝. **Shift+F9** 신고 · **Shift+F10** 목록.
+
+### Windows 개발 환경
+SDK(플러그인·신고 창·뷰어·콘솔)와 스타터의 프록시는 OS 를 가리지 않습니다. **워커**(저장소 사본·Claude 실행·검증·미리보기)만 리눅스/맥 전용이라, Windows 에서는 앱이 워커를 띄우지 않고 `/bugfix` 가 503 이 됩니다(앱 자체는 정상).
+Windows 개발자는 로컬 프로파일에 개발서버 워커 한 줄이면 됩니다(신고·AI 수정·미리보기 전부 개발서버에서 돕니다):
+```properties
+# application-local.properties (Spring)  /  Vite 는 bugfixKit({ server: 'http://<개발서버>:<포트>' }) 로 같은 효과
+bugfix.server=http://<개발서버>:<워커 포트>
+```
+꼭 로컬 워커가 필요하면 WSL2 에서 앱을 실행하세요(리눅스 환경이라 그대로 돕니다).
 
 ### 버전·미리보기 (AI 수정본을 원격에 올리기 전에 직접 써 보기)
 AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 **버전**(키트 저장소 태그 `bugfix/v{n}`)으로 갖습니다. 프로젝트 `delivery` 로 어디까지 내보낼지 정하고(`local` 보관만 · `branch` · `pr` · `merge`),

@@ -62,6 +62,13 @@ public class BugfixWorker implements SmartLifecycle {
         // 외부 인스턴스(bugfix.server)를 쓰거나 워커를 껐으면 아무것도 안 띄운다
         if (props.getServer() != null && !props.getServer().isBlank()) { log.info("[bugfix-kit] 외부 인스턴스 {} 로 프록시합니다 (워커 없음)", props.getServer()); return; }
         if (!props.getWorker().isEnabled()) return;
+        // Windows 에서는 워커(bash·sh·심볼릭 링크·claude CLI)가 돌지 않는다 - 개발서버 워커를 가리키거나 WSL2 에서 실행
+        if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+            log.warn("[bugfix-kit] Windows 에서는 bugfix-kit 워커를 띄우지 않습니다. 앱은 정상 동작하며 /bugfix 만 503 입니다.\n"
+                + "  → 로컬 프로파일(application-local.properties 등)에 개발서버 워커를 적으세요:  bugfix.server=http://<개발서버>:<워커 포트>\n"
+                + "  → 또는 WSL2 에서 앱을 실행하세요(리눅스 환경이라 워커가 그대로 돕니다).");
+            return;
+        }
         running = true;
         supervisor = new Thread(this::supervise, "bugfix-kit-worker");
         supervisor.setDaemon(true);
@@ -71,7 +78,7 @@ public class BugfixWorker implements SmartLifecycle {
     private void supervise() {
         try {
             String node = findNode();
-            if (node == null) { log.warn("[bugfix-kit] node 를 찾지 못해 워커를 띄우지 않습니다 (bugfix.worker.node 로 지정하거나 bugfix.server 로 외부 인스턴스를 쓰세요)"); return; }
+            if (node == null) { log.warn("[bugfix-kit] node 를 찾지 못해 워커를 띄우지 않습니다. 앱은 정상 동작하며 /bugfix 만 503 입니다.\n  → bugfix.worker.node=/경로/node 로 지정하거나, bugfix.server=http://<개발서버>:<워커 포트> 로 개발서버 워커를 쓰세요"); return; }
             Path dataDir = dataDir();
             Files.createDirectories(dataDir);
             Path kitBin = ensureKit(node, dataDir);
