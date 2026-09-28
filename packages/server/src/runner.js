@@ -309,11 +309,16 @@ export class Runner {
     if (this.versions) {
       try {
         const sha = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
-        const baseSha = (await ex.execOut(wt, 1, ['git', 'merge-base', 'HEAD', `origin/${base}`])).trim() || (await ex.execOut(wt, 1, ['git', 'rev-parse', `origin/${base}`])).trim();
-        const files = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `${baseSha}..HEAD`])).trim().split(/\r?\n/).filter(Boolean);
-        const n = await this.versions.record(project, { reportId: id, branch, sha, base: baseSha, summary, files });
-        await this.updateFix(project, id, { fixVersion: n });
-        await L(`버전 v${n} 기록 (${sha.slice(0, 8)}) - 콘솔 '버전' 탭에서 미리보기·diff`);
+        // 같은 커밋이 이미 버전으로 있으면(보관해 둔 것을 나중에 내보낼 때) 다시 기록하지 않는다
+        const dup = (await this.versions.list(project.name)).find((v) => v.sha === sha);
+        if (dup) await L(`버전 v${dup.n} (${sha.slice(0, 8)}) 그대로 내보냅니다`);
+        else {
+          const baseSha = (await ex.execOut(wt, 1, ['git', 'merge-base', 'HEAD', `origin/${base}`])).trim() || (await ex.execOut(wt, 1, ['git', 'rev-parse', `origin/${base}`])).trim();
+          const files = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `${baseSha}..HEAD`])).trim().split(/\r?\n/).filter(Boolean);
+          const n = await this.versions.record(project, { reportId: id, branch, sha, base: baseSha, summary, files });
+          await this.updateFix(project, id, { fixVersion: n });
+          await L(`버전 v${n} 기록 (${sha.slice(0, 8)}) - 콘솔 '버전' 탭에서 미리보기·diff`);
+        }
       } catch (e) { await L(`버전 기록 실패(계속): ${firstLine(e.message, 150)}`); }
     }
     if (mode === 'local') {
