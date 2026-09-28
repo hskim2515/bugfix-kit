@@ -76,7 +76,7 @@
   #rows td:last-child, #rows td:nth-child(7) { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
   .p-QUEUED { background: #3b3a1f; color: var(--warn); } .p-RUNNING { background: #1f3350; color: #8ec1ff; } .p-PR_OPENED { background: #3b2a1f; color: #ffb27a; }
-  .p-READY { background: #1f3a3a; color: #8ee0d0; } .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
+  .p-READY { background: #1f3a3a; color: #8ee0d0; } .p-REVERTED { background: #3b2a3a; color: #e0a0d0; } .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
   .sev-CRITICAL { color: #ff6b7a; } .sev-HIGH { color: #ffb27a; } .sev-MEDIUM { color: var(--warn); } .sev-LOW { color: var(--ok); }
   .dim { color: var(--dim); font-size: 11px; }
   .ok { color: var(--ok); } .bad { color: var(--bad); }
@@ -238,7 +238,7 @@
       <div class="toolbar">
         <span class="seg" id="filterSeg">
           <button data-f="all" class="on">전체</button><button data-f="active">진행 중</button><button data-f="FAILED">실패</button>
-          <button data-f="READY">수정본 준비</button><button data-f="PR_OPENED">PR 열림</button><button data-f="MERGED">병합됨</button><button data-f="NONE">요청 전</button>
+          <button data-f="READY">수정본 준비</button><button data-f="PR_OPENED">PR 열림</button><button data-f="MERGED">병합됨</button><button data-f="REVERTED">되돌림</button><button data-f="NONE">요청 전</button>
         </span>
         <input type="search" id="q" placeholder="문제·보고자 검색">
       </div>
@@ -344,7 +344,10 @@
             · <b>자동 병합</b> - PR 을 만든 뒤 기준 브랜치와 합쳐 재검증하고 통과하면 병합, 배포까지 추적합니다.
           </div>
           <label>수정 요청 <small>누가 할 수 있나</small></label><div class="inline"><select id="p_fixFrom"><option value="app">앱 사용자 + 관리 콘솔</option><option value="admin">관리 콘솔에서만 (앱은 신고만)</option></select></div>
-          <label>앱 주소 <small>쉼표 구분</small></label><input id="p_cors" placeholder="https://dev.myapp.com, http://localhost:3000">
+          <label>앱 주소 <small>쉼표 구분 · 첫 주소가 알림 링크 기준</small></label><input id="p_cors" placeholder="https://dev.myapp.com, http://localhost:3000">
+          <label>알림 웹훅 <small>Slack incoming webhook 또는 JSON 을 받을 URL</small></label><div class="inline"><input id="p_notify_webhook" placeholder="https://hooks.slack.com/services/… (비우면 알림 없음)" style="flex:1;min-width:260px"><button class="btn" id="notifyTest" type="button">테스트 보내기</button><span class="dim" id="notifyMsg"></span></div>
+          <label>알림 이벤트 <small>받을 것만</small></label><div class="inline" id="p_notify_events" style="gap:4px 14px"></div>
+          <label>알림 멘션 <small>Slack, 선택</small></label><input id="p_notify_mention" placeholder="<@U0123ABC> 또는 <!channel>" style="width:220px">
           <label>API 키 <small>프론트에 넣는 공개 키</small></label><input id="p_apiKey" placeholder="(선택)">
           <label>설명 <small>스택·구조 한 줄</small></label><input id="p_description" placeholder="MyApp (Vue 3 프론트 web/, Spring Boot 백엔드 api/)">
           <label>규약</label><textarea id="p_conventions" placeholder="- 주석은 한국어&#10;- SCSS 는 web/src/styles 를 고친다"></textarea>
@@ -440,7 +443,7 @@
   const setLog = (el, text) => { const h = logHtml(text); if (h != null) el.innerHTML = h; else el.textContent = text; };
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
-  const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패' };
+  const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패', REVERTED: '되돌림' };
   const deliveryLabel = { merge: '자동 병합까지', pr: 'PR/MR 까지', branch: '원격 브랜치만', local: '보관만(이 서버)' };
   const H = () => ({ 'X-Bugfix-Admin': key, 'Content-Type': 'application/json' });
   async function api(method, path, body) {
@@ -564,7 +567,7 @@
     }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
     $('#rows').innerHTML = rows.map((r) => { const st = r.fixStatus || 'NONE';
       const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
-      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px" title="AI 수정본이 담긴 작업 브랜치. '푸시됨' 이면 원격 저장소에 같은 이름으로 있고, '키트 안' 이면 아직 이 서버에만 있습니다">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 원격에 푸시됨(PR 없음)' : ' · 키트 저장소 안(원격에 없음)'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
+      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px" title="AI 수정본이 담긴 작업 브랜치. '푸시됨' 이면 원격 저장소에 같은 이름으로 있고, '키트 안' 이면 아직 이 서버에만 있습니다">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 원격에 푸시됨(PR 없음)' : ' · 키트 저장소 안(원격에 없음)'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : st === 'MERGED' && r.fixMergeSha ? `<div style="margin-top:4px"><button class="btn danger" data-revert="${r.bugReportId}" title="병합된 수정을 revert 하는 브랜치·PR 을 만듭니다(자동 병합 프로젝트면 병합까지)">되돌리기</button></div>` : st === 'REVERTED' && r.fixRevertPrUrl ? `<div class="dim" style="margin-top:4px"><a href="${esc(r.fixRevertPrUrl)}" target="_blank">되돌리기 PR</a></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
     $('#empty').hidden = rows.length > 0;
   }
 
@@ -666,6 +669,20 @@
     const op = e.target.closest('[data-open]'); if (op && kit) { e.preventDefault(); kit.setProject(vProject); kit.openViewer(Number(op.dataset.open)); return; }
   });
 
+  // ── 알림 ──
+  let notifyEvents = null;
+  const NOTIFY_DEFAULT = ['report.new', 'fix.pr', 'fix.merged', 'fix.failed', 'fix.reverted', 'preview.up', 'deploy.failed', 'loop.done', 'loop.failed'];
+  async function renderNotifyEvents(selected) {
+    if (!notifyEvents) { try { notifyEvents = await api('GET', '/admin/notify/events'); } catch { notifyEvents = {}; } }
+    const sel = new Set(Array.isArray(selected) && selected.length ? selected : (selected === '*' ? Object.keys(notifyEvents) : NOTIFY_DEFAULT));
+    $('#p_notify_events').innerHTML = Object.entries(notifyEvents).map(([k, v]) => `<label class="dim" style="white-space:nowrap"><input type="checkbox" value="${k}" ${sel.has(k) ? 'checked' : ''}> ${esc(v)}</label>`).join('');
+  }
+  document.addEventListener('click', async (e) => {
+    if (!e.target.closest('#notifyTest')) return;
+    const name = $('#p_name').value.trim(); if (!name) { $('#notifyMsg').textContent = '프로젝트를 먼저 저장하세요'; return; }
+    $('#notifyMsg').textContent = '보내는 중…';
+    try { await api('POST', `/admin/notify/${name}/test`); $('#notifyMsg').textContent = '✓ 보냈습니다 (저장된 설정 기준 - 방금 바꿨으면 먼저 저장)'; } catch (x) { $('#notifyMsg').textContent = `✗ ${x.message}`; }
+  });
   // ── 루프 ──
   let lTimer = null, lProject = null, lEditing = null;
   const stepLabel = (st) => ({ knowledge: '지식 갱신', insights: `제안 분석${st.focus ? `(${st.focus})` : ''}`, fix: `자동 수정 ${st.severity || 'HIGH'} 이상 최대 ${st.max || 1}건${st.kinds?.length ? ` [${st.kinds.join(',')}]` : ''}`, preview: '미리보기', export: `원격으로: ${({ branch: '브랜치만', pr: 'PR/MR', merge: '자동 병합' })[st.mode] || st.mode || 'PR/MR'}` })[st.type] || st.type;
@@ -1001,6 +1018,8 @@
     v('#p_name', p?.name); $('#p_name').disabled = !!p;
     v('#p_repo', p?.repo); v('#p_githubRepo', p?.githubRepo); v('#p_baseBranch', p?.baseBranch || 'main');
     $('#p_delivery').value = p ? (p.delivery || (p.autoMerge === false ? 'pr' : 'merge')) : 'merge';
+    $('#p_notify_webhook').value = p?.notify?.webhook || ''; $('#p_notify_mention').value = p?.notify?.mention || '';
+    renderNotifyEvents(p?.notify?.events);
     $('#p_fixFrom').value = p?.fixFrom === 'admin' ? 'admin' : 'app';
     v('#p_cors', (p?.cors || []).join(', ')); v('#p_apiKey', ''); $('#p_apiKey').placeholder = p?.apiKeySet ? `${p.apiKeySet} - 바꾸려면 입력` : '(선택)';
     v('#p_description', p?.description); v('#p_conventions', p?.conventions);
@@ -1013,7 +1032,8 @@
     const modules = [...$('#mods').querySelectorAll('.mod')].map((d) => ({ name: d.querySelector('[data-k=name]').value.trim(), match: d.querySelector('[data-k=match]').value.trim(), dir: d.querySelector('[data-k=dir]').value.trim() || undefined, verify: csv(d.querySelector('[data-k=verify]').value), nodeModulesCache: d.querySelector('[data-k=nm]').checked || undefined })).filter((m) => m.match);
     const env = Object.fromEntries(lines($('#p_env').value).map((l) => l.split('=')).filter((a) => a.length >= 2).map(([k, ...r]) => [k.trim(), r.join('=').trim()]));
     const fc = $('#p_fc_cmd').value.trim() ? { cwd: $('#p_fc_cwd').value.trim() || '.', command: $('#p_fc_cmd').value.trim(), when: csv($('#p_fc_when').value) } : null;
-    return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', delivery: $('#p_delivery').value, autoMerge: $('#p_delivery').value === 'merge', fixFrom: $('#p_fixFrom').value,
+    return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', delivery: $('#p_delivery').value, autoMerge: $('#p_delivery').value === 'merge',
+      notify: { webhook: $('#p_notify_webhook').value.trim(), mention: $('#p_notify_mention').value.trim(), events: [...document.querySelectorAll('#p_notify_events input:checked')].map((x) => x.value) }, fixFrom: $('#p_fixFrom').value,
       cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), protectedPaths: lines($('#p_protectedPaths').value), env };
   }
 
@@ -1088,6 +1108,7 @@
     const op = e.target.closest('[data-open]'); if (op && kit) { e.preventDefault(); kit.setProject(op.dataset.ip || op.closest('tr')?.dataset.ip); kit.openViewer(Number(op.dataset.open)); return; }
     const idl = e.target.closest('[data-idel]'); if (idl) { const proj = idl.closest('tr')?.dataset.ip; if (!confirm('이 제안을 지울까요? 다음 분석에서 같은 내용은 다시 나오지 않습니다.')) return; try { await api('DELETE', `/admin/insights/${proj}/items/${idl.dataset.idel}`); await loadInsights(); } catch (x) { alert(x.message); } return; }
     const fb = e.target.closest('#filterSeg button'); if (fb) { filter = fb.dataset.f; document.querySelectorAll('#filterSeg button').forEach((b) => b.classList.toggle('on', b === fb)); renderReports(); return; }
+    const rv = e.target.closest('[data-revert]'); if (rv) { const proj = rv.closest('tr')?.dataset.p; const reason = prompt('이 수정을 되돌립니다. 되돌린 코드를 검증해 revert 브랜치와 PR 을 만들고, 자동 병합 프로젝트면 병합까지 합니다.\n\n사유(선택):', ''); if (reason === null) return; try { await api('POST', `/p/${proj}/reports/${rv.dataset.revert}/revert`, { reason }); await load(); } catch (x) { alert(x.message); } return; }
     const ex = e.target.closest('[data-export]'); if (ex) { const proj = ex.closest('tr')?.dataset.p; const mode = ex.dataset.mode; if (!confirm(mode === 'merge' ? '이 수정본을 푸시하고 PR 을 만들어 병합까지 진행할까요?' : '이 수정본을 푸시하고 PR 을 만들까요?')) return; try { await api('POST', `/p/${proj}/reports/${ex.dataset.export}/merge`, { mode }); await load(); } catch (x) { alert(x.message); } return; }
     const tr = e.target.closest('tr.r'); if (tr && kit) { kit.setProject(tr.dataset.p); kit.openViewer(Number(tr.dataset.id)); return; }
     const pl = e.target.closest('#plist button'); if (pl) { editing = pl.dataset.p; renderProjects(); return; }

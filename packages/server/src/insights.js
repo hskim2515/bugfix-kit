@@ -158,6 +158,7 @@ export class Insights {
       } catch (e) { await L(`결과 파일을 읽지 못했습니다: ${firstLine(e.message, 120)}`); }
       await this.save(name, { status: 'DONE', items, ranAt: nowIso(), head: (await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim() });
       await L(`✓ 제안 ${items.length}건`);
+      this.notifier?.send(project, 'insights.done', { title: `제안 분석 끝 - ${items.length}건`, lines: items.slice(0, 5).map((i) => `[${i.severity}] ${firstLine(i.title, 70)}`), level: 'info' }).catch(() => {});
     } finally {
       await this.runner.removeWorktree(ex, repo, wt);
     }

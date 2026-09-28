@@ -173,6 +173,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const ahead = this.runner.submit(project, `preview-${n}`, () => this.run(project, n), async (e) => {
       await this.plog(project.name, n, `✗ 실패: ${firstLine(e.message, 300)}`);
       await this.update(project.name, n, (x) => ({ preview: { ...x.preview, status: 'FAILED', error: firstLine(e.message, 300) } }));
+      this.notifier?.send(project, 'preview.failed', { title: `미리보기 실패 - v${n}`, lines: [firstLine(e.message, 200)], level: 'bad' }).catch(() => {});
     }, 'preview', { low });
     await this.plog(project.name, n, `▶ 미리보기 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}`);
     return this.get(project.name, n);
@@ -257,6 +258,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       }
       await upd({ status: 'UP', upAt: nowIso(), lastAccess: nowIso() });
       await L(`✓ 미리보기 준비 완료: ${vars.previewUrl}/`);
+      this.notifier?.send(project, 'preview.up', { title: `미리보기 준비 - v${n} (#${v.reportId})`, lines: [firstLine(v.summary || '', 80)], url: `${vars.previewUrl}/`, level: 'ok' }).catch(() => {});
     } finally {
       await this.runner.removeWorktree(ex, repo, wt);
     }

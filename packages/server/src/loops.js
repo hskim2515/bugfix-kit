@@ -224,9 +224,11 @@ export class Loops {
       }
       await L(`✓ 루프 끝 - 만든 리포트 ${made.length}건`);
       await this.updateRun(p, id, { status: 'DONE', endedAt: nowIso(), made });
+      this.notifier?.send(project, 'loop.done', { title: `루프 '${loop.name}' 끝 (${trigger})`, lines: [`만든 리포트 ${made.length}건${made.length ? `: ${made.map((m) => '#' + m).join(' ')}` : ''}`, `단계: ${(loop.steps || []).map((s) => s.type).join(' → ')}`], level: 'ok' }).catch(() => {});
     } catch (e) {
       await L(`✗ ${firstLine(e.message, 200)}`);
       await this.updateRun(p, id, { status: ctl.stop ? 'STOPPED' : 'FAILED', endedAt: nowIso(), made });
+      if (!ctl.stop) this.notifier?.send(project, 'loop.failed', { title: `루프 '${loop.name}' 실패`, lines: [firstLine(e.message, 200)], level: 'bad' }).catch(() => {});
     } finally {
       this.active.delete(p);
     }

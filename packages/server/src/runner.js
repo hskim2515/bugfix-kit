@@ -93,11 +93,29 @@ export class Runner {
   }
   /** fixStatus 등 부분 갱신 (null 값은 건너뜀) */
   async updateFix(project, id, patch) {
-    return this.store.update(project.name, id, (c) => {
+    let before = null;
+    const after = await this.store.update(project.name, id, (c) => {
+      before = c;
       const p = typeof patch === 'function' ? patch(c) : patch;
       const clean = Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined));
       return { ...c, ...clean, fixUpdatedAt: nowIso() };
     });
+    // 상태가 바뀌었으면 알림 (실패해도 작업은 계속)
+    if (after && before && after.fixStatus !== before.fixStatus) this.notifyFix(project, before, after).catch(() => {});
+    return after;
+  }
+  async notifyFix(project, before, r) {
+    if (!this.notifier) return;
+    const id = r.bugReportId;
+    const head = `#${id} ${firstLine(r.fixSummary || r.problem || '', 80)}`;
+    const ev = { READY: 'fix.ready', PR_OPENED: 'fix.pr', MERGED: 'fix.merged', FAILED: 'fix.failed' }[r.fixStatus];
+    if (!ev) return;
+    const lines = [head];
+    if (r.fixStatus === 'READY') lines.push(r.fixPushed ? `원격 브랜치 ${r.fixBranch} (PR 없음)` : `이 서버에만 보관 · 브랜치 ${r.fixBranch}`, r.fixVersion ? `버전 v${r.fixVersion} - 콘솔 버전 탭에서 미리보기·원격으로 보내기` : '');
+    if (r.fixStatus === 'PR_OPENED') lines.push(`PR/MR: ${r.fixPrUrl || '-'}`);
+    if (r.fixStatus === 'MERGED') lines.push(`${project.baseBranch} @ ${(r.fixMergeSha || '').slice(0, 8)} - 배포 추적 중`);
+    if (r.fixStatus === 'FAILED') lines.push(firstLine(r.fixSummary || '', 200));
+    await this.notifier.send(project, ev, { title: `${({ READY: '수정본 준비', PR_OPENED: 'PR/MR 생성', MERGED: '병합 완료', FAILED: '수정 실패' })[r.fixStatus]} - ${head}`, lines, url: r.fixStatus === 'PR_OPENED' ? r.fixPrUrl : '', level: r.fixStatus === 'FAILED' ? 'bad' : r.fixStatus === 'MERGED' ? 'ok' : 'info', data: { reportId: id, fixStatus: r.fixStatus, prUrl: r.fixPrUrl, version: r.fixVersion } });
   }
   async appendChat(project, id, role, text) {
     await this.store.update(project.name, id, (c) => {
@@ -461,6 +479,7 @@ export class Runner {
         const ok = runs.every((r) => r.conclusion === 'success');
         await L(ok ? '✓ 배포 완료 - 개발서버에 반영됐습니다' : `✗ 배포 중 실패한 워크플로가 있습니다 - ${project.host === 'gitlab' ? 'GitLab CI' : 'GitHub Actions'} 를 확인하세요`);
         await done(ok ? 'DONE' : 'FAILED');
+        this.notifier?.send(project, ok ? 'deploy.done' : 'deploy.failed', { title: `배포 ${ok ? '완료' : '실패'} - #${id}`, lines: runs.map((r) => `${r.name}: ${r.conclusion}`), url: ok ? '' : (runs.find((r) => r.conclusion !== 'success')?.url || ''), level: ok ? 'ok' : 'bad' }).catch(() => {});
         return;
       }
       if (!anyRun && Date.now() - (until - waitMin * 60_000) > 120_000) {
@@ -497,6 +516,75 @@ export class Runner {
    * 열려 있는 PR 을 정식 경로로 병합한다: base 와 합치고(충돌은 Claude) → 재검증 → 푸시 → 병합 → 실제 반영 확인.
    * 새로고침(fix-sync)이 autoMerge 프로젝트의 열린 PR 에 대해 부르고, 큐에서 하나씩 돈다.
    */
+  /**
+   * 되돌리기: 병합된 수정(fixMergeSha)을 revert 한 브랜치 claude/revert-{id}-{시각} 을 만들어 검증 → 푸시 → PR → (프로젝트가 자동 병합이면) 병합.
+   * 원래 리포트는 REVERTED 로, 상태는 OPEN 으로 돌아간다. 보관만(local) 프로젝트라도 되돌리기는 원격에 가야 뜻이 있으니 최소 PR 까지.
+   */
+  async enqueueRevert(project, id, reason = '') {
+    const r = await this.store.get(project.name, id);
+    if (!r || r.fixStatus !== 'MERGED' || !notBlank(r.fixMergeSha)) throw Object.assign(new Error('병합된 수정만 되돌릴 수 있습니다(병합 커밋을 모르는 옛 리포트는 저장소에서 직접)'), { status: 409 });
+    await this.updateFix(project, id, { fixStatus: 'QUEUED', fixRevertReason: reason });
+    const ahead = this.submit(project, id, () => this.runRevert(project, id, reason), async (e) => {
+      await this.logLine(project, id, `✗ 되돌리기 실패: ${firstLine(e.message, 300)}`);
+      await this.updateFix(project, id, { fixStatus: 'MERGED' });
+    });
+    await this.logLine(project, id, `▶ 되돌리기 대기열 등록${ahead > 0 ? ` (앞에 ${ahead}건)` : ''}${reason ? ` - ${reason}` : ''}`);
+  }
+  async runRevert(project, id, reason) {
+    const r = await this.store.get(project.name, id);
+    const ex = this.ex(project);
+    const gh = this.gh(project);
+    const base = project.baseBranch;
+    const auth = gh.gitAuthHeader();
+    const { repo, jobs, wt } = this.paths(project, id);
+    const L = (s) => this.logLine(project, id, s);
+    await this.updateFix(project, id, { fixStatus: 'RUNNING' });
+    await L(`▶ 되돌리기 시작: ${base} 의 ${r.fixMergeSha.slice(0, 8)} 를 revert`);
+    await this.prepareRepo(project, ex, auth, L);
+    if (!await this.fetch(project, ex, auth, [base])) throw new Error(`origin/${base} 를 받지 못했습니다`);
+    await this.freshWorktree(ex, repo, jobs, wt, `origin/${base}`);
+    const branch = `claude/revert-${id}-${stamp()}`;
+    try {
+      if ((await ex.execRc(wt, 1, ['git', 'cat-file', '-e', `${r.fixMergeSha}^{commit}`])) !== 0) throw new Error(`병합 커밋 ${r.fixMergeSha.slice(0, 8)} 이 ${base} 에 없습니다(강제 푸시로 사라졌나?)`);
+      if ((await ex.execRc(wt, 1, ['git', 'merge-base', '--is-ancestor', r.fixMergeSha, 'HEAD'])) !== 0) throw new Error(`병합 커밋이 현재 ${base} 의 조상이 아닙니다 - 이미 되돌려졌거나 브랜치가 바뀌었습니다`);
+      await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
+      // 병합 커밋이면 -m 1, 아니면(fast-forward·squash) 그냥 revert
+      const parents = (await ex.execOut(wt, 1, ['git', 'rev-list', '--parents', '-n', '1', r.fixMergeSha])).trim().split(/\s+/).length - 1;
+      const rc = await ex.execRc(wt, 2, ['git', ...GIT_ID, 'revert', '--no-edit', ...(parents > 1 ? ['-m', '1'] : []), r.fixMergeSha]);
+      if (rc !== 0) { await ex.execOut(wt, 1, ['git', 'revert', '--abort']); throw new Error('revert 가 충돌했습니다 - 그 뒤의 변경과 겹칩니다. 저장소에서 직접 되돌리세요'); }
+      const changed = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim();
+      if (!changed) throw new Error('되돌릴 변경이 없습니다');
+      await L(`되돌린 파일:\n${changed}`);
+      const mods = this.changedModules(project, changed.split(/\r?\n/).map((f) => `M  ${f}`).join('\n'));
+      await this.prepareNodeModules(project, ex, wt, L, true);
+      await L(`검증(${mods.map((m) => m.name).join(' · ') || '규칙 없음'})…`);
+      await this.verify(project, ex, wt, mods);
+      await L('✓ 검증 통과');
+      await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '--amend', '-q', '-F', '-'], { stdin: `revert: 버그 #${id} 수정 되돌림 (${r.fixMergeSha.slice(0, 8)})\n\n${reason || ''}\n\n원래 수정: ${firstLine(r.fixSummary || '', 120)}\n\nCo-Authored-By: Claude <noreply@anthropic.com>` });
+      await ex.exec(wt, 5, ['git', '-c', `http.extraheader=${auth}`, 'push', '-u', 'origin', branch]);
+      await L(`브랜치 푸시: ${branch}`);
+      const prTitle = `revert: 버그 #${id} 수정 되돌림`;
+      const pr = await gh.createPullRequest(prTitle, `버그 리포트 #${id} 의 수정(${r.fixMergeSha.slice(0, 8)})을 되돌립니다.${reason ? `\n\n사유: ${reason}` : ''}\n\n---\nbugfix-kit 콘솔의 '되돌리기' 로 만들었습니다.`, branch, base);
+      await L(`✓ 되돌리기 PR: ${pr.url}`);
+      await this.updateFix(project, id, { fixRevertPrUrl: pr.url, fixRevertBranch: branch });
+      if (project.delivery === 'merge') {
+        await this.autoMerge(project, ex, gh, id, wt, branch, auth, pr, prTitle, mods);
+        const after = await this.store.get(project.name, id);
+        if (after.fixStatus === 'MERGED') {
+          await this.updateFix(project, id, { fixStatus: 'REVERTED', status: 'OPEN', fixRevertedAt: nowIso(), fixRevertSha: after.fixMergeSha, fixMergeSha: r.fixMergeSha });
+          await L('✓ 되돌림 병합 완료 - 리포트는 다시 OPEN');
+          this.notifier?.send(project, 'fix.reverted', { title: `되돌림 병합 - #${id}`, lines: [firstLine(r.fixSummary || '', 80), reason], url: pr.url, level: 'warn' }).catch(() => {});
+        }
+      } else {
+        await this.updateFix(project, id, { fixStatus: 'REVERTED', status: 'OPEN', fixRevertedAt: nowIso() });
+        await L('되돌리기 PR 이 열렸습니다 - 병합은 사람이');
+        this.notifier?.send(project, 'fix.reverted', { title: `되돌리기 PR - #${id}`, lines: [firstLine(r.fixSummary || '', 80), reason], url: pr.url, level: 'warn' }).catch(() => {});
+      }
+    } finally {
+      await this.removeWorktree(ex, repo, wt);
+    }
+  }
+
   /** 내보내기·병합: mode 는 branch|pr|merge (기본 merge). READY(보관·푸시만) 리포트도 여기서 푸시·PR·병합까지 간다 */
   async enqueueMerge(project, id, mode = 'merge', { low = false } = {}) {
     const r = await this.store.get(project.name, id);

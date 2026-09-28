@@ -29,7 +29,7 @@ const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 's
  * 라우터를 돌려준다(경로는 마운트 지점 기준). 독립 서버는 `app.use('/api', router)`, 앱 내장(bugfix-kit/embed)은 `app.use('/bugfix', router)`.
  * 콘솔(/ui/)은 자기 주소의 한 단계 위를 API 기준으로 쓰므로 어디에 마운트해도 맞는다.
  */
-export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null, versions = null, loops = null) {
+export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null, versions = null, loops = null, notifier = null) {
   const app = express.Router();
   // 버전 미리보기({마운트}/v/:project/:n/…)는 본문을 그대로 넘겨야 하므로 JSON 파서보다 앞에
   if (versions) app.use(versions.router());
@@ -92,6 +92,8 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   // ── 지식 그래프(Knowledge): 메뉴·기능 → 파일·API 온톨로지 ──
   app.get('/admin/knowledge/:project', admin, wrap(async (req) => knowledge ? knowledge.summary(proj(req).name) : { status: 'NONE' }));
   app.get('/admin/knowledge/:project/graph', admin, wrap(async (req) => { const s = knowledge ? await knowledge.state(proj(req).name) : {}; return { nodes: s.nodes || [], edges: s.edges || [], head: s.head || null }; }));
+  app.post('/admin/notify/:project/test', admin, wrap(async (req) => notifier.test(proj(req))));
+  app.get('/admin/notify/events', admin, wrap(async () => (await import('./notifier.js')).EVENTS));
   // ── 루프(되풀이 자동화) ──
   app.get('/admin/loops/:project', admin, wrap(async (req) => (loops ? loops.list(proj(req)) : { loops: [], runs: [] })));
   app.post('/admin/loops/:project/:name/run', admin, wrap(async (req) => loops.runNow(proj(req), req.params.name)));
@@ -166,6 +168,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     report.tool = b.tool === true || b.tool === 'true';
     const saved = await store.save(req.project.name, report);
     log.info(`[bugfix ${req.project.name}] 리포트 #${saved.bugReportId} (${report.reporter})`);
+    notifier?.send(req.project, 'report.new', { title: `새 리포트 #${saved.bugReportId} [${report.severity || '-'}]`, lines: [notBlank(report.problem) ? report.problem.split('\n')[0].slice(0, 160) : '(내용 없음)', `보고자 ${report.reporter || '-'}${report.tool ? ' · 신고 도구 문제' : ''}`], level: 'info', data: { reportId: saved.bugReportId, severity: report.severity } }).catch(() => {});
     return { bugReportId: saved.bugReportId };
   }));
 
@@ -255,6 +258,12 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   }));
 
   /** 열린 PR 을 정식 경로로 병합 (관리 콘솔·자동 병합 프로젝트용) */
+  // 되돌리기: 병합된 수정을 revert 브랜치 + PR 로 (자동 병합 프로젝트면 병합까지)
+  pr.post('/reports/:id/revert', fixGuard, wrap(async (req) => {
+    const r = await loadFixable(req);
+    await runner.enqueueRevert(req.project, r.bugReportId, String(req.body?.reason || '').slice(0, 300));
+    return FileStore.fixState(await store.get(req.project.name, r.bugReportId));
+  }));
   // 내보내기·병합: body.mode = branch|pr|merge (기본 merge). 보관만 한 수정본(READY)도 여기서 푸시·PR·병합
   pr.post('/reports/:id/merge', fixGuard, wrap(async (req) => {
     const r = await loadFixable(req);

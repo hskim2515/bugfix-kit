@@ -104,6 +104,7 @@
                   <span v-if="detail.fixStatus && fixable" class="brv-ai__tools">
                     <button class="brv-ai__tool" :disabled="fixBusy" @click="refreshDetail" title="상태·로그 다시 읽기 (PR 이 열려 있으면 GitHub 와 맞춤)">새로고침</button>
                     <button class="brv-ai__tool" :disabled="fixBusy || fixInProgress" @click="requestFix" title="앞선 대화·수정을 잇지 않고 원인 조사부터 새로 고칩니다">처음부터 다시</button>
+                    <button v-if="detail.fixStatus === 'MERGED' && detail.fixMergeSha" class="brv-ai__tool brv-ai__tool--danger" :disabled="fixBusy || fixInProgress" @click="revertFix" title="병합된 이 수정을 되돌리는 브랜치·PR 을 만듭니다 (자동 병합 프로젝트면 병합까지)">되돌리기</button>
                   </span>
                 </div>
 
@@ -118,6 +119,7 @@
                 <template v-else>
                   <div v-if="detail.fixPrUrl || detail.fixBranch" class="brv-ai__meta">
                     <a v-if="detail.fixPrUrl" class="brv-link brv-ai__pr" :href="detail.fixPrUrl" target="_blank" rel="noopener">PR #{{ prNumber }}</a>
+                    <a v-if="detail.fixRevertPrUrl" class="brv-link" :href="detail.fixRevertPrUrl" target="_blank" rel="noopener">되돌리기 PR</a>
                     <span v-if="detail.fixBranch" class="brv-ai__branch brv-selectable" :title="detail.fixStatus === 'READY' ? (detail.fixPushed ? 'AI 수정본이 담긴 작업 브랜치 - 원격 저장소에 같은 이름으로 올라가 있습니다 (PR 은 아직 없음)' : 'AI 수정본이 담긴 작업 브랜치 - 아직 키트 서버 안에만 있고 원격에는 없습니다 (콘솔에서 내보내기)') : 'AI 수정본이 담긴 작업 브랜치 (기준 브랜치는 건드리지 않음)'">{{ detail.fixBranch }}</span>
                     <span v-if="detail.fixStatus === 'READY'" class="brv-ai__hint">{{ detail.fixPushed ? '원격에 브랜치만 있음 · PR 없음' : '키트 서버 안에만 있음 · 원격에 없음' }}</span>
                     <template v-if="detail.fixVersion != null">
@@ -383,9 +385,10 @@ const FIX_LABELS = {
   READY:     '수정본 준비 · 작업 브랜치에 커밋됨, 아직 PR·병합 전(콘솔 버전 탭에서 내보내기)',
   PR_OPENED: 'PR 올라옴 · 병합 안 됨(로그 확인)',
   MERGED:    '병합 완료',
+  REVERTED:  '되돌림 - 수정이 취소됨(되돌리기 PR 참고)',
   FAILED:    '실패 · 진행 로그 확인',
 };
-const FIX_SHORT = { QUEUED: '대기', RUNNING: '수정중', READY: '준비', PR_OPENED: 'PR', MERGED: '병합', FAILED: '실패' };
+const FIX_SHORT = { QUEUED: '대기', RUNNING: '수정중', READY: '준비', PR_OPENED: 'PR', MERGED: '병합', FAILED: '실패', REVERTED: '되돌림' };
 
 const STATUSES = [
   { value: 'OPEN',        label: '접수' },
@@ -677,6 +680,15 @@ export default {
         this.showNotice('전송 실패', e?.message || '실패했습니다.', 'error');
       } finally { this.fixBusy = false; }
     },
+    async revertFix() {
+      if (!this.detail) return;
+      const reason = window.prompt('이 수정을 되돌립니다. revert 브랜치와 PR 을 만들고, 자동 병합 프로젝트면 병합까지 합니다.\n\n사유(선택):', '');
+      if (reason === null) return;
+      this.fixBusy = true;
+      try { const r = await this.kit.api.revert(this.detail.bugReportId, reason); this.detail = { ...this.detail, ...r }; this._startFixPolling(); }
+      catch (e) { this.showNotice('되돌리기 실패', e?.message || '실패했습니다.', 'error'); }
+      finally { this.fixBusy = false; }
+    },
     async startPreview() {
       if (!this.detail) return;
       this.fixBusy = true;
@@ -949,6 +961,8 @@ export default {
 .brv-fix--running   { background: #dbeafe; color: #1e3a8a; }
 .brv-fix--pr_opened { background: #e0f2fe; color: #075985; }
 .brv-fix--ready     { background: #ccfbf1; color: #115e59; }
+.brv-fix--reverted  { background: #fce7f3; color: #9d174d; }
+.brv-ai__tool--danger { color: #b91c1c; border-color: #fca5a5; }
 .brv-fix--merged    { background: #dcfce7; color: #166534; }
 .brv-fix--failed    { background: #fee2e2; color: #991b1b; }
 .brv-link { color: #2563eb; text-decoration: underline; word-break: break-all; }

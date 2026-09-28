@@ -6,6 +6,7 @@ import { Insights } from './insights.js';
 import { Knowledge } from './knowledge.js';
 import { Versions } from './versions.js';
 import { Loops } from './loops.js';
+import { Notifier } from './notifier.js';
 
 export const defaultLog = {
   info: (...a) => console.log(new Date().toISOString(), ...a),
@@ -40,10 +41,12 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
   const knowledge = new Knowledge(cfg, store, runner, log);
   const versions = new Versions(cfg, store, runner, log);
   const loops = new Loops(cfg, store, runner, insights, knowledge, versions, log);
+  const notifier = new Notifier(cfg, log);
   runner.knowledge = knowledge;
   runner.versions = versions;
+  runner.notifier = notifier; versions.notifier = notifier; loops.notifier = notifier; insights.notifier = notifier;
   insights.knowledge = knowledge;
-  const router = createApi(cfg, store, runner, log, insights, knowledge, versions, loops);
+  const router = createApi(cfg, store, runner, log, insights, knowledge, versions, loops, notifier);
 
   /** 재시작으로 끊긴 작업을 다시 큐에 넣고 예약을 시작한다 */
   async function start() {
@@ -67,5 +70,5 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
     if (!cfg.githubToken(Object.values(cfg.projects)[0])) log.warn('[bugfix] 저장소 토큰이 없습니다 - 리포트 저장은 되지만 자동 수정은 거부됩니다');
   }
   function stop() { insights.stopSchedules(); knowledge.stopSchedules(); versions.stopSweeper(); loops.stopSchedules(); }
-  return { cfg, store, runner, insights, knowledge, versions, loops, router, log, start, stop };
+  return { cfg, store, runner, insights, knowledge, versions, loops, notifier, router, log, start, stop };
 }
