@@ -57,7 +57,16 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   const uiDir = path.join(here, '..', 'ui');
   const clientDist = path.join(here, '..', '..', 'client', 'dist');
   app.use('/ui/client', express.static(clientDist, { maxAge: '1h' }));
-  app.get(['/ui', '/ui/'], (req, res) => res.sendFile(path.join(uiDir, 'index.html')));
+  // 콘솔 HTML: 클라이언트 번들 주소에 킷 버전을 붙인다 - Cloudflare 같은 CDN 이 .js 를 몇 시간 캐시해 새 배포 뒤에도 옛 번들을 주는 것을 막는다
+  let uiHtml = null;
+  app.get(['/ui', '/ui/'], (req, res) => {
+    if (!uiHtml) {
+      let ver = '';
+      try { ver = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8')).version || ''; } catch { /* */ }
+      uiHtml = fs.readFileSync(path.join(uiDir, 'index.html'), 'utf8').replace('client/bugfix-client.iife.js"', `client/bugfix-client.iife.js?v=${encodeURIComponent(ver || Date.now())}"`);
+    }
+    res.setHeader('Cache-Control', 'no-cache'); res.type('html').send(uiHtml);
+  });
 
   const admin = (req, res, next) => {
     if (!notBlank(cfg.server.adminKey)) return next(new HttpError(503, '운영자 키가 설정되지 않았습니다 (BUGFIX_ADMIN_KEY 또는 ~/.config/bugfix-kit/default.env 의 ADMIN_KEY)'));
