@@ -31,7 +31,10 @@
   .shotbig { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: zoom-out; }
   .shotbig img { max-width: 94vw; max-height: 86vh; border: 1px solid var(--line); border-radius: 6px; }
   .kg { position: relative; padding: 0; overflow: hidden; height: 74vh; min-height: 480px; }
-  #kGraph { width: 100%; height: 100%; }
+  #kGraph { width: 100%; height: 100%; background:
+    radial-gradient(ellipse at 50% 45%, rgba(110,160,255,0.10) 0%, rgba(110,160,255,0.03) 35%, rgba(0,0,0,0) 70%),
+    radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1.4px) 0 0 / 26px 26px,
+    linear-gradient(180deg, #1b2130 0%, #161b26 100%); }
   .kg-side { position: absolute; left: 12px; top: 12px; z-index: 2; background: rgba(15,18,26,0.82); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; max-height: calc(100% - 24px); overflow: auto; }
   .kg-side label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; } .kg-side input { margin: 0; }
   .kg-side .sw { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -650,8 +653,8 @@
   async function kgLoadLibs() {
     if (kgLibs) return kgLibs;
     // 두 라이브러리가 같은 three.js 인스턴스를 써야 한다(다르면 Sprite 가 렌더러와 안 맞아 터진다) - esm.sh 의 deps 고정으로 하나로
-    const [fg, st] = await Promise.all([import('https://esm.sh/3d-force-graph@1.73.4?deps=three@0.180.0'), import('https://esm.sh/three-spritetext@1.8.2?deps=three@0.180.0')]);
-    kgLibs = { ForceGraph3D: fg.default, SpriteText: st.default };
+    const [fg, st, three] = await Promise.all([import('https://esm.sh/3d-force-graph@1.73.4?deps=three@0.180.0'), import('https://esm.sh/three-spritetext@1.8.2?deps=three@0.180.0'), import('https://esm.sh/three@0.180.0')]);
+    kgLibs = { ForceGraph3D: fg.default, SpriteText: st.default, THREE: three };
     return kgLibs;
   }
   // 프로젝트가 여럿이면 id 에 프로젝트 이름을 붙여 합친다
@@ -730,12 +733,40 @@
         .onEngineStop(() => { if (kgFitPending) { kgFitPending = false; kg3d.zoomToFit(700, 60, (n) => kShown.has(n.id)); } });
       kg3d.d3Force('charge').strength(-60);
       kg3d.d3Force('link').distance((l) => l.rel === 'contains' ? 40 : 70);
+      kgDecor(kgLibs.THREE, SpriteText);
       window.addEventListener('resize', () => kg3d && kg3d.width(el.clientWidth).height(el.clientHeight));
     }
     kg3d.width(el.clientWidth).height(el.clientHeight);
     kgRecompute();
     if (force) { kgFitPending = true; kg3d.graphData(kMerged); setTimeout(() => kg3d.zoomToFit(600, 60, (n) => kShown.has(n.id)), 2500); }
     else kgRefresh();
+  }
+  /** 배경: 층마다 반투명 판과 이름(왼→오: 모듈 화면 메뉴 기능 구현 API 서비스 테이블), 바닥 격자, 멀어질수록 흐려지는 안개 - 노드가 어느 층인지 읽힌다 */
+  function kgDecor(THREE, SpriteText) {
+    const scene = kg3d.scene();
+    const old = scene.getObjectByName('kg-decor'); if (old) scene.remove(old);
+    const g = new THREE.Group(); g.name = 'kg-decor';
+    const byLayer = new Map();
+    for (const [t, L] of Object.entries(K_LAYER)) { if (!byLayer.has(L)) byLayer.set(L, []); byLayer.get(L).push(t); }
+    const H = 900, D = 1400;
+    for (const [L, types] of byLayer) {
+      const x = L * 170;
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(D, H), new THREE.MeshBasicMaterial({ color: 0x6ea0ff, transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false }));
+      plane.rotation.y = Math.PI / 2; plane.position.set(x, 0, 0); g.add(plane);
+      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(D, H)), new THREE.LineBasicMaterial({ color: 0x6ea0ff, transparent: true, opacity: 0.2 }));
+      edge.rotation.y = Math.PI / 2; edge.position.set(x, 0, 0); g.add(edge);
+      const label = new SpriteText(types.map((t) => K_LABEL[t] || t).join(' · '), 34, 'rgba(220,230,245,0.8)');
+      label.fontWeight = '700'; label.backgroundColor = 'rgba(15,18,26,0.55)'; label.padding = 4; label.borderRadius = 4; label.position.set(x, H / 2 + 40, 0); g.add(label);
+      const label2 = new SpriteText(types.map((t) => K_LABEL[t] || t).join(' · '), 28, 'rgba(220,230,245,0.55)');
+      label2.position.set(x, -H / 2 - 40, 0); g.add(label2);
+      const c = K_COLORS[types[0]] || '#8ab4ff';
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(6, 6, D), new THREE.MeshBasicMaterial({ color: new THREE.Color(c), transparent: true, opacity: 0.35 }));
+      bar.position.set(x, -H / 2, 0); g.add(bar);
+    }
+    const grid = new THREE.GridHelper(2400, 40, 0x2c3850, 0x232c3d); grid.position.set(600, -H / 2 - 2, 0);
+    grid.material.transparent = true; grid.material.opacity = 0.6; g.add(grid);
+    scene.add(g);
+    scene.fog = new THREE.Fog(0x1e2431, 1200, 3200);
   }
   function kgRefresh() { if (!kg3d) return; kg3d.nodeColor(kg3d.nodeColor()).nodeThreeObject(kg3d.nodeThreeObject()).linkColor(kg3d.linkColor()).linkDirectionalParticles(kg3d.linkDirectionalParticles()).nodeVisibility(kg3d.nodeVisibility()).linkVisibility(kg3d.linkVisibility()); }
   function kgFly(n) {
