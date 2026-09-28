@@ -133,6 +133,11 @@
                     </template>
                   </div>
                   <div v-if="detail.fixSummary" class="brv-ai__summary brv-selectable" v-html="md(detail.fixSummary)"></div>
+                  <details v-if="detail.fixReport || fixFiles.length" class="brv-result" open>
+                    <summary>수정 결과 <span class="brv-suggest__hint">원인 · 고친 내용 · 검증 · 확인이 필요한 점</span></summary>
+                    <div v-if="detail.fixReport" class="brv-result__body brv-selectable" v-html="md(detail.fixReport)"></div>
+                    <div v-if="fixFiles.length" class="brv-result__files"><span class="brv-field-label">바뀐 파일 ({{ fixFiles.length }})</span><ul><li v-for="f in fixFiles" :key="f"><code>{{ f }}</code></li></ul></div>
+                  </details>
 
                   <!-- 이 신고와 관련된 지식 그래프 부분 - AI 가 참고한 것과 같은 선택. 화면 → 기능 → 파일 → API → 백엔드 층으로 -->
                   <details v-if="kgLayout" class="brv-kg" open>
@@ -488,6 +493,7 @@ export default {
       return Date.now() - t < 35 * 60 * 1000;
     },
     fixChat() { try { return this.detail?.fixChat ? JSON.parse(this.detail.fixChat) : []; } catch { return []; } },
+    fixFiles() { try { const v = this.detail?.fixFiles ? JSON.parse(this.detail.fixFiles) : []; return Array.isArray(v) ? v : []; } catch { return []; } },
     fixSuggestions() {
       try { const v = this.detail?.fixSuggestions ? JSON.parse(this.detail.fixSuggestions) : []; return Array.isArray(v) ? v : []; } catch { return []; }
     },
@@ -980,6 +986,12 @@ export default {
 .brv-hint { margin-top: 6px; font-size: 11px; color: #667; line-height: 1.5; }
 .brv-fix-elapsed { margin-left: 6px; font-size: 11px; color: #667; }
 .brv-fix-log { margin-top: 8px; font-size: 11px; }
+.brv-result { margin: 6px 0 8px; font-size: 12px; }
+.brv-result > summary { cursor: pointer; color: #556; font-weight: 600; }
+.brv-result__body { margin-top: 6px; padding: 8px 10px; background: rgba(255,255,255,0.04); border-radius: 6px; line-height: 1.55; }
+.brv-result__body h3, .brv-result__body h4 { margin: 8px 0 3px; font-size: 12px; color: #9ab; }
+.brv-result__body h3:first-child, .brv-result__body h4:first-child { margin-top: 0; }
+.brv-result__files { margin-top: 6px; } .brv-result__files ul { margin: 2px 0 0; padding-left: 16px; } .brv-result__files li { margin: 1px 0; } .brv-result__files code { font-size: 11px; }
 .brv-fix-log summary { cursor: pointer; color: #445; }
 /* 배경을 직접 칠하므로 글자색도 직접 - 어두운 테마에서 글자색이 밝게 상속되어 안 보였다 */
 .brv-fix-log pre, .brv-logbox { margin: 6px 0 0; max-height: 260px; overflow: auto; padding: 8px; background: #1f2530; color: #d8dee6; border-radius: 6px; white-space: pre-wrap; word-break: break-all; font-size: 11px; line-height: 1.45; font-family: ui-monospace, Menlo, Consolas, monospace; }

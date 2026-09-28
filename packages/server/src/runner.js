@@ -230,7 +230,7 @@ export class Runner {
 
       const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
       const summary = result.title || `버그 #${id} 수정`;
-      await this.saveSuggestions(project, id, result.body);
+      await this.saveSuggestions(project, id, result.body, changed);
       const commitMsg = `fix: ${summary} (버그 #${id})\n\n${result.body || ''}\n\n버그 리포트 #${id}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
       await ex.exec(wt, 1, ['git', 'checkout', '-b', branch]);
       await ex.exec(wt, 1, ['git', 'add', '-A']);
@@ -319,7 +319,7 @@ export class Runner {
       const check = await this.frontCheck(project, ex, id, wt, mods);
       const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
       const summary = result.title || `버그 #${id} 추가 수정`;
-      await this.saveSuggestions(project, id, result.body);
+      await this.saveSuggestions(project, id, result.body, changed);
       const commitMsg = `fix: ${summary} (버그 #${id} 추가 요청)\n\n${result.body || ''}\n\n요청: ${firstLine(message, 200)}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
       const branch = cont ? r.fixBranch : `claude/bugfix-${id}-${stamp()}`;
       if (!cont) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
@@ -701,11 +701,13 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
   }
 
   /** 추천 개선을 리포트에 둔다 - 뷰어가 목록으로 보여 주고, 누르면 그 줄을 추가 요청으로 보낸다. 실패해도 작업은 계속 */
-  async saveSuggestions(project, id, body) {
+  /** result.md 본문(원인·고친 내용·검증·확인 필요)과 바뀐 파일을 리포트에 남긴다 - 뷰어 '수정 결과' 에 보인다 */
+  async saveSuggestions(project, id, body, changed = '') {
     try {
       const items = parseSuggestions(body);
-      await this.updateFix(project, id, { fixSuggestions: items.length ? JSON.stringify(items) : null });
-    } catch (e) { this.log.warn(`[bugfix ${project.name}#${id}] 추천 개선 저장 실패: ${e.message}`); }
+      const files = String(changed || '').split(/\r?\n/).map((l) => l.trim().replace(/^[A-Z?! ]{1,3}\s+/, '')).filter(Boolean);
+      await this.updateFix(project, id, { fixSuggestions: items.length ? JSON.stringify(items) : null, fixReport: notBlank(body) ? body.slice(0, 20000) : undefined, fixFiles: files.length ? JSON.stringify(files.slice(0, 100)) : undefined });
+    } catch (e) { this.log.warn(`[bugfix ${project.name}#${id}] 수정 결과 저장 실패: ${e.message}`); }
   }
 
   /** 기본 도구 + 프로젝트 허용 도구 + 검증 명령의 첫 단어(./gradlew, mvn …) - Claude 가 고친 뒤 스스로 컴파일해 볼 수 있게(승인 요청으로 턴을 낭비하지 않게) */
