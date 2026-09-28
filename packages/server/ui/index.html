@@ -198,6 +198,7 @@
     <button data-t="reports" class="on">리포트</button>
     <button data-t="insights">제안</button>
     <button data-t="versions">버전</button>
+    <button data-t="loops">루프</button>
     <button data-t="knowledge">지식</button>
     <button data-t="projects">프로젝트</button>
     <button data-t="secrets">키·계정</button>
@@ -266,6 +267,32 @@
       <div class="empty" id="vEmpty" hidden>아직 버전이 없습니다 - AI 수정이 끝나면 여기에 쌓입니다</div>
       <details class="card" id="vLogWrap" hidden style="margin-top:12px"><summary class="dim" id="vLogHead">진행 로그</summary><pre class="log" id="vLog"></pre></details>
       <div class="card" id="vDiff" hidden style="margin-top:12px"><div class="toolbar"><b id="vDiffHead"></b><button class="btn" id="vDiffClose">닫기</button></div><pre class="log tall" id="vDiffBody"></pre></div>
+    </div>
+
+    <!-- 루프 -->
+    <div data-tab="loops" hidden>
+      <div class="intro">정해 둔 순서를 되풀이 돕니다: <b>지식 갱신 → 제안 분석 → 심각도 이상 자동 수정 → 미리보기 → 내보내기</b> 중 원하는 단계만. 시점은 수동 · 원격에 새 커밋이 보일 때 · N시간마다 · 매일 HH:MM. 수정은 프로젝트의 내보내기 설정(보관만/브랜치/PR/병합)을 따르고, 한 번에 최대 건수를 둡니다(Claude 비용).</div>
+      <table id="lTable"><thead><tr><th style="width:150px">루프</th><th>단계</th><th style="width:150px">시점</th><th style="width:170px">마지막 · 다음</th><th style="width:250px"></th></tr></thead><tbody id="lRows"></tbody></table>
+      <div class="empty" id="lEmpty" hidden>루프가 없습니다 - 아래에서 만드세요</div>
+      <div class="card" style="margin-top:12px">
+        <h3 id="lFormTitle">새 루프</h3>
+        <div class="form" id="lform">
+          <label>이름</label><input id="l_name" placeholder="야간 점검">
+          <label>시점</label><div class="inline"><select id="l_kind"><option value="manual">수동(지금 실행만)</option><option value="push">원격에 새 커밋이 보이면</option><option value="interval">N시간마다</option><option value="daily">매일 정해진 시각</option></select><input id="l_val" placeholder="6 (시간) / 03:00" style="width:120px"></div>
+          <label>단계 <small>순서대로</small></label><div class="inline" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <label class="dim"><input type="checkbox" id="l_s_knowledge" checked> 지식 그래프 갱신</label>
+            <label class="dim"><input type="checkbox" id="l_s_insights" checked> 제안 분석 <input id="l_focus" placeholder="특히 볼 것(선택)" style="width:220px;margin-left:6px"></label>
+            <label class="dim"><input type="checkbox" id="l_s_fix"> 자동 수정: 심각도 <select id="l_sev"><option>CRITICAL</option><option selected>HIGH</option><option>MEDIUM</option><option>LOW</option></select> 이상 · 최대 <input id="l_max" type="number" value="1" min="1" max="10" style="width:60px"> 건 · 종류 <input id="l_kinds" placeholder="bug,risk (비우면 전부)" style="width:170px"></label>
+            <label class="dim"><input type="checkbox" id="l_s_preview"> 수정본 미리보기 띄우기</label>
+            <label class="dim"><input type="checkbox" id="l_s_export"> 내보내기 <select id="l_mode"><option value="pr">PR 까지</option><option value="merge">병합까지</option><option value="branch">브랜치 푸시만</option></select></label>
+          </div>
+          <label>제한 시간 <small>분</small></label><input id="l_max_min" type="number" value="180" style="width:100px">
+          <label>켜기</label><div class="inline"><input type="checkbox" id="l_enabled" checked></div>
+        </div>
+        <div class="actions"><button class="btn primary" id="lSave">저장</button><button class="btn" id="lNew" hidden>새 루프</button><span class="msg" id="lMsg"></span></div>
+      </div>
+      <h2>실행 기록</h2>
+      <div id="lRuns"></div>
     </div>
 
     <!-- 지식 그래프 -->
@@ -392,7 +419,7 @@
 
   // 표 → 카드 전환: 리포트 표 720px, 제안 표 1000px (매체 질의는 CSS, 클래스는 여기서)
   const mqR = matchMedia('(max-width: 720px)'), mqI = matchMedia('(max-width: 1000px)');
-  const applyCardRows = () => { $('#rTable').classList.toggle('cardrows', mqR.matches); $('#iTable').classList.toggle('cardrows', mqI.matches); $('#vTable').classList.toggle('cardrows', mqI.matches); };
+  const applyCardRows = () => { $('#rTable').classList.toggle('cardrows', mqR.matches); $('#iTable').classList.toggle('cardrows', mqI.matches); $('#vTable').classList.toggle('cardrows', mqI.matches); $('#lTable').classList.toggle('cardrows', mqI.matches); };
   mqR.addEventListener('change', applyCardRows); mqI.addEventListener('change', applyCardRows); applyCardRows();
   const F = window.BugfixKit && BugfixKit.fmt;
   if (F) { const st = document.createElement('style'); st.textContent = F.FMT_CSS; document.head.appendChild(st); }
@@ -624,6 +651,61 @@
     const ve = e.target.closest('[data-vexport]'); if (ve) { const mode = prompt('어디까지 내보낼까요? branch(푸시만) / pr / merge', 'merge'); if (!mode || !['branch', 'pr', 'merge'].includes(mode)) return; try { await api('POST', `/p/${vProject}/reports/${ve.dataset.r}/merge`, { mode }); alert('내보내기를 시작했습니다 - 리포트 탭에서 진행을 볼 수 있습니다'); } catch (x) { alert(x.message); } return; }
     const vx = e.target.closest('[data-vdel]'); if (vx) { if (!confirm(`v${vx.dataset.vdel} 을 지울까요? 미리보기·태그도 함께 지웁니다 (원격에 올린 것은 남습니다)`)) return; try { await api('DELETE', `/admin/versions/${vProject}/${vx.dataset.vdel}`); await loadVersions(); } catch (x) { alert(x.message); } return; }
     const op = e.target.closest('[data-open]'); if (op && kit) { e.preventDefault(); kit.setProject(vProject); kit.openViewer(Number(op.dataset.open)); return; }
+  });
+
+  // ── 루프 ──
+  let lTimer = null, lProject = null, lEditing = null;
+  const stepLabel = (st) => ({ knowledge: '지식 갱신', insights: `제안 분석${st.focus ? `(${st.focus})` : ''}`, fix: `자동 수정 ${st.severity || 'HIGH'}↑ 최대 ${st.max || 1}건${st.kinds?.length ? ` [${st.kinds.join(',')}]` : ''}`, preview: '미리보기', export: `내보내기(${st.mode || 'pr'})` })[st.type] || st.type;
+  const everyLabel = (e) => { const s = String(e || 'manual'); if (s === 'manual') return '수동'; if (s === 'push') return '원격 새 커밋'; const m = s.match(/^(\d+)\s*([mh])$/); if (m) return `${m[1]}${m[2] === 'h' ? '시간' : '분'}마다`; const d = s.match(/^daily\s+(\S+)/); return d ? `매일 ${d[1]}` : s; };
+  const runPill = { RUNNING: 'p-RUNNING', DONE: 'p-MERGED', FAILED: 'p-FAILED', STOPPED: 'p-NONE' };
+  async function loadLoops() {
+    lProject = versionProject(); if (!lProject) return;
+    let r; try { r = await api('GET', `/admin/loops/${lProject}`); } catch (e) { $('#lEmpty').hidden = false; $('#lEmpty').textContent = e.message; return; }
+    const loops = r.loops || [];
+    $('#lEmpty').hidden = loops.length > 0;
+    $('#lRows').innerHTML = loops.map((l) => `<tr data-l="${esc(l.name)}"><td><b>${esc(l.name)}</b>${l.enabled === false ? ' <span class="pill p-NONE">꺼짐</span>' : ''}</td>
+      <td>${(l.steps || []).map((st) => `<span class="pill">${esc(stepLabel(st))}</span>`).join(' → ') || '<span class="dim">단계 없음</span>'}</td>
+      <td>${esc(everyLabel(l.every))}</td>
+      <td class="dim">${l.last?.at ? `마지막 ${ago(l.last.at)}` : '실행 전'}${l.nextAt ? `<br>다음 ${new Date(l.nextAt).toLocaleString()}` : ''}</td>
+      <td>${r.running ? '' : `<button class="btn primary" data-lrun="${esc(l.name)}">지금 실행</button>`} <button class="btn" data-ledit="${esc(l.name)}">편집</button> <button class="btn danger" data-ldel="${esc(l.name)}">삭제</button></td></tr>`).join('');
+    const runs = r.runs || [];
+    $('#lRuns').innerHTML = runs.length ? runs.map((x) => `<details class="card" style="margin-bottom:8px" ${x.status === 'RUNNING' ? 'open' : ''}><summary><span class="pill ${runPill[x.status] || ''}">${esc(x.status)}</span> <b>${esc(x.loop)}</b> <span class="dim">${esc(x.trigger)} · ${ago(x.startedAt)}${x.endedAt ? ` · ${Math.round((new Date(x.endedAt) - new Date(x.startedAt)) / 60000)}분` : ''}${x.made?.length ? ` · 리포트 ${x.made.map((m) => '#' + m).join(' ')}` : ''}</span>${x.status === 'RUNNING' ? ' <button class="btn" data-lstop="1">중지</button>' : ''}</summary><pre class="log">${logHtml(x.log || '') ?? esc(x.log || '')}</pre></details>`).join('') : '<div class="dim">아직 실행한 적 없음</div>';
+    clearInterval(lTimer); if (r.running) lTimer = setInterval(loadLoops, 5000);
+  }
+  function loopFromForm() {
+    const kind = $('#l_kind').value, val = $('#l_val').value.trim();
+    const every = kind === 'manual' ? 'manual' : kind === 'push' ? 'push' : kind === 'interval' ? `${val || 6}h` : `daily ${val || '03:00'}`;
+    const steps = [];
+    if ($('#l_s_knowledge').checked) steps.push({ type: 'knowledge' });
+    if ($('#l_s_insights').checked) steps.push({ type: 'insights', focus: $('#l_focus').value.trim() });
+    if ($('#l_s_fix').checked) steps.push({ type: 'fix', severity: $('#l_sev').value, max: Number($('#l_max').value) || 1, kinds: $('#l_kinds').value.split(',').map((x) => x.trim()).filter(Boolean) });
+    if ($('#l_s_preview').checked) steps.push({ type: 'preview' });
+    if ($('#l_s_export').checked) steps.push({ type: 'export', mode: $('#l_mode').value });
+    return { name: $('#l_name').value.trim(), every, steps, maxMinutes: Number($('#l_max_min').value) || 180, enabled: $('#l_enabled').checked };
+  }
+  function loopToForm(l) {
+    lEditing = l ? l.name : null; $('#lFormTitle').textContent = l ? `루프 편집: ${l.name}` : '새 루프'; $('#lNew').hidden = !l;
+    $('#l_name').value = l?.name || ''; const e = String(l?.every || 'manual'); const m = e.match(/^(\d+)\s*h$/), d = e.match(/^daily\s+(\S+)/);
+    $('#l_kind').value = e === 'manual' ? 'manual' : e === 'push' ? 'push' : m ? 'interval' : d ? 'daily' : 'manual'; $('#l_val').value = m ? m[1] : d ? d[1] : '';
+    const st = (t) => (l?.steps || []).find((x) => x.type === t);
+    $('#l_s_knowledge').checked = l ? !!st('knowledge') : true; $('#l_s_insights').checked = l ? !!st('insights') : true; $('#l_focus').value = st('insights')?.focus || '';
+    $('#l_s_fix').checked = !!st('fix'); $('#l_sev').value = st('fix')?.severity || 'HIGH'; $('#l_max').value = st('fix')?.max || 1; $('#l_kinds').value = (st('fix')?.kinds || []).join(',');
+    $('#l_s_preview').checked = !!st('preview'); $('#l_s_export').checked = !!st('export'); $('#l_mode').value = st('export')?.mode || 'pr';
+    $('#l_max_min').value = l?.maxMinutes || 180; $('#l_enabled').checked = l ? l.enabled !== false : true;
+  }
+  async function saveLoops(mutate) {
+    const s = await api('GET', '/admin/settings'); const p = (s.projects || []).find((x) => x.name === lProject); if (!p) throw new Error('프로젝트 설정을 못 읽었습니다');
+    const loops = mutate(Array.isArray(p.loops) ? p.loops.slice() : []);
+    await api('PUT', `/admin/projects/${lProject}`, { ...p, loops }); settings = null;
+  }
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('#lSave')) { const l = loopFromForm(); if (!l.name) { $('#lMsg').textContent = '이름을 적어 주세요'; return; } if (!l.steps.length) { $('#lMsg').textContent = '단계를 하나 이상 고르세요'; return; }
+      try { await saveLoops((arr) => { const i = arr.findIndex((x) => x.name === (lEditing || l.name)); if (i >= 0) arr[i] = l; else arr.push(l); return arr; }); $('#lMsg').textContent = '저장됨'; loopToForm(null); await loadLoops(); } catch (x) { $('#lMsg').textContent = x.message; } return; }
+    if (e.target.closest('#lNew')) { loopToForm(null); return; }
+    const ed = e.target.closest('[data-ledit]'); if (ed) { try { const r = await api('GET', `/admin/loops/${lProject}`); const l = (r.loops || []).find((x) => x.name === ed.dataset.ledit); if (l) { loopToForm(l); $('#lform').scrollIntoView({ behavior: 'smooth' }); } } catch (x) { alert(x.message); } return; }
+    const dl = e.target.closest('[data-ldel]'); if (dl) { if (!confirm(`루프 '${dl.dataset.ldel}' 을 지울까요?`)) return; try { await saveLoops((arr) => arr.filter((x) => x.name !== dl.dataset.ldel)); await loadLoops(); } catch (x) { alert(x.message); } return; }
+    const rn = e.target.closest('[data-lrun]'); if (rn) { if (!confirm(`루프 '${rn.dataset.lrun}' 을 지금 실행할까요? (단계에 따라 Claude 비용이 듭니다)`)) return; try { await api('POST', `/admin/loops/${lProject}/${encodeURIComponent(rn.dataset.lrun)}/run`); await loadLoops(); } catch (x) { alert(x.message); } return; }
+    if (e.target.closest('[data-lstop]')) { try { await api('POST', `/admin/loops/${lProject}/stop`); await loadLoops(); } catch (x) { alert(x.message); } return; }
   });
   // ── 지식 그래프 ──
   let kTimer = null, kq = '', kView = '3d', kGraphKey = '', kMerged = null;
@@ -969,7 +1051,7 @@
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
-    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); return; }
+    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); if (tab === 'loops') loadLoops(); return; }
     const sh = e.target.closest('.shots figure'); if (sh) { const img = sh.querySelector('img'); if (img) { const big = document.createElement('div'); big.className = 'shotbig'; big.innerHTML = `<img src="${img.src}"><div class="dim">${esc(sh.dataset.shot)} (눌러서 닫기)</div>`; big.onclick = () => big.remove(); document.body.appendChild(big); } return; }
     const sb = e.target.closest('.shotbig'); if (sb) { sb.remove(); return; }
     const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }

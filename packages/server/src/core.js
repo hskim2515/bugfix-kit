@@ -5,6 +5,7 @@ import { createApi } from './api.js';
 import { Insights } from './insights.js';
 import { Knowledge } from './knowledge.js';
 import { Versions } from './versions.js';
+import { Loops } from './loops.js';
 
 export const defaultLog = {
   info: (...a) => console.log(new Date().toISOString(), ...a),
@@ -38,10 +39,11 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
   const insights = new Insights(cfg, store, runner, log);
   const knowledge = new Knowledge(cfg, store, runner, log);
   const versions = new Versions(cfg, store, runner, log);
+  const loops = new Loops(cfg, store, runner, insights, knowledge, versions, log);
   runner.knowledge = knowledge;
   runner.versions = versions;
   insights.knowledge = knowledge;
-  const router = createApi(cfg, store, runner, log, insights, knowledge, versions);
+  const router = createApi(cfg, store, runner, log, insights, knowledge, versions, loops);
 
   /** 재시작으로 끊긴 작업을 다시 큐에 넣고 예약을 시작한다 */
   async function start() {
@@ -57,11 +59,13 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
     await insights.resetInterrupted();
     await knowledge.resetInterrupted();
     await versions.resetInterrupted().catch((e) => log.warn('[preview] 상태 정리 실패:', e.message));
+    await loops.resetInterrupted().catch((e) => log.warn('[loops] 상태 정리 실패:', e.message));
     insights.startSchedules();
     knowledge.startSchedules();
     versions.startSweeper();
+    loops.startSchedules();
     if (!cfg.githubToken(Object.values(cfg.projects)[0])) log.warn('[bugfix] 저장소 토큰이 없습니다 - 리포트 저장은 되지만 자동 수정은 거부됩니다');
   }
-  function stop() { insights.stopSchedules(); knowledge.stopSchedules(); versions.stopSweeper(); }
-  return { cfg, store, runner, insights, knowledge, versions, router, log, start, stop };
+  function stop() { insights.stopSchedules(); knowledge.stopSchedules(); versions.stopSweeper(); loops.stopSchedules(); }
+  return { cfg, store, runner, insights, knowledge, versions, loops, router, log, start, stop };
 }

@@ -29,7 +29,7 @@ const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 's
  * 라우터를 돌려준다(경로는 마운트 지점 기준). 독립 서버는 `app.use('/api', router)`, 앱 내장(bugfix-kit/embed)은 `app.use('/bugfix', router)`.
  * 콘솔(/ui/)은 자기 주소의 한 단계 위를 API 기준으로 쓰므로 어디에 마운트해도 맞는다.
  */
-export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null, versions = null) {
+export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null, versions = null, loops = null) {
   const app = express.Router();
   // 버전 미리보기({마운트}/v/:project/:n/…)는 본문을 그대로 넘겨야 하므로 JSON 파서보다 앞에
   if (versions) app.use(versions.router());
@@ -92,6 +92,10 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   // ── 지식 그래프(Knowledge): 메뉴·기능 → 파일·API 온톨로지 ──
   app.get('/admin/knowledge/:project', admin, wrap(async (req) => knowledge ? knowledge.summary(proj(req).name) : { status: 'NONE' }));
   app.get('/admin/knowledge/:project/graph', admin, wrap(async (req) => { const s = knowledge ? await knowledge.state(proj(req).name) : {}; return { nodes: s.nodes || [], edges: s.edges || [], head: s.head || null }; }));
+  // ── 루프(되풀이 자동화) ──
+  app.get('/admin/loops/:project', admin, wrap(async (req) => (loops ? loops.list(proj(req)) : { loops: [], runs: [] })));
+  app.post('/admin/loops/:project/:name/run', admin, wrap(async (req) => loops.runNow(proj(req), req.params.name)));
+  app.post('/admin/loops/:project/stop', admin, wrap(async (req) => loops.stop(proj(req))));
   // ── 버전(AI 수정본) · 미리보기 ──
   app.get('/admin/versions/:project', admin, wrap(async (req) => ({ versions: versions ? await versions.list(proj(req).name) : [], recipe: versions ? versions.recipe(proj(req)) : null, dbTemplate: versions ? (await versions.state(proj(req).name)).dbTemplate || null : null, lane: runner.laneState().preview || null })));
   app.get('/admin/versions/:project/:n/diff', admin, wrap(async (req) => { const d = versions ? await versions.diff(proj(req), req.params.n) : null; if (!d) throw new HttpError(404, '없는 버전'); return d; }));
