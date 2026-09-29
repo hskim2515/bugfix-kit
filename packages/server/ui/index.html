@@ -265,10 +265,11 @@
     <div data-tab="versions" hidden>
       <div class="intro">AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 <b>버전</b>으로 갖고 있습니다(키트 저장소 태그 bugfix/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워 <b>접속</b>해 보고, 마음에 들면 <b>원격으로 보냅니다</b>(브랜치만 / PR·MR / 자동 병합).</div>
       <details class="card" id="vRecipeWrap" style="margin-bottom:12px"><summary class="dim">미리보기 레시피 <span id="vRecipeState"></span></summary>
-        <div class="dim" style="margin:6px 0">프론트 빌드·백엔드 실행·DB 복제 방법. 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}. db.mode: template(기본, 템플릿 DB 에서 초 단위 복제) · clone(매번 라이브에서, 느림) · shared(사본 없이 개발 DB 공유). maxUp(동시 개수, 기본 2) · ttlHours(미사용 자동 중지, 기본 12)</div>
+        <div class="dim" style="margin:6px 0">프론트 빌드·백엔드 실행·DB 복제 방법. 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}. db.mode: template(기본, 템플릿 DB 에서 초 단위 복제) · clone(매번 라이브에서, 느림) · shared(사본 없이 개발 DB 공유). maxUp(동시 개수, 기본 1) · volumes '호스트:컨테이너[:ro|:shared]'(표시 없으면 샌드박스 사본) · ttlHours(미사용 자동 중지, 기본 12)</div>
         <textarea id="vRecipe" style="min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea>
         <div class="actions"><button class="btn" id="vDraft" title="Claude 가 저장소(컴포즈·Dockerfile·env·properties)를 읽고 초안을 만듭니다 (1~3분)">AI 초안 만들기</button><input id="vNote" placeholder="AI 에게 줄 메모 (선택: 배포 서버 IP, DB 컨테이너 이름 …)" style="flex:1;min-width:200px"><button class="btn primary" id="vSave">레시피 저장</button><span class="msg" id="vMsg"></span></div>
       </details>
+      <div class="card" id="vSandbox" style="margin-bottom:12px"><div class="toolbar"><b>샌드박스 사본</b> <span class="dim" id="vSandboxState"></span><button class="btn" id="vSandboxReset" title="떠 있는 미리보기를 내리고 원본 파일 저장소에서 사본을 다시 만듭니다">샌드박스 초기화</button></div><div class="dim">미리보기는 원본 파일 저장소 대신 이 사본을 씁니다(레시피 volumes 중 :ro·:shared 표시가 없는 것). 미리보기에서 만든 파일은 여기 쌓이고, 원본에 새로 올라온 자료는 초기화해야 들어옵니다.</div></div>
       <table id="vTable"><thead><tr><th style="width:60px">버전</th><th>내용</th><th style="width:140px">미리보기</th><th style="width:330px"></th></tr></thead><tbody id="vRows"></tbody></table>
       <div class="empty" id="vEmpty" hidden>아직 버전이 없습니다 - AI 수정이 끝나면 여기에 쌓입니다</div>
       <details class="card" id="vLogWrap" hidden style="margin-top:12px"><summary class="dim" id="vLogHead">진행 로그</summary><pre class="log" id="vLog"></pre></details>
@@ -648,6 +649,8 @@
     $('#vRecipeState').textContent = (r.recipe ? '· 있음' : '· 없음 (초안을 만들거나 적어 주세요)') + (r.dbTemplate ? ` · 템플릿 DB ${esc(r.dbTemplate.name)} ${ago(r.dbTemplate.refreshedAt)} 갱신(${r.dbTemplate.seconds}초)` : '');
     if (document.activeElement !== $('#vRecipe')) $('#vRecipe').value = r.recipe ? JSON.stringify(r.recipe, null, 2) : '';
     $('#vRecipeWrap').open = !r.recipe;
+    const sbe = Object.entries(r.sandbox || {});
+    $('#vSandboxState').innerHTML = sbe.length ? sbe.map(([h, x]) => `${esc(h)} → ${ago(x.at)} 생성(${x.seconds}초)${x.skip?.length ? ` · 건너뜀 ${esc(x.skip.join(', '))}` : ''}`).join(' · ') : '아직 없음 - 처음 미리보기를 띄울 때 만듭니다';
     const vs = r.versions || [];
     $('#vEmpty').hidden = vs.length > 0; $('#vEmpty').textContent = '아직 버전이 없습니다 - AI 수정이 끝나면 여기에 쌓입니다';
     $('#vRows').innerHTML = vs.map((v) => { const st = v.preview?.status || 'NONE'; const busy = ['QUEUED', 'BUILDING', 'STARTING'].includes(st);
@@ -669,6 +672,7 @@
   }
   document.addEventListener('click', async (e) => {
     if (e.target.closest('#vSave')) { saveRecipe(); return; }
+    if (e.target.closest('#vSandboxReset')) { const b = e.target.closest('#vSandboxReset'); if (!confirm('떠 있는 미리보기를 내리고 샌드박스 사본을 원본에서 다시 만듭니다. 미리보기에서 만든 파일은 사라집니다. 계속할까요?')) return; b.disabled = true; $('#vSandboxState').textContent = '초기화 중…'; try { const r = await api('POST', `/admin/versions/${vProject}/sandbox/reset`); $('#vMsg').textContent = (r.lines || []).slice(-1)[0] || '초기화 완료'; } catch (x) { $('#vMsg').textContent = x.message; } finally { b.disabled = false; loadVersions(); } return; }
     if (e.target.closest('#vDraft')) { const b = e.target.closest('#vDraft'); b.disabled = true; $('#vMsg').textContent = 'Claude 가 저장소를 읽는 중… (1~3분)'; try { const r = await api('POST', `/admin/versions/${vProject}/recipe/draft`, { note: $('#vNote').value }); $('#vRecipe').value = JSON.stringify(r.recipe, null, 2); $('#vMsg').textContent = '초안이 왔습니다 - 확인 뒤 저장하세요'; } catch (x) { $('#vMsg').textContent = x.message; } finally { b.disabled = false; } return; }
     if (e.target.closest('#vDiffClose')) { $('#vDiff').hidden = true; return; }
     const ps = e.target.closest('[data-pstart]'); if (ps) { ps.disabled = true; try { await api('POST', `/admin/versions/${vProject}/${ps.dataset.pstart}/preview`); await loadVersions(); } catch (x) { alert(x.message); ps.disabled = false; } return; }

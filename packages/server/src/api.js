@@ -108,7 +108,8 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   app.post('/admin/loops/:project/:name/run', admin, wrap(async (req) => loops.runNow(proj(req), req.params.name)));
   app.post('/admin/loops/:project/stop', admin, wrap(async (req) => loops.stop(proj(req))));
   // ── 버전(AI 수정본) · 미리보기 ──
-  app.get('/admin/versions/:project', admin, wrap(async (req) => ({ versions: versions ? await versions.list(proj(req).name) : [], recipe: versions ? versions.recipe(proj(req)) : null, dbTemplate: versions ? (await versions.state(proj(req).name)).dbTemplate || null : null, lane: runner.laneState().preview || null })));
+  app.get('/admin/versions/:project', admin, wrap(async (req) => ({ versions: versions ? await versions.list(proj(req).name) : [], recipe: versions ? versions.recipe(proj(req)) : null, dbTemplate: versions ? (await versions.state(proj(req).name)).dbTemplate || null : null, sandbox: versions ? await versions.sandboxInfo(proj(req)) : {}, lane: runner.laneState().preview || null })));
+  app.post('/admin/versions/:project/sandbox/reset', admin, wrap(async (req) => versions.resetSandbox(proj(req))));
   app.get('/admin/versions/:project/:n/diff', admin, wrap(async (req) => { const d = versions ? await versions.diff(proj(req), req.params.n) : null; if (!d) throw new HttpError(404, '없는 버전'); return d; }));
   app.post('/admin/versions/:project/:n/preview', admin, wrap(async (req) => versions.start(proj(req), req.params.n)));
   app.delete('/admin/versions/:project/:n/preview', admin, wrap(async (req) => versions.stop(proj(req), req.params.n)));

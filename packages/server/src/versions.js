@@ -19,8 +19,11 @@ import { firstLine, hhmmss, notBlank, nowIso, sleep } from './util.js';
  *   host:  192.168.10.182                 워커가 백엔드 컨테이너에 닿는 주소(앱 안 워커가 컨테이너면 127.0.0.1 은 안 됨)
  *   front: { dir, build, dist, env: { VITE_API_URL: '{backUrl}' } }     build 는 sh 명령. BUGFIX_PREVIEW_BASE 는 키트가 넣는다
  *   back:  { dir, build, artifact: 'build/libs/*.jar', image, port, cmd: 'java -jar /app.jar', env: {}, volumes: [], startTimeoutMin: 8 }
- *          volumes: '호스트:컨테이너[:ro|:copy]' - copy 는 미리보기마다 호스트 디렉터리의 사본(<부모>/.bugfix-previews/v{n}/<이름>, xfs·btrfs 면 reflink 로 즉시)을
- *          만들어 마운트하고 중지 때 지운다 → 미리보기가 원본 파일 저장소를 건드리지 않는다. 큰 읽기 전용 자료는 :ro 로.
+ *          volumes: '호스트:컨테이너[:ro|:shared]' - 표시가 없으면 **프로젝트 샌드박스 사본**(<부모>/.bugfix-sandbox/<프로젝트>/<이름>)을 마운트한다.
+ *          샌드박스는 처음 띄울 때 한 번 만들고(xfs·btrfs 면 reflink 로 즉시) 그 뒤 미리보기들이 같이 쓴다 → 원본 파일 저장소를 건드리지 않고,
+ *          디렉터리마다 쓰는 곳인지 가릴 필요가 없다. 콘솔 '샌드박스 초기화' 로 원본에서 다시 만든다(sandboxMaxAgeHours 로 자동 갱신도 가능, 기본 0=수동).
+ *          아주 큰 읽기 전용 트리(타일 등)는 :ro 로 원본을 그대로 - 샌드박스 사본 안의 같은 위치는 복사하지 않고 건너뛴다(바로 아래 항목만).
+ *          :shared 는 원본을 쓰기 가능으로 그대로(미리보기의 쓰기가 원본에 남음). 옛 ':copy' 는 샌드박스와 같게 본다.
  *          컨테이너 env 에는 항상 BUGFIX_PREVIEW=v{n} · BUGFIX_PREVIEW_N={n} 이 들어간다(앱이 저장 경로·큐 이름에 접두어를 붙이는 데 쓸 수 있음)
  *   db:    { container, name, user, mode }  mode: template(기본 - 키트가 {name}_bugfix_tmpl 템플릿 DB 를 하루 한 번 pg_dump 로 갱신해 두고
  *                                          CREATE DATABASE … TEMPLATE 로 초 단위 복제) · clone(매번 라이브 DB 를 pg_dump|psql, 느림) ·
@@ -28,7 +31,7 @@ import { firstLine, hhmmss, notBlank, nowIso, sleep } from './util.js';
  *          templateMaxAgeHours: 24        템플릿 갱신 주기
  *   proxies: { '/file-proxy/': 'http://…/' }   프론트가 같은 오리진으로 부르는 다른 경로 → 그대로 넘김
  *   ttlHours: 12                          마지막 접속 뒤 이 시간이 지나면 자동 중지 (중지 시 컨테이너·DB 사본·빌드 산출물 제거, 다시 띄우면 재빌드)
- *   maxUp: 2                              프로젝트당 동시에 떠 있는 미리보기 수 - 넘으면 가장 오래 안 쓴 것부터 내림
+ *   maxUp: 1                              프로젝트당 동시에 떠 있는 미리보기 수(기본 1 - 샌드박스를 같이 쓰므로) - 넘으면 가장 오래 안 쓴 것부터 내림
  */
 export class Versions {
   constructor(cfg, store, runner, log = console) {
@@ -115,7 +118,7 @@ export class Versions {
     const r = project.preview;
     if (!r || typeof r !== 'object' || (!r.front && !r.back)) return null;
     const db = r.db ? { mode: 'template', templateMaxAgeHours: 24, ...r.db, template: r.db.template || `${r.db.name}_bugfix_tmpl` } : null;
-    return { ttlHours: 12, maxUp: 2, host: '127.0.0.1', proxies: {}, ...r, db, base: String(r.base || '/bugfix').replace(/\/+$/, '') };
+    return { ttlHours: 12, maxUp: 1, host: '127.0.0.1', proxies: {}, ...r, db, base: String(r.base || '/bugfix').replace(/\/+$/, '') };
   }
   fill(s, vars) { return String(s ?? '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m)); }
   vars(project, n, extra = {}) {
@@ -180,7 +183,9 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const r = this.recipe(project);
     const up = (await this.state(project.name)).versions.filter((x) => x.n !== Number(n) && x.preview?.status === 'UP')
       .sort((a, b) => Date.parse(a.preview.lastAccess || a.preview.upAt || 0) - Date.parse(b.preview.lastAccess || b.preview.upAt || 0));
-    for (const x of up.slice(0, Math.max(0, up.length - (r.maxUp - 1)))) { await this.plog(project.name, x.n, `■ 동시 ${r.maxUp}개 제한 - v${n} 을 띄우려고 내림`); await this.stop(project, x.n).catch(() => {}); }
+    const replaced = [];
+    for (const x of up.slice(0, Math.max(0, up.length - (r.maxUp - 1)))) { await this.plog(project.name, x.n, `■ 동시 ${r.maxUp}개 제한 - v${n} 을 띄우려고 내림`); await this.stop(project, x.n).catch(() => {}); replaced.push(x.n); }
+    if (replaced.length) this.notifier?.send(project, 'preview.up', { title: `미리보기 교체 - v${replaced.join(', v')} 를 내리고 v${n} 준비`, lines: [`동시 ${r.maxUp}개 제한 - 보고 있던 미리보기가 바뀝니다`], level: 'warn' }).catch(() => {});
     await this.update(project.name, n, { preview: { status: 'QUEUED', log: '', startedAt: nowIso() } });
     const ahead = this.runner.submit(project, `preview-${n}`, () => this.run(project, n), async (e) => {
       await this.plog(project.name, n, `✗ 실패: ${firstLine(e.message, 300)}`);
@@ -255,26 +260,8 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
         } else if (db) await L(`DB: 라이브 DB ${db} 공유(사본 없음 - 미리보기에서 쓴 데이터가 개발 DB 에 남습니다)`);
         await upd({ status: 'STARTING' });
         const envArgs = Object.entries({ BUGFIX_PREVIEW: `v${n}`, BUGFIX_PREVIEW_N: String(n), ...(r.back.env || {}) }).flatMap(([k, val]) => ['-e', `${k}=${this.fill(val, vars)}`]);
-        // 볼륨: ':copy' 는 미리보기 전용 사본을 만들어 그 자리를 마운트 (원본 파일 저장소 보호)
-        const image = r.back.image || 'eclipse-temurin:21-jdk';
-        const copies = [];
-        const volArgs = [];
-        for (const raw of r.back.volumes || []) {
-          const m = this.fill(raw, vars);
-          const parts = m.split(':');
-          if (parts.length >= 3 && parts[parts.length - 1] === 'copy') {
-            const host = parts[0], ctr = parts.slice(1, -1).join(':');
-            const parent = path.posix.dirname(host), base = path.posix.basename(host);
-            const dst = `${parent}/.bugfix-previews/v${n}/${base}`;
-            await L(`파일 저장소 사본: ${host} → ${dst} (reflink 가능하면 즉시)…`);
-            const t0 = Date.now();
-            await ex.exec(wt, 30, ['docker', 'run', '--rm', '-v', `${parent}:/w`, image, 'sh', '-c', `mkdir -p /w/.bugfix-previews/v${n} && rm -rf ${sq(`/w/.bugfix-previews/v${n}/${base}`)} && cp -a --reflink=auto ${sq(`/w/${base}`)} ${sq(`/w/.bugfix-previews/v${n}/${base}`)}`]);
-            await L(`✓ 사본 완료 (${Math.round((Date.now() - t0) / 1000)}초)`);
-            copies.push({ parent, base });
-            volArgs.push('-v', `${dst}:${ctr}`);
-          } else volArgs.push('-v', m);
-        }
-        if (copies.length) await upd({ copies });
+        // 볼륨: 표시 없는 것은 프로젝트 샌드박스 사본을 마운트 (원본 파일 저장소 보호) - 없으면 지금 만든다
+        const volArgs = await this.sandboxVolumes(project, r, ex, wt, L, vars);
         const cmd = (r.back.cmd || `java -jar /app${artName}`).split(/\s+/);
         await ex.exec(wt, 5, ['docker', 'run', '-d', '--name', container, '--label', 'bugfix-kit=preview', '--restart', 'no', '-p', `${port}:${r.back.port || 8080}`, '-v', `${artCopy}:/app${artName}:ro`, ...volArgs, ...envArgs, r.back.image || 'eclipse-temurin:21-jdk', ...cmd]);
         await L(`컨테이너 시작: ${container} (${vars.host}:${port} → ${r.back.port})`);
@@ -341,6 +328,67 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       tryOnce();
     });
   }
+
+  /** 레시피 볼륨을 파싱: [{host, ctr, mode: 'sandbox'|'ro'|'shared'}] */
+  parseVolumes(r, vars) {
+    return (r.back?.volumes || []).map((raw) => {
+      const m = this.fill(raw, vars); const parts = m.split(':');
+      const last = parts[parts.length - 1];
+      const mode = parts.length >= 3 && ['ro', 'shared', 'copy'].includes(last) ? last : 'sandbox';
+      const host = parts[0]; const ctr = (parts.length >= 3 && mode !== 'sandbox' ? parts.slice(1, -1) : parts.slice(1, mode === 'sandbox' && last === 'copy' ? -1 : undefined)).join(':');
+      return { host, ctr: ctr || host, mode: mode === 'copy' ? 'sandbox' : mode, raw: m };
+    });
+  }
+  sandboxDir(project, host) { return `${path.posix.dirname(host)}/.bugfix-sandbox/${project.name}/${path.posix.basename(host)}`; }
+  /** 샌드박스 사본 마운트 인자 - 없거나(또는 force·오래됨) 다시 만든다 */
+  async sandboxVolumes(project, r, ex, wt, L, vars, { force = false } = {}) {
+    const vols = this.parseVolumes(r, vars);
+    const st = await this.state(project.name);
+    const sb = { ...(st.sandbox || {}) };
+    const maxAge = Number(r.back?.sandboxMaxAgeHours) > 0 ? Number(r.back.sandboxMaxAgeHours) * 3600_000 : 0;
+    const image = r.back?.image || 'eclipse-temurin:21-jdk';
+    const args = [];
+    for (const v of vols) {
+      if (v.mode === 'ro') { args.push('-v', `${v.host}:${v.ctr}:ro`); continue; }
+      if (v.mode === 'shared') { args.push('-v', `${v.host}:${v.ctr}`); continue; }
+      const parent = path.posix.dirname(v.host), base = path.posix.basename(v.host);
+      const dst = this.sandboxDir(project, v.host);
+      const rec = sb[v.host];
+      const stale = !rec || force || (maxAge && Date.parse(rec.at || 0) < Date.now() - maxAge) || !(await this.sandboxExists(ex, wt, image, parent, dst));
+      if (stale) {
+        // 같은 트리 안에서 :ro 로 따로 마운트되는 바로 아래 항목은 복사하지 않는다(타일처럼 큰 읽기 전용)
+        const skip = vols.filter((o) => o.mode === 'ro' && path.posix.dirname(o.host) === v.host).map((o) => path.posix.basename(o.host));
+        await L(`샌드박스 사본 만드는 중: ${v.host} → ${dst}${skip.length ? ` (건너뜀: ${skip.join(', ')})` : ''} - reflink 가능하면 빠름…`);
+        const t0 = Date.now();
+        const rel = `/w/.bugfix-sandbox/${project.name}/${base}`;
+        const skipTest = skip.map((k) => `[ "$e" = ${sq(k)} ]`).join(' || ') || 'false';
+        const script = `set -e; mkdir -p ${sq(`/w/.bugfix-sandbox/${project.name}`)}; rm -rf ${sq(rel)}.tmp ${sq(rel)}; mkdir -p ${sq(rel)}.tmp; cd ${sq(`/w/${base}`)}; for e in .[!.]* ..?* *; do [ -e "$e" ] || continue; if ${skipTest}; then mkdir -p ${sq(rel)}.tmp/"$e"; continue; fi; cp -a --reflink=auto -- "$e" ${sq(rel)}.tmp/; done; mv ${sq(rel)}.tmp ${sq(rel)}`;
+        await ex.exec(wt, 120, ['docker', 'run', '--rm', '-v', `${parent}:/w`, image, 'sh', '-c', script]);
+        const sec = Math.round((Date.now() - t0) / 1000);
+        await L(`✓ 샌드박스 사본 완료 (${sec}초)`);
+        sb[v.host] = { dir: dst, at: nowIso(), seconds: sec, skip };
+        await this.save(project.name, (c) => ({ ...c, sandbox: { ...(c.sandbox || {}), [v.host]: sb[v.host] } }));
+      }
+      args.push('-v', `${dst}:${v.ctr}`);
+    }
+    return args;
+  }
+  async sandboxExists(ex, wt, image, parent, dst) {
+    const rel = '/w/' + path.posix.relative(parent, dst);
+    return (await ex.execRc(wt, 1, ['docker', 'run', '--rm', '-v', `${parent}:/w`, image, 'sh', '-c', `[ -d ${sq(rel)} ]`])) === 0;
+  }
+  /** 콘솔 '샌드박스 초기화': 떠 있는 미리보기를 내리고 원본에서 다시 만든다 */
+  async resetSandbox(project) {
+    const r = this.recipe(project);
+    if (!r) throw Object.assign(new Error('미리보기 레시피가 없습니다'), { status: 409 });
+    const st = await this.state(project.name);
+    for (const v of st.versions.filter((x) => ['UP', 'QUEUED', 'BUILDING', 'STARTING'].includes(x.preview?.status))) { await this.plog(project.name, v.n, '■ 샌드박스 초기화로 내림'); await this.stop(project, v.n).catch(() => {}); }
+    const ex = this.runner.ex(project); const wt = this.previewDir(project.name, 0); await fs.mkdir(wt, { recursive: true });
+    const lines = [];
+    await this.sandboxVolumes(project, r, ex, wt, async (l) => { lines.push(l); this.log.info(`[sandbox ${project.name}] ${l}`); }, this.vars(project, 0, { db: '', port: '' }), { force: true });
+    return { ok: true, lines, sandbox: (await this.state(project.name)).sandbox || {} };
+  }
+  async sandboxInfo(project) { return (await this.state(project.name)).sandbox || {}; }
 
   async teardown(project, n, { quiet = false } = {}) {
     const v = await this.get(project.name, n);
