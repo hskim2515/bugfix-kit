@@ -29,7 +29,7 @@ import java.util.function.Supplier;
 public class BugfixProxyController {
 
     private static final Set<String> SKIP = Set.of("host", "content-length", "connection", "transfer-encoding", "expect", "accept-encoding");
-    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(10)).build();
     private final String path;
     private final Supplier<String> target;
 

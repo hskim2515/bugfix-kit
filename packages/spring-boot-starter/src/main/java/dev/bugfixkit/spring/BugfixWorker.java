@@ -78,7 +78,7 @@ public class BugfixWorker implements SmartLifecycle {
     /** 워커가 응답하나 (GET /api/health) */
     private boolean healthy(String base) {
         try {
-            HttpResponse<Void> r = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
+            HttpResponse<Void> r = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(2)).build()
                 .send(HttpRequest.newBuilder(URI.create(base + "/api/health")).timeout(Duration.ofSeconds(2)).GET().build(), HttpResponse.BodyHandlers.discarding());
             return r.statusCode() == 200;
         } catch (Exception e) { return false; }
@@ -302,7 +302,7 @@ public class BugfixWorker implements SmartLifecycle {
     public boolean healthy() {
         if (url.isBlank()) return false;
         try {
-            HttpResponse<String> r = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(url + "/api/health")).timeout(Duration.ofSeconds(3)).build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> r = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build().send(HttpRequest.newBuilder(URI.create(url + "/api/health")).timeout(Duration.ofSeconds(3)).build(), HttpResponse.BodyHandlers.ofString());
             return r.statusCode() == 200;
         } catch (Exception e) { return false; }
     }

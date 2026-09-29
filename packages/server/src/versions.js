@@ -445,6 +445,16 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
    */
   attachUpgrade(server, mount = '/api') {
     server.on('upgrade', async (req, socket, head) => {
+      // ⚠️ upgrade 리스너가 하나라도 있으면 Node 는 Upgrade 헤더가 있는 모든 요청을 여기로 보낸다 - JDK HttpClient 는 평문 http 에
+      //    기본으로 `Upgrade: h2c` 를 붙이므로(앱의 Spring 프록시!) websocket 이 아니면 일반 요청으로 되돌려 준다
+      if (!/websocket/i.test(String(req.headers.upgrade || ''))) {
+        if (head?.length) socket.unshift(head);
+        if (Number(req.headers['content-length']) > 0 || req.headers['transfer-encoding']) { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Type: text/plain\r\n\r\nupgrade with body not supported\r\n'); return; }
+        const res = new http.ServerResponse(req); res.assignSocket(socket); res.shouldKeepAlive = false;
+        res.on('finish', () => { try { socket.end(); } catch { /* */ } });
+        server.emit('request', req, res);
+        return;
+      }
       const m = String(req.url || '').match(new RegExp(`^${mount.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/v/([^/]+)/(\\d+)/back(/.*)?$`));
       if (!m) return socket.destroy();
       const project = this.cfg.projects[m[1]]; const v = project ? await this.get(project.name, Number(m[2])) : null;
