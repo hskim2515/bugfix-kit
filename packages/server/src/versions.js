@@ -19,6 +19,9 @@ import { firstLine, hhmmss, notBlank, nowIso, sleep } from './util.js';
  *   host:  192.168.10.182                 워커가 백엔드 컨테이너에 닿는 주소(앱 안 워커가 컨테이너면 127.0.0.1 은 안 됨)
  *   front: { dir, build, dist, env: { VITE_API_URL: '{backUrl}' } }     build 는 sh 명령. BUGFIX_PREVIEW_BASE 는 키트가 넣는다
  *   back:  { dir, build, artifact: 'build/libs/*.jar', image, port, cmd: 'java -jar /app.jar', env: {}, volumes: [], startTimeoutMin: 8 }
+ *          volumes: '호스트:컨테이너[:ro|:copy]' - copy 는 미리보기마다 호스트 디렉터리의 사본(<부모>/.bugfix-previews/v{n}/<이름>, xfs·btrfs 면 reflink 로 즉시)을
+ *          만들어 마운트하고 중지 때 지운다 → 미리보기가 원본 파일 저장소를 건드리지 않는다. 큰 읽기 전용 자료는 :ro 로.
+ *          컨테이너 env 에는 항상 BUGFIX_PREVIEW=v{n} · BUGFIX_PREVIEW_N={n} 이 들어간다(앱이 저장 경로·큐 이름에 접두어를 붙이는 데 쓸 수 있음)
  *   db:    { container, name, user, mode }  mode: template(기본 - 키트가 {name}_bugfix_tmpl 템플릿 DB 를 하루 한 번 pg_dump 로 갱신해 두고
  *                                          CREATE DATABASE … TEMPLATE 로 초 단위 복제) · clone(매번 라이브 DB 를 pg_dump|psql, 느림) ·
  *                                          shared(사본 없이 라이브 DB 그대로 - 빠르지만 미리보기의 쓰기가 개발 DB 에 남음). {db} = 사본 이름
@@ -251,8 +254,27 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
           await L('✓ DB 복제 완료');
         } else if (db) await L(`DB: 라이브 DB ${db} 공유(사본 없음 - 미리보기에서 쓴 데이터가 개발 DB 에 남습니다)`);
         await upd({ status: 'STARTING' });
-        const envArgs = Object.entries(r.back.env || {}).flatMap(([k, val]) => ['-e', `${k}=${this.fill(val, vars)}`]);
-        const volArgs = (r.back.volumes || []).flatMap((m) => ['-v', this.fill(m, vars)]);
+        const envArgs = Object.entries({ BUGFIX_PREVIEW: `v${n}`, BUGFIX_PREVIEW_N: String(n), ...(r.back.env || {}) }).flatMap(([k, val]) => ['-e', `${k}=${this.fill(val, vars)}`]);
+        // 볼륨: ':copy' 는 미리보기 전용 사본을 만들어 그 자리를 마운트 (원본 파일 저장소 보호)
+        const image = r.back.image || 'eclipse-temurin:21-jdk';
+        const copies = [];
+        const volArgs = [];
+        for (const raw of r.back.volumes || []) {
+          const m = this.fill(raw, vars);
+          const parts = m.split(':');
+          if (parts.length >= 3 && parts[parts.length - 1] === 'copy') {
+            const host = parts[0], ctr = parts.slice(1, -1).join(':');
+            const parent = path.posix.dirname(host), base = path.posix.basename(host);
+            const dst = `${parent}/.bugfix-previews/v${n}/${base}`;
+            await L(`파일 저장소 사본: ${host} → ${dst} (reflink 가능하면 즉시)…`);
+            const t0 = Date.now();
+            await ex.exec(wt, 30, ['docker', 'run', '--rm', '-v', `${parent}:/w`, image, 'sh', '-c', `mkdir -p /w/.bugfix-previews/v${n} && rm -rf ${sq(`/w/.bugfix-previews/v${n}/${base}`)} && cp -a --reflink=auto ${sq(`/w/${base}`)} ${sq(`/w/.bugfix-previews/v${n}/${base}`)}`]);
+            await L(`✓ 사본 완료 (${Math.round((Date.now() - t0) / 1000)}초)`);
+            copies.push({ parent, base });
+            volArgs.push('-v', `${dst}:${ctr}`);
+          } else volArgs.push('-v', m);
+        }
+        if (copies.length) await upd({ copies });
         const cmd = (r.back.cmd || `java -jar /app${artName}`).split(/\s+/);
         await ex.exec(wt, 5, ['docker', 'run', '-d', '--name', container, '--label', 'bugfix-kit=preview', '--restart', 'no', '-p', `${port}:${r.back.port || 8080}`, '-v', `${artCopy}:/app${artName}:ro`, ...volArgs, ...envArgs, r.back.image || 'eclipse-temurin:21-jdk', ...cmd]);
         await L(`컨테이너 시작: ${container} (${vars.host}:${port} → ${r.back.port})`);
@@ -327,6 +349,10 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const container = v?.preview?.container || `bugfix-${project.name}-v${n}`;
     await ex.execOut('/', 1, ['docker', 'rm', '-f', container]);
     if (r?.db && r.db.mode !== 'shared' && v?.preview?.db && v.preview.db !== r.db.name) await ex.execOut('/', 5, ['docker', 'exec', r.db.container, 'dropdb', '-U', r.db.user, '--if-exists', '--force', v.preview.db]);
+    // 파일 저장소 사본(:copy 볼륨) 제거
+    for (const parent of [...new Set((v?.preview?.copies || []).map((c) => c.parent))]) {
+      await ex.execOut('/', 30, ['docker', 'run', '--rm', '-v', `${parent}:/w`, r?.back?.image || 'eclipse-temurin:21-jdk', 'sh', '-c', `rm -rf /w/.bugfix-previews/v${n}; rmdir /w/.bugfix-previews 2>/dev/null; true`]);
+    }
     if (!quiet) await this.plog(project.name, n, '■ 미리보기 중지(컨테이너·DB 사본 제거)');
   }
   async stop(project, n) {

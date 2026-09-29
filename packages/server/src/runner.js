@@ -297,7 +297,7 @@ export class Runner {
       const preface = allowChange
         ? '사용자의 추가 요청입니다. 앞서 고친 내용 위에 아래 요청을 반영하세요. 고친 뒤 검증 명령을 통과시키고, '
           + '`.bugfix/result.md` 를 같은 형식(# 한 줄 요약 / ## 원인 / ## 고친 내용 / ## 검증 / ## 확인이 필요한 점 / ## 추천 개선)으로 다시 쓰세요. '
-          + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. `.bugfix/repro.json`(재현 절차: api·steps)도 맞게 두세요 - 고친 뒤 서버가 미리보기에서 그 절차를 돌려 확인합니다. '
+          + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. `.bugfix/repro.json`(재현 절차: api·steps, 저장 대상 식별자는 미리보기 전용 값)도 맞게 두세요 - 고친 뒤 서버가 미리보기에서 그 절차를 돌려 확인합니다. '
           + 'git 커밋·푸시는 하지 마세요. 마지막 답변은 무엇을 바꿨는지 한국어로 간단히.\n\n요청: '
         : '사용자의 질문입니다. 코드를 바꾸지 말고 한국어로 간결하게 답하세요. 필요하면 파일을 읽어 근거를 대세요.\n\n질문: ';
       let out = await this.claudeResume(project, ex, id, wt, r.fixSessionId, preface + message, allowed, allowChange ? 40 : 20);
@@ -927,6 +927,8 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
        신고된 실패 요청(network-logs.json 의 status ≥ 400 항목)을 프론트가 실제로 보내는 형식대로. 실패 요청이 없으면 [].
      - steps: 화면에서 재현할 수 있으면 front-check 절차(goto/click/fill/waitFor/expect). 확실하지 않으면 [].
      - 통과 기준: 응답 status < 500 (expect.status 를 주면 그 값). 그러니 400대로 "정상 거절" 되는 요청은 넣지 마세요.
+     - **저장 대상 식별자(versionId·시나리오 키·파일 이름 등)는 실제 데이터 이름을 쓰지 말고 미리보기 전용 값(예: "bugfix-repro")** 으로 바꾸세요.
+       재현은 미리보기(DB·파일 사본)에서 돌지만 바깥 자원(SFTP·큐 등)을 공유할 수 있어 실제 데이터를 덮어쓰면 안 됩니다. 읽기는 실제 이름이어도 됩니다.
   6. 마지막에 \`.bugfix/result.md\` 를 아래 형식으로 씁니다. 첫 줄이 PR 제목이 됩니다(한 줄, 60자 이내, 한국어).
      \`\`\`
      # <한 줄 요약>

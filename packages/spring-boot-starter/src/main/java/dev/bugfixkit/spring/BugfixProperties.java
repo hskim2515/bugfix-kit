@@ -26,6 +26,8 @@ public class BugfixProperties {
     private String logsPath = "/debug/recent-logs";
     /** 메모리 로그 버퍼 크기 */
     private int logBuffer = 500;
+    /** 이 인스턴스가 bugfix-kit 미리보기면 "v{n}" (키트가 컨테이너 env BUGFIX_PREVIEW 로 넣음). 앱이 저장 경로·큐 이름에 접두어를 붙이거나 화면에 표시하는 데 쓴다 */
+    private String preview = "";
     /** 프록시(콘솔·미리보기 백엔드) 응답 대기 상한(초) - 긴 가져오기·변환이 중간에 끊기지 않게 */
     private int proxyTimeoutSeconds = 600;
     /** Spring Security 가 있으면 path 를 허용 목록에 넣는다(인증은 bugfix-kit 이 따로 한다) */
@@ -76,6 +78,9 @@ public class BugfixProperties {
     public void setPath(String path) { this.path = path; }
     public String getLogsPath() { return logsPath; }
     public void setLogsPath(String logsPath) { this.logsPath = logsPath; }
+    public String getPreview() { return preview; }
+    public void setPreview(String v) { this.preview = v == null ? "" : v.trim(); }
+    public boolean isPreview() { return !preview.isBlank(); }
     public int getProxyTimeoutSeconds() { return proxyTimeoutSeconds; }
     public void setProxyTimeoutSeconds(int v) { this.proxyTimeoutSeconds = v; }
     public int getLogBuffer() { return logBuffer; }
