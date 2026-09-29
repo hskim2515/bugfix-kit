@@ -358,10 +358,11 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       if (stale) {
         // 같은 트리 안에서 :ro 로 따로 마운트되는 바로 아래 항목은 복사하지 않는다(타일처럼 큰 읽기 전용)
         const skip = vols.filter((o) => o.mode === 'ro' && path.posix.dirname(o.host) === v.host).map((o) => path.posix.basename(o.host));
-        await L(`샌드박스 사본 만드는 중: ${v.host} → ${dst}${skip.length ? ` (건너뜀: ${skip.join(', ')})` : ''} - reflink 가능하면 빠름…`);
+        await L(`샌드박스 사본 만드는 중: ${v.host} → ${dst}${skip.length ? ` (건너뜀: ${skip.join(', ')})` : ''} - reflink 면 용량은 상관없고 파일 수에 비례(10만 개 ≈ 수 분). 파일이 아주 많은 읽기 전용 트리는 :ro 로 빼세요`);
         const t0 = Date.now();
         const rel = `/w/.bugfix-sandbox/${project.name}/${base}`;
-        const skipTest = skip.map((k) => `[ "$e" = ${sq(k)} ]`).join(' || ') || 'false';
+        // 키트 자신의 흔적(.bugfix-*)은 절대 복사하지 않는다
+        const skipTest = [...skip.map((k) => `[ "$e" = ${sq(k)} ]`), 'case "$e" in .bugfix-*) true;; *) false;; esac'].join(' || ');
         const script = `set -e; mkdir -p ${sq(`/w/.bugfix-sandbox/${project.name}`)}; rm -rf ${sq(rel)}.tmp ${sq(rel)}; mkdir -p ${sq(rel)}.tmp; cd ${sq(`/w/${base}`)}; for e in .[!.]* ..?* *; do [ -e "$e" ] || continue; if ${skipTest}; then mkdir -p ${sq(rel)}.tmp/"$e"; continue; fi; cp -a --reflink=auto -- "$e" ${sq(rel)}.tmp/; done; mv ${sq(rel)}.tmp ${sq(rel)}`;
         await ex.exec(wt, 120, ['docker', 'run', '--rm', '-v', `${parent}:/w`, image, 'sh', '-c', script]);
         const sec = Math.round((Date.now() - t0) / 1000);
