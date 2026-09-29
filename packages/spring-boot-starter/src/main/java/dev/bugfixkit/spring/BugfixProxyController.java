@@ -35,11 +35,16 @@ public class BugfixProxyController {
 
     private final java.util.function.BooleanSupplier starting;
 
+    private final int timeoutSeconds;
+
     public BugfixProxyController(String path, Supplier<String> target) { this(path, target, () -> false); }
-    public BugfixProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting) {
+    public BugfixProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting) { this(path, target, starting, 600); }
+    /** timeoutSeconds: 워커·미리보기 백엔드 응답 대기 상한(긴 가져오기·변환이 끊기지 않게, 기본 600) */
+    public BugfixProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting, int timeoutSeconds) {
         this.path = path.replaceAll("/+$", "");
         this.target = target;
         this.starting = starting;
+        this.timeoutSeconds = timeoutSeconds > 0 ? timeoutSeconds : 600;
     }
 
     @RequestMapping("${bugfix.path:/bugfix}/**")
@@ -85,7 +90,13 @@ public class BugfixProxyController {
                 // 멀티파트 파싱이 꺼져 있으면 여기 오지 않는다(스트림에 본문이 그대로 있음) - 그 밖의 실패는 빈 본문으로 넘긴다
             }
         }
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(120))
+        // x-www-form-urlencoded 도 앞선 필터(CSRF·HiddenHttpMethod 등)가 getParameter 로 본문을 읽어 버렸을 수 있다 → 파라미터로 다시 만든다
+        if (body.length == 0 && ct != null && ct.toLowerCase().startsWith("application/x-www-form-urlencoded") && !req.getParameterMap().isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            req.getParameterMap().forEach((k, vs) -> { for (String v : vs) { if (sb.length() > 0) sb.append('&'); sb.append(java.net.URLEncoder.encode(k, StandardCharsets.UTF_8)).append('=').append(java.net.URLEncoder.encode(v == null ? "" : v, StandardCharsets.UTF_8)); } });
+            body = sb.toString().getBytes(StandardCharsets.UTF_8);
+        }
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(timeoutSeconds))
                 .method(req.getMethod(), body.length > 0 ? HttpRequest.BodyPublishers.ofByteArray(body) : HttpRequest.BodyPublishers.noBody());
         if (contentTypeOverride != null) b.header("Content-Type", contentTypeOverride);
         Enumeration<String> names = req.getHeaderNames();

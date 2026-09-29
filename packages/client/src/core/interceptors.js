@@ -62,6 +62,12 @@ function truncate(data, maxLen = 2000) {
 }
 function safeBody(url, v) {
   if (v == null) return v;
+  // 폼 업로드(FormData)는 문자열화하면 "[object FormData]" 라 재현에 못 쓴다 → 필드 목록으로(파일은 이름·크기만)
+  if (typeof FormData !== 'undefined' && v instanceof FormData) {
+    const form = {}; let files = 0;
+    try { for (const [k, val] of v.entries()) { if (typeof val === 'string') form[k] = val.length > 500 ? val.slice(0, 500) + '…' : val; else { files++; form[k] = `[file ${val.name || ''} ${val.size || 0}B]`; } } } catch { /* */ }
+    v = { __form: form, __files: files };
+  } else if (typeof URLSearchParams !== 'undefined' && v instanceof URLSearchParams) v = { __urlencoded: Object.fromEntries(v.entries()) };
   const str = typeof v === 'string' ? v : (() => { try { return JSON.stringify(v); } catch { return String(v); } })();
   if (SENSITIVE_URL.test(url || '') || SENSITIVE_KEY.test(str)) return '[masked]';
   return truncate(v);

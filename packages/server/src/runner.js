@@ -320,7 +320,7 @@ export class Runner {
       if (!allowChange || !changed) {
         if (changed) { await ex.exec(wt, 1, ['git', 'checkout', '--', '.']); await ex.exec(wt, 1, ['git', 'clean', '-fdq', '-e', '.bugfix']); await L('질문 모드 - 변경 되돌림'); }
         // 코드는 안 바꿨지만 재현 절차(.bugfix/repro.json)를 썼으면 보관된 버전으로 재현 검증만 돌린다 - 검증이 다시 고치면 그 커밋을 내보낸다
-        if (allowChange && cont && r.fixVersion != null && await readIfExists(path.join(wt, '.bugfix/repro.json'))) {
+        if (allowChange && cont && r.fixVersion != null && (await readIfExists(path.join(wt, '.bugfix/repro.json')) || notBlank(r.fixReproSpec))) {
           await L(`코드 변경은 없지만 재현 절차가 있어 v${r.fixVersion} 으로 재현 검증만 합니다`);
           const before = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
           const repro = await this.afterFix(project, id, ex, wt, r.fixBranch, base, r.fixSummary || `버그 #${id}`, r.fixVersion, [], sid || r.fixSessionId);
@@ -414,7 +414,11 @@ export class Runner {
       for (const x of bad.slice(-10)) {
         const key = `${x.method} ${String(x.url).split('?')[0]}`; if (seen.has(key)) continue; seen.add(key);
         let body = null; try { body = x.requestBody ? JSON.parse(x.requestBody) : null; } catch { body = x.requestBody || null; }
-        api.push({ method: x.method || 'GET', path: String(x.url), body, note: `신고된 ${x.status || x.error} 요청` });
+        const a = { method: x.method || 'GET', path: String(x.url), note: `신고된 ${x.status || x.error} 요청`, timeoutSec: 240 };
+        if (body && typeof body === 'object' && body.__form) { a.contentType = 'multipart'; a.form = body.__form; if (body.__files) a.note += ` (파일 ${body.__files}개는 재현에서 빠짐)`; }
+        else if (body && typeof body === 'object' && body.__urlencoded) { a.contentType = 'form'; a.form = body.__urlencoded; }
+        else a.body = body;
+        api.push(a);
       }
       repro = normRepro({ api, steps: [] });
     }

@@ -20,6 +20,7 @@ const app = express();
 app.disable('x-powered-by');
 app.use('/api', kit.router);
 await kit.start();
-app.listen(port, cfg.server.host, () => {
+const server = app.listen(port, cfg.server.host, () => {
   log.info(`[bugfix] 서버 시작 http://${cfg.server.host}:${port}  프로젝트: ${Object.keys(cfg.projects).join(', ')}  data=${cfg.server.dataDir}  work=${cfg.server.workDir}`);
 });
+kit.versions?.attachUpgrade?.(server, '/api');

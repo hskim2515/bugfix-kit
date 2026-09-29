@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import fss from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import net from 'node:net';
 import express from 'express';
 import { runClaudeStream, resultTextOf, claudeSummary } from './claude.js';
 import { firstLine, hhmmss, notBlank, nowIso, sleep } from './util.js';
@@ -425,15 +426,44 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       const rel = decodeURIComponent(sub.split('?')[0]);
       const previewUrl = `${recipe.base || '/bugfix'}/v/${project.name}/${n}`;
       // 일부 플러그인(vite-plugin-cesium 등)은 base 를 출력 경로에도 붙여 dist/<base>/… 에 놓는다 - 그 자리도 본다
+      // 캐시: 같은 버전을 다시 빌드(재현 검증 뒤 재시작)해도 CDN(Cloudflare 등)이 옛 파일을 주지 않게 - 해시 이름 파일만 오래 캐시
+      const hashed = /[.-][0-9a-f]{8,}\.[a-z0-9]+$/i.test(rel);
+      const cache = hashed ? 'public, max-age=31536000, immutable' : 'no-store';
       for (const file of [path.join(front, rel), path.join(front, previewUrl, rel)]) {
-        if (rel !== '/' && file.startsWith(front) && fss.existsSync(file) && fss.statSync(file).isFile()) return res.sendFile(file);
+        if (rel !== '/' && file.startsWith(front) && fss.existsSync(file) && fss.statSync(file).isFile()) return res.sendFile(file, { cacheControl: false, headers: { 'Cache-Control': cache } });
       }
-      return res.sendFile(path.join(front, 'index.html'));
+      // 확장자가 있는 경로(자산 파일)가 없으면 404 - index.html 을 돌려주면 스크립트 오류가 HTML 파싱 오류로 둔갑한다
+      if (/\.[a-z0-9]{1,8}$/i.test(rel) && !/\.html?$/i.test(rel)) return res.status(404).type('text').send(`미리보기 v${n} 에 없는 파일: ${rel}`);
+      return res.sendFile(path.join(front, 'index.html'), { cacheControl: false, headers: { 'Cache-Control': 'no-store' } });
     });
     return r;
   }
+
+  /**
+   * 웹소켓 업그레이드(`…/v/<p>/<n>/back/...`)를 미리보기 백엔드로 넘긴다 - 독립 워커의 http 서버에 붙인다.
+   * (앱 안의 Spring 프록시(bugfix.path)를 거치는 경로는 업그레이드를 못 넘기니 nginx 가 워커로 직접 보내는 구성에서만 통한다)
+   */
+  attachUpgrade(server, mount = '/api') {
+    server.on('upgrade', async (req, socket, head) => {
+      const m = String(req.url || '').match(new RegExp(`^${mount.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/v/([^/]+)/(\\d+)/back(/.*)?$`));
+      if (!m) return socket.destroy();
+      const project = this.cfg.projects[m[1]]; const v = project ? await this.get(project.name, Number(m[2])) : null;
+      const pv = v?.preview || {};
+      if (!project || pv.status !== 'UP' || !pv.port) { socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n'); return socket.destroy(); }
+      const recipe = this.recipe(project) || { host: '127.0.0.1' };
+      const up = net.connect(pv.port, recipe.host, () => {
+        const lines = [`${req.method} ${m[3] || '/'} HTTP/1.1`];
+        for (const [k, val] of Object.entries(req.headers)) lines.push(`${k}: ${k === 'host' ? `${recipe.host}:${pv.port}` : val}`);
+        up.write(lines.join('\r\n') + '\r\n\r\n'); if (head?.length) up.write(head);
+        socket.pipe(up); up.pipe(socket);
+      });
+      up.on('error', () => socket.destroy()); socket.on('error', () => up.destroy());
+    });
+  }
 }
 
+/** 프록시 응답 대기 상한 - 긴 가져오기·변환(수 분)이 중간에 끊기지 않게. BUGFIX_PROXY_TIMEOUT_SEC 로 조정 */
+const PROXY_TIMEOUT_MS = (Number(process.env.BUGFIX_PROXY_TIMEOUT_SEC) > 0 ? Number(process.env.BUGFIX_PROXY_TIMEOUT_SEC) : 600) * 1000;
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 /** 요청을 그대로 스트리밍해 넘긴다 (헤더·본문·상태 유지). 웹소켓은 안 다룬다 */
@@ -441,7 +471,7 @@ function proxyTo(req, res, host, port, pathname, tls = false) {
   const mod = tls ? import('node:https') : Promise.resolve(http);
   mod.then((h) => {
     const headers = { ...req.headers, host: `${host}:${port}` };
-    const up = h.request({ host, port, path: pathname, method: req.method, headers, timeout: 120_000 }, (r2) => {
+    const up = h.request({ host, port, path: pathname, method: req.method, headers, timeout: PROXY_TIMEOUT_MS }, (r2) => {
       res.status(r2.statusCode);
       for (const [k, val] of Object.entries(r2.headers)) if (!['transfer-encoding', 'connection'].includes(k)) res.setHeader(k, val);
       r2.pipe(res);
