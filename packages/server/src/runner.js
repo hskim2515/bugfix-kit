@@ -433,8 +433,10 @@ export class Runner {
       if (v?.preview?.status !== 'UP') { out.note = `미리보기가 뜨지 않아 재현 검증을 못 했습니다(${v?.preview?.status || '?'}: ${firstLine(v?.preview?.error || '', 120)})`; await L(`✗ ${out.note}`); return out; }
       const evid = [];
       let failed = false;
-      // 1) API 재실행 - 미리보기 백엔드로 직접
-      const backBase = `http://${recipe.host}:${v.preview.port}`;
+      // 1) API 재실행 - 사용자가 쓰는 경로 그대로(앱 프록시 → 워커 → 미리보기 백엔드). 앱 주소가 없거나 그 경로가 안 닿으면 백엔드로 직접
+      const appUrl0 = this.notifier?.appUrl(project) || '';
+      const publicBack = appUrl0 ? `${appUrl0}${String(v.preview.url || '').replace(/\/+$/, '')}/back` : '';
+      const directBack = `http://${recipe.host}:${v.preview.port}`;
       const prefixes = [...new Set([project.restBase, '/rest', '/api', '/lhdt-rest', ''].filter((x) => x != null))];
       for (const a of repro.api.slice(0, 8)) {
         let p = String(a.path || '').replace(/^https?:\/\/[^/]+/, '');
@@ -442,20 +444,25 @@ export class Runner {
         if (a.query && typeof a.query === 'object') p += (p.includes('?') ? '&' : '?') + new URLSearchParams(Object.entries(a.query).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])).toString();
         const cands = [p, ...prefixes.filter((pf) => pf && p.startsWith(pf + '/')).map((pf) => p.slice(pf.length))];
         let res = null;
-        for (const cp of [...new Set(cands)]) {
-          try {
-            const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), Math.min(600, Number(a.timeoutSec) || 120) * 1000);
-            const { body, headers } = reqBody(a);
-            const resp = await fetch(backBase + cp, { method: a.method, headers, body, signal: ctl.signal });
-            clearTimeout(t);
-            const text = (await resp.text().catch(() => '')).slice(0, 400);
-            res = { path: cp, status: resp.status, text };
-            if (resp.status !== 404) break;
-          } catch (e) { res = { path: cp, status: 'ERR', text: e.message }; }
+        for (const [via, backBase] of [['공개 경로', publicBack], ['백엔드 직접', directBack]]) {
+          if (!backBase) continue;
+          for (const cp of [...new Set(cands)]) {
+            try {
+              const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), Math.min(600, Number(a.timeoutSec) || 120) * 1000);
+              const { body, headers } = reqBody(a);
+              const resp = await fetch(backBase + cp, { method: a.method, headers, body, signal: ctl.signal });
+              clearTimeout(t);
+              const text = (await resp.text().catch(() => '')).slice(0, 400);
+              res = { path: cp, status: resp.status, text, via };
+              if (resp.status !== 404) break;
+            } catch (e) { res = { path: cp, status: 'ERR', text: e.message, via }; }
+          }
+          // 공개 경로가 아예 안 닿을 때(연결 실패·502/503 게이트웨이)만 백엔드 직접으로 - 500 은 그대로 실패로 친다
+          if (res && res.status !== 'ERR' && ![502, 503, 504].includes(res.status)) break;
         }
         const ok = res && typeof res.status === 'number' && (a.expect?.status ? res.status === Number(a.expect.status) : res.status < (Number(a.expect?.statusLt) || 500));
         if (!ok) failed = true;
-        evid.push(`${ok ? '✓' : '✗'} ${a.method} ${res?.path || p} → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
+        evid.push(`${ok ? '✓' : '✗'} ${a.method} ${res?.path || p} (${res?.via || '-'}) → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
       }
       // 2) 화면 절차 - front-check 로 공개 미리보기 주소에서
       if (repro.steps?.length) {
@@ -483,7 +490,7 @@ export class Runner {
       // 3) 증거 모아 다시 고치기
       const logs = (await ex.execOut(wt, 1, ['docker', 'logs', '--tail', '300', v.preview.container])).split(/\r?\n/);
       const errLines = logs.filter((l) => /exception|error|caused by|\tat /i.test(l)).slice(-60);
-      const msg = `재현 검증 ${round}회에서 **여전히 실패**했습니다. 수정본을 실제로 띄워(미리보기 v${n}) 신고된 요청·절차를 다시 돌린 결과입니다:\n${evid.join('\n')}\n\n미리보기 백엔드 로그(오류 부분):\n${errLines.join('\n').slice(0, 6000) || '(오류 줄 없음)'}\n\n증상 은폐(오류 메시지만 고치기)가 아니라 **실제 원인**을 찾아 고치세요. 필요하면 로그의 스택트레이스를 따라가세요. 고친 뒤 검증 명령을 통과시키고 \`.bugfix/result.md\` 를 갱신하고, 재현 절차가 잘못됐으면 \`.bugfix/repro.json\` 도 고치세요. git 커밋은 하지 마세요.`;
+      const msg = `재현 검증 ${round}회에서 **여전히 실패**했습니다. 수정본을 실제로 띄워(미리보기 v${n}) 신고된 요청·절차를 다시 돌린 결과입니다:\n${evid.join('\n')}\n\n미리보기 백엔드 로그(오류 부분):\n${errLines.join('\n').slice(0, 6000) || '(오류 줄 없음)'}\n\n증상 은폐(오류 메시지만 고치기)가 아니라 **실제 원인**을 찾아 고치세요. 요청은 사용자가 쓰는 경로 그대로(앱 → bugfix-kit 프록시 → 미리보기 백엔드) 보냈으니, 백엔드 로그에 요청이 정상 파라미터로 도착했는지부터 보세요. 필요하면 로그의 스택트레이스를 따라가세요. 고친 뒤 검증 명령을 통과시키고 \`.bugfix/result.md\` 를 갱신하고, 재현 절차가 잘못됐으면 \`.bugfix/repro.json\` 도 고치세요. git 커밋은 하지 마세요.`;
       await L(`Claude 에게 증거를 주고 다시 고칩니다 (${round}/${maxRounds})…`);
       const o2 = await this.claudeResume(project, ex, id, wt, sid, msg, this.allowedTools(project), 40);
       sid = sessionIdOf(o2) || sid; if (sid) await this.updateFix(project, id, { fixSessionId: sid });

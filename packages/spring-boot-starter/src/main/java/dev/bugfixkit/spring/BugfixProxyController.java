@@ -1,12 +1,16 @@
 package dev.bugfixkit.spring;
 
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Part;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -56,12 +60,39 @@ public class BugfixProxyController {
         String url = server.replaceAll("/+$", "") + "/api" + (rest.isEmpty() ? "/" : rest) + (req.getQueryString() != null ? "?" + req.getQueryString() : "");
 
         byte[] body = req.getInputStream().readAllBytes();
+        // multipart(파일 업로드·폼)는 Spring 의 MultipartResolver 가 컨트롤러에 오기 전에 이미 본문을 다 읽어 버려 입력 스트림이 비어 있다
+        // → 파싱된 파트로 본문을 다시 조립해 넘긴다(미리보기 백엔드로 가는 폼 요청이 "필수 파라미터 없음" 500 이 되던 문제)
+        String contentTypeOverride = null;
+        String ct = req.getContentType();
+        if (body.length == 0 && ct != null && ct.toLowerCase().startsWith("multipart/")) {
+            try {
+                String boundary = "----bugfixkit" + Long.toHexString(System.nanoTime());
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                for (Part part : req.getParts()) {
+                    bo.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
+                    String fn = part.getSubmittedFileName();
+                    bo.write(("Content-Disposition: form-data; name=\"" + part.getName().replace("\"", "%22") + "\""
+                            + (fn != null ? "; filename=\"" + fn.replace("\"", "%22") + "\"" : "") + "\r\n").getBytes(StandardCharsets.UTF_8));
+                    if (part.getContentType() != null) bo.write(("Content-Type: " + part.getContentType() + "\r\n").getBytes(StandardCharsets.UTF_8));
+                    bo.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                    try (InputStream in = part.getInputStream()) { in.transferTo(bo); }
+                    bo.write("\r\n".getBytes(StandardCharsets.UTF_8));
+                }
+                bo.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+                body = bo.toByteArray();
+                contentTypeOverride = "multipart/form-data; boundary=" + boundary;
+            } catch (ServletException | IllegalStateException e) {
+                // 멀티파트 파싱이 꺼져 있으면 여기 오지 않는다(스트림에 본문이 그대로 있음) - 그 밖의 실패는 빈 본문으로 넘긴다
+            }
+        }
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(120))
                 .method(req.getMethod(), body.length > 0 ? HttpRequest.BodyPublishers.ofByteArray(body) : HttpRequest.BodyPublishers.noBody());
+        if (contentTypeOverride != null) b.header("Content-Type", contentTypeOverride);
         Enumeration<String> names = req.getHeaderNames();
         while (names.hasMoreElements()) {
             String n = names.nextElement();
             if (SKIP.contains(n.toLowerCase())) continue;
+            if (contentTypeOverride != null && n.equalsIgnoreCase("content-type")) continue;
             Enumeration<String> vs = req.getHeaders(n);
             while (vs.hasMoreElements()) { try { b.header(n, vs.nextElement()); } catch (IllegalArgumentException ignored) { /* 제한 헤더 */ } }
         }
