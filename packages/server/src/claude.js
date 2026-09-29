@@ -1,5 +1,33 @@
 import readline from 'node:readline';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { firstLine, tail } from './util.js';
+
+/**
+ * Claude Code 로그인 상태 - 실행 계정의 ~/.claude/.credentials.json(또는 ~/.claude.json) 이나 환경변수(CLAUDE_CODE_OAUTH_TOKEN·ANTHROPIC_API_KEY).
+ * 파일이 있는데 못 읽으면(root 로 claude 를 돌려 소유자가 바뀐 흔한 사고) 그 사유를 hint 에 담는다.
+ */
+export function loginState(bin = 'claude', env = process.env) {
+  if (env.CLAUDE_CODE_OAUTH_TOKEN || env.ANTHROPIC_API_KEY) return { loggedIn: true, hint: '', via: 'env' };
+  const home = os.homedir();
+  const user = (() => { try { return os.userInfo().username; } catch { return env.USER || '?'; } })();
+  for (const f of ['.claude/.credentials.json', '.claude.json'].map((x) => path.join(home, x))) {
+    if (!fs.existsSync(f)) continue;
+    try {
+      const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+      if (j.claudeAiOauth || j.oauthAccount || j.primaryApiKey) return { loggedIn: true, hint: '', via: f };
+    } catch (e) {
+      if (e && e.code === 'EACCES') {
+        let owner = '?'; try { owner = String(fs.statSync(f).uid); } catch { /* */ }
+        return { loggedIn: false, via: f, hint: `자격 파일 ${f} 을 실행 계정(${user})이 읽을 수 없습니다(소유자 uid ${owner} - 보통 root 로 claude 를 실행해서 생김). 서버에서 \`sudo chown ${user}:${user} ${f}\` 한 뒤 다시 시도하거나, ${user} 계정에서 \`${bin} login\` 을 다시 하세요` };
+      }
+    }
+  }
+  return { loggedIn: false, via: null, hint: `서버 실행 계정(${user})에서 \`${bin} login\` 을 한 번 실행하세요 (터미널 필요)` };
+}
+/** result 이벤트가 오류였으면 그 문구, 아니면 '' */
+export function errorOf(out) { const n = parseResultJson(out); return n?.is_error ? String(n.result || n.subtype || 'error') : ''; }
 
 /**
  * Claude Code 를 `--output-format stream-json` 으로 돌리며 진행 상황(읽는 파일·고치는 파일·중간 설명)을

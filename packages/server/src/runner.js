@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { makeExec } from './exec.js';
 import { GitHub } from './github.js';
 import { GitLab } from './gitlab.js';
-import { runClaudeStream, sessionIdOf, resultTextOf, claudeSummary } from './claude.js';
+import { runClaudeStream, sessionIdOf, resultTextOf, claudeSummary, loginState, errorOf } from './claude.js';
 import { writeReportFiles } from './reportFiles.js';
 import { Shots, mergeShots } from './shots.js';
 import { firstLine, hhmmss, notBlank, nowIso, orDash, parseResult, sleep, stamp } from './util.js';
@@ -840,10 +840,17 @@ export class Runner {
   }
 
   // ── Claude ──────────────────────────────────────────────────────────────
-  claude(project, ex, id, wt, timeoutMin, args) {
-    const cmd = [this.cfg.server.claudeBin || 'claude', ...args];
+  async claude(project, ex, id, wt, timeoutMin, args) {
+    const bin = this.cfg.server.claudeBin || 'claude';
+    // 시작 전에 로그인부터 - 안 돼 있으면 45분 기다리거나 "코드를 바꾸지 않았습니다" 로 뭉뚱그리지 않고 사유를 바로 남긴다
+    const st = loginState(bin);
+    if (!st.loggedIn) { await this.logLine(project, id, `✗ Claude 로그인 안 됨 - ${st.hint}`); throw new Error(`Claude 로그인 안 됨 - ${st.hint}`); }
+    const cmd = [bin, ...args];
     if (notBlank(this.cfg.server.model)) cmd.push('--model', this.cfg.server.model);
-    return runClaudeStream(ex, wt, timeoutMin, cmd, (line) => { this.logLine(project, id, `  ${line}`); });
+    const out = await runClaudeStream(ex, wt, timeoutMin, cmd, (line) => { this.logLine(project, id, `  ${line}`); });
+    const err = errorOf(out);
+    if (/not logged in|\/login\b|authentication_error|invalid.*api key|unauthori[sz]ed/i.test(err)) { const st2 = loginState(bin); throw new Error(`Claude 로그인 안 됨 (${firstLine(err, 80)}) - ${st2.hint}`); }
+    return out;
   }
 
   /** 세션 이어 실행. 세션을 못 찾으면 새 세션으로 한 번 더 */

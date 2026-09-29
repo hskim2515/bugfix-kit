@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import YAML from 'yaml';
 import { loadConfig, readEnvFile } from './config.js';
+import { loginState } from './claude.js';
 import { GitHub } from './github.js';
 import { gitClient } from './runner.js';
 import { expandHome, HttpError, notBlank } from './util.js';
@@ -197,12 +198,8 @@ export function adminRouter(cfg, store, runner, log = console) {
     const env = { ...process.env, PATH: `${cfg.server.pathExtra ? cfg.server.pathExtra + ':' : ''}${process.env.PATH}` };
     const v = await run(bin, ['--version'], { timeout: 20000, env });
     const gitV = await run('git', ['--version'], { timeout: 10000, env });
-    const home = os.homedir();
-    const cred = ['.claude/.credentials.json', '.claude.json'].map((f) => path.join(home, f)).find((f) => fs.existsSync(f));
-    let loggedIn = false;
-    try { if (cred) { const j = JSON.parse(fs.readFileSync(cred, 'utf8')); loggedIn = !!(j.claudeAiOauth || j.oauthAccount || j.primaryApiKey); } } catch { /* 형식 다름 */ }
-    if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY) loggedIn = true;
-    return { installed: v.status === 0, version: (v.stdout || '').trim().split('\n')[0], loggedIn, hint: loggedIn ? '' : `서버 실행 계정에서 \`${bin} login\` 을 한 번 실행하세요 (터미널 필요)`, git: { ok: gitV.status === 0, version: (gitV.stdout || '').trim() }, node: process.version, home: os.homedir() };
+    const { loggedIn, hint } = loginState(bin, env);
+    return { installed: v.status === 0, version: (v.stdout || '').trim().split('\n')[0], loggedIn, hint, git: { ok: gitV.status === 0, version: (gitV.stdout || '').trim() }, node: process.version, home: os.homedir() };
   }));
 
   r.post('/check/docker', wrap(async () => {
