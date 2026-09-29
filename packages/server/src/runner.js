@@ -319,6 +319,19 @@ export class Runner {
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!allowChange || !changed) {
         if (changed) { await ex.exec(wt, 1, ['git', 'checkout', '--', '.']); await ex.exec(wt, 1, ['git', 'clean', '-fdq', '-e', '.bugfix']); await L('질문 모드 - 변경 되돌림'); }
+        // 코드는 안 바꿨지만 재현 절차(.bugfix/repro.json)를 썼으면 보관된 버전으로 재현 검증만 돌린다 - 검증이 다시 고치면 그 커밋을 내보낸다
+        if (allowChange && cont && r.fixVersion != null && await readIfExists(path.join(wt, '.bugfix/repro.json'))) {
+          await L(`코드 변경은 없지만 재현 절차가 있어 v${r.fixVersion} 으로 재현 검증만 합니다`);
+          const before = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
+          const repro = await this.afterFix(project, id, ex, wt, r.fixBranch, base, r.fixSummary || `버그 #${id}`, r.fixVersion, [], sid || r.fixSessionId);
+          const after = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
+          if (after !== before) {
+            const latest = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
+            const prBody = `버그 리포트 #${id} 재현 검증 뒤 수정 (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || ''}\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}\n\n---\n이 PR 은 bugfix-kit 의 재현 검증 루프가 만들었습니다.`;
+            await this.deliver(project, ex, gh, id, wt, r.fixBranch, auth, { summary: latest.title || r.fixSummary, prBody, existingPr: prOpen && r.fixPrNumber != null ? { number: r.fixPrNumber, url: r.fixPrUrl } : null }, []);
+            return;
+          }
+        }
         await this.updateFix(project, id, { fixStatus: prevStatus || 'FAILED' });
         return;
       }
