@@ -427,7 +427,9 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       const previewUrl = `${recipe.base || '/bugfix'}/v/${project.name}/${n}`;
       // 일부 플러그인(vite-plugin-cesium 등)은 base 를 출력 경로에도 붙여 dist/<base>/… 에 놓는다 - 그 자리도 본다
       // 캐시: 같은 버전을 다시 빌드(재현 검증 뒤 재시작)해도 CDN(Cloudflare 등)이 옛 파일을 주지 않게 - 해시 이름 파일만 오래 캐시
-      const hashed = /[.-][0-9a-f]{8,}\.[a-z0-9]+$/i.test(rel);
+      // 해시 이름: vite `name-XxYy1234.js`(base64url 8자, 대문자/숫자 포함) · webpack `name.1a2b3c4d.js`(16진수 8자 이상)
+      const hm = rel.match(/[.-]([A-Za-z0-9_-]{8}|[0-9a-f]{16,})\.[a-z0-9]+$/);
+      const hashed = !!hm && (/^[0-9a-f]{16,}$/.test(hm[1]) || /[0-9A-Z]/.test(hm[1]));
       const cache = hashed ? 'public, max-age=31536000, immutable' : 'no-store';
       for (const file of [path.join(front, rel), path.join(front, previewUrl, rel)]) {
         if (rel !== '/' && file.startsWith(front) && fss.existsSync(file) && fss.statSync(file).isFile()) return res.sendFile(file, { cacheControl: false, headers: { 'Cache-Control': cache } });
