@@ -77,8 +77,8 @@ export class FileStore {
   }
 
   static light(r) {
-    const { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, tool, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro } = r;
-    return { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, ...(tool ? { tool: true } : {}) };
+    const { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, tool, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec } = r;
+    return { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, ...(tool ? { tool: true } : {}) };
   }
   /** 진행 상태 폴링용 - 스크린샷·로그·컨텍스트 제외 */
   static fixState(r) {

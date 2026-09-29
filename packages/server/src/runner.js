@@ -354,7 +354,7 @@ export class Runner {
     if (n == null || !this.versions?.recipe(project)) return none;
     if (project.reproCheck !== false) {
       try { return await this.reproLoop(project, id, ex, wt, branch, base, summary, n, mods, sessionId); }
-      catch (e) { await this.logLine(project, id, `재현 검증 오류(계속): ${firstLine(e.message, 200)}`); return none; }
+      catch (e) { await this.logLine(project, id, `재현 검증 오류(계속): ${firstLine(e.message, 200)}`); await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: null, rounds: 0, evidence: [], note: `재현 검증 오류: ${firstLine(e.message, 200)}` }) }); return none; }
     }
     if (project.previewAuto !== false) { await this.logLine(project, id, `미리보기 v${n} 자동 생성 예약`); this.versions.start(project, n, { low: true }).catch(() => {}); }
     return none;
@@ -387,11 +387,13 @@ export class Runner {
     if (!this.versions || n == null) return out;
     const recipe = this.versions.recipe(project);
     if (!recipe) { await L('재현 검증 건너뜀 - 미리보기 레시피가 없습니다(프로젝트 탭)'); return out; }
-    let repro = null;
-    try { repro = JSON.parse(await readIfExists(path.join(wt, '.bugfix/repro.json')) || 'null'); } catch { repro = null; }
     const r = await this.store.get(project.name, id);
-    // Claude 가 안 썼으면 신고된 실패 요청으로 만든다
-    if (!repro || (!repro.api?.length && !repro.steps?.length)) {
+    let repro = null;
+    try { repro = normRepro(JSON.parse(await readIfExists(path.join(wt, '.bugfix/repro.json')) || 'null')); } catch (e) { await L(`repro.json 을 읽지 못했습니다(${firstLine(e.message, 80)}) - 이전 절차·신고 요청으로 대체`); repro = null; }
+    // 이번에 안 썼으면 지난번 절차(.bugfix 는 커밋되지 않으므로 리포트에 보관해 둔 것)
+    if (!repro || (!repro.api.length && !repro.steps.length)) { try { repro = normRepro(JSON.parse(r.fixReproSpec || 'null')); } catch { repro = null; } }
+    // 그것도 없으면 신고된 실패 요청으로 만든다
+    if (!repro || (!repro.api.length && !repro.steps.length)) {
       let net = []; try { net = JSON.parse(r.networkLogs || '[]'); } catch { /* */ }
       const bad = net.filter((x) => x && (x.error || (Number(x.status) >= 500) || (Number(x.status) >= 400 && ![401, 403, 404].includes(Number(x.status)))));
       const seen = new Set();
@@ -401,9 +403,11 @@ export class Runner {
         let body = null; try { body = x.requestBody ? JSON.parse(x.requestBody) : null; } catch { body = x.requestBody || null; }
         api.push({ method: x.method || 'GET', path: String(x.url), body, note: `신고된 ${x.status || x.error} 요청` });
       }
-      repro = { api, steps: [] };
+      repro = normRepro({ api, steps: [] });
     }
-    if (!repro.api?.length && !repro.steps?.length) { await L('재현 검증 건너뜀 - 재현할 요청·절차가 없습니다(신고에 실패 요청이 없고 repro.json 도 비어 있음)'); return out; }
+    if (!repro.api.length && !repro.steps.length) { await L('재현 검증 건너뜀 - 재현할 요청·절차가 없습니다(신고에 실패 요청이 없고 repro.json 도 비어 있음)'); return out; }
+    await this.updateFix(project, id, { fixReproSpec: JSON.stringify(repro).slice(0, 20_000) });
+    await L(`재현 절차: 요청 ${repro.api.length}건${repro.api.map((a) => ` · ${a.method} ${a.path}`).join('').slice(0, 300)} · 화면 절차 ${repro.steps.length}단계`);
     out.ran = true;
     const maxRounds = Number(project.reproRounds) > 0 ? Number(project.reproRounds) : 2;
     let sid = sessionId;
@@ -419,24 +423,26 @@ export class Runner {
       // 1) API 재실행 - 미리보기 백엔드로 직접
       const backBase = `http://${recipe.host}:${v.preview.port}`;
       const prefixes = [...new Set([project.restBase, '/rest', '/api', '/lhdt-rest', ''].filter((x) => x != null))];
-      for (const a of (repro.api || []).slice(0, 8)) {
+      for (const a of repro.api.slice(0, 8)) {
         let p = String(a.path || '').replace(/^https?:\/\/[^/]+/, '');
         const m = p.match(/\/v\/[^/]+\/\d+\/back(\/.*)$/); if (m) p = m[1];
+        if (a.query && typeof a.query === 'object') p += (p.includes('?') ? '&' : '?') + new URLSearchParams(Object.entries(a.query).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])).toString();
         const cands = [p, ...prefixes.filter((pf) => pf && p.startsWith(pf + '/')).map((pf) => p.slice(pf.length))];
         let res = null;
         for (const cp of [...new Set(cands)]) {
           try {
-            const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 60_000);
-            const resp = await fetch(backBase + cp, { method: a.method || 'GET', headers: { 'Content-Type': 'application/json', ...(a.headers || {}) }, body: a.body != null && !['GET', 'HEAD'].includes(String(a.method).toUpperCase()) ? (typeof a.body === 'string' ? a.body : JSON.stringify(a.body)) : undefined, signal: ctl.signal });
+            const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), Math.min(600, Number(a.timeoutSec) || 120) * 1000);
+            const { body, headers } = reqBody(a);
+            const resp = await fetch(backBase + cp, { method: a.method, headers, body, signal: ctl.signal });
             clearTimeout(t);
             const text = (await resp.text().catch(() => '')).slice(0, 400);
             res = { path: cp, status: resp.status, text };
             if (resp.status !== 404) break;
           } catch (e) { res = { path: cp, status: 'ERR', text: e.message }; }
         }
-        const ok = res && typeof res.status === 'number' && res.status < 500 && !(a.expect?.status && res.status !== a.expect.status) && !(a.expect?.statusLt && res.status >= a.expect.statusLt);
+        const ok = res && typeof res.status === 'number' && (a.expect?.status ? res.status === Number(a.expect.status) : res.status < (Number(a.expect?.statusLt) || 500));
         if (!ok) failed = true;
-        evid.push(`${ok ? '✓' : '✗'} ${a.method || 'GET'} ${res?.path || p} → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
+        evid.push(`${ok ? '✓' : '✗'} ${a.method} ${res?.path || p} → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
       }
       // 2) 화면 절차 - front-check 로 공개 미리보기 주소에서
       if (repro.steps?.length) {
@@ -889,11 +895,14 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
   5. \`.bugfix/repro.json\` 에 **재현 절차**를 씁니다. 고친 뒤 서버가 수정본을 실제로 띄워(미리보기) 이 절차를 돌려 고쳐졌는지 확인하고,
      여전히 실패하면 증거(응답·서버 로그)를 주고 다시 고치게 합니다. 형식:
      \`\`\`
-     { "api": [ { "method": "POST", "path": "/network/import/ktdb/save", "body": {…}, "note": "신고된 500 요청 - network-logs.json 그대로" } ],
+     { "api": [ { "method": "POST", "path": "/network/import/ktdb/save", "contentType": "multipart", "form": { "south": 37.5, "west": 127.0, "north": 37.51, "east": 127.01, "polygon": "[[[127.0,37.5],…]]" }, "timeoutSec": 180, "note": "신고된 500 요청" },
+                { "method": "POST", "path": "/api/things", "body": { "name": "x" } } ],
        "steps": [ { "goto": "/some/route" }, { "click": { "text": "가져오기" } }, { "waitFor": 2000 }, { "expect": { "selector": ".toast-error", "count": 0 } } ] }
      \`\`\`
-     - api: 신고된 실패 요청(network-logs.json 의 status ≥ 400 항목)을 그대로. path 는 앱 REST 접두 경로(/rest, /api 등)를 뺀 경로. 실패 요청이 없으면 [].
+     - api 는 **반드시 배열**. 각 항목: method · path(앱 REST 접두 경로 /rest, /api 등을 뺀 경로) · JSON 이면 body, 폼이면 contentType "multipart"|"form" 과 form{필드:값}(파일 업로드는 files:[{field,name,content}]) · 선택 expect{status} · timeoutSec.
+       신고된 실패 요청(network-logs.json 의 status ≥ 400 항목)을 프론트가 실제로 보내는 형식대로. 실패 요청이 없으면 [].
      - steps: 화면에서 재현할 수 있으면 front-check 절차(goto/click/fill/waitFor/expect). 확실하지 않으면 [].
+     - 통과 기준: 응답 status < 500 (expect.status 를 주면 그 값). 그러니 400대로 "정상 거절" 되는 요청은 넣지 마세요.
   6. 마지막에 \`.bugfix/result.md\` 를 아래 형식으로 씁니다. 첫 줄이 PR 제목이 됩니다(한 줄, 60자 이내, 한국어).
      \`\`\`
      # <한 줄 요약>
@@ -1096,6 +1105,33 @@ export function parseSuggestions(body) {
 async function readIfExists(p) {
   try { return await fs.readFile(p, 'utf8'); } catch { return ''; }
 }
+/** Claude 가 쓴 repro.json 을 관대하게 정규화: api 는 배열(객체 하나면 감싸기, requests/apis 도 인정), path|url, method 대문자 */
+function normRepro(x) {
+  if (!x || typeof x !== 'object') return { api: [], steps: [] };
+  let api = x.api ?? x.requests ?? x.apis ?? [];
+  if (!Array.isArray(api)) api = api && typeof api === 'object' ? [api] : [];
+  api = api.filter((a) => a && typeof a === 'object' && (a.path || a.url)).map((a) => ({ ...a, path: String(a.path || a.url), method: String(a.method || 'GET').toUpperCase() }));
+  let steps = x.steps ?? x.ui ?? [];
+  if (!Array.isArray(steps)) steps = [];
+  return { api, steps: steps.filter((s) => s && typeof s === 'object') };
+}
+/** 요청 본문: contentType(json 기본 | form | multipart) · body 또는 form · files[{field,name,content}] */
+function reqBody(a) {
+  const headers = {}; for (const [k, v] of Object.entries(a.headers || {})) if (!/^content-type$/i.test(k)) headers[k] = v;
+  if (['GET', 'HEAD'].includes(a.method)) return { body: undefined, headers };
+  const declared = String(a.contentType || Object.entries(a.headers || {}).find(([k]) => /^content-type$/i.test(k))?.[1] || (a.form || a.files ? 'multipart' : 'json')).toLowerCase();
+  const data = a.form ?? a.body;
+  const str = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
+  if (declared.includes('multipart')) {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(data && typeof data === 'object' ? data : {})) fd.append(k, str(v));
+    for (const f of Array.isArray(a.files) ? a.files : []) fd.append(f.field || 'file', new Blob([String(f.content ?? '')]), f.name || 'file.txt');
+    return { body: fd, headers };
+  }
+  if (declared.includes('form')) return { body: new URLSearchParams(Object.entries(data && typeof data === 'object' ? data : {}).map(([k, v]) => [k, str(v)])).toString(), headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' } };
+  return { body: data == null ? undefined : str(data), headers: { ...headers, 'Content-Type': 'application/json' } };
+}
+
 function uniqBy(arr, key) {
   const seen = new Set();
   return arr.filter((x) => { const k = key(x); if (seen.has(k)) return false; seen.add(k); return true; });
