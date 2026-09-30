@@ -11,9 +11,9 @@ import { firstLine } from './util.js';
 export const EVENTS = {
   'report.new': '새 리포트', 'fix.ready': '수정본 준비(보관·브랜치)', 'fix.pr': 'PR/MR 생성', 'fix.merged': '병합 완료', 'fix.failed': '수정 실패', 'fix.reverted': '되돌림',
   'preview.up': '미리보기 준비됨', 'preview.failed': '미리보기 실패', 'deploy.done': '배포 완료', 'deploy.failed': '배포 실패',
-  'plan.ready': '계획 승인 대기', 'step.wait': '다음 단계 대기', 'regression.failed': '기능 회귀 실패', 'loop.done': '루프 끝', 'loop.failed': '루프 실패', 'insights.done': '제안 분석 끝', 'knowledge.behind': '원격이 앞섬(지식 그래프)',
+  'plan.ready': '계획 승인 대기', 'step.wait': '다음 단계 대기', 'regression.failed': '기능 회귀 실패', 'feature.impacted': '원격 변경이 기능 범위에 닿음', 'loop.done': '루프 끝', 'loop.failed': '루프 실패', 'insights.done': '제안 분석 끝', 'knowledge.behind': '원격이 앞섬(지식 그래프)',
 };
-const DEFAULT_EVENTS = ['report.new', 'plan.ready', 'step.wait', 'regression.failed', 'fix.pr', 'fix.merged', 'fix.failed', 'fix.reverted', 'preview.up', 'deploy.failed', 'loop.done', 'loop.failed'];
+const DEFAULT_EVENTS = ['report.new', 'plan.ready', 'step.wait', 'regression.failed', 'feature.impacted', 'fix.pr', 'fix.merged', 'fix.failed', 'fix.reverted', 'preview.up', 'deploy.failed', 'loop.done', 'loop.failed'];
 
 export class Notifier {
   constructor(cfg, log = console) { this.cfg = cfg; this.log = log; }

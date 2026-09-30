@@ -235,8 +235,11 @@ ${schema}`;
     const out = await ex.execOut(this.cfg.server.workDir, 1, ['git', ...auth, '-c', 'credential.helper=', 'ls-remote', project.repo, `refs/heads/${project.baseBranch}`]);
     const remoteHead = (out.trim().split(/\s+/)[0] || '').trim();
     if (!/^[0-9a-f]{40}$/.test(remoteHead)) throw new Error(`ls-remote 응답을 읽지 못했습니다: ${out.trim().slice(0, 80)}`);
+    const prevHead = st.remoteHead || st.head || null;
     const patch = { lastWatchAt: now.toISOString(), remoteHead, remoteSeenAt: st.remoteHead === remoteHead ? (st.remoteSeenAt || now.toISOString()) : now.toISOString() };
     st = await this.save(project.name, patch);
+    // 원격이 바뀌었으면(이전에 본 head 와 다름) 기능 영향 분석 훅 - 지식 그래프 갱신과는 별개로, 어느 기능 범위가 바뀌었는지 알린다
+    if (prevHead && prevHead !== remoteHead && this.onRemoteChange) this.onRemoteChange(project, prevHead, remoteHead).catch((e) => this.log.warn(`[knowledge ${project.name}] 원격 변경 영향 분석 실패: ${e.message}`));
     const behind = st.nodes?.length && st.head && st.head !== remoteHead;
     if (!behind) { if (st.remotePending) st = await this.save(project.name, { remotePending: null }); return st; }
     // 기본은 표시만 - 콘솔의 '갱신' 을 누르면 그때 돈다(Claude 비용). knowledge.autoUpdate=true 면 minGapMinutes 간격으로 자동

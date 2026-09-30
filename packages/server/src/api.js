@@ -116,6 +116,12 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   app.get('/admin/features/:project/:id/tasks', admin, wrap(async (req) => ({ tasks: (await features.tasksOf(proj(req).name, req.params.id)).map((r) => FileStore.light(r)) })));
   app.post('/admin/features/:project/:id/regress', admin, wrap(async (req) => { const p = proj(req); let n = Number(req.body?.n); if (!n) { const vs = versions ? await versions.list(p.name) : []; n = (vs.find((v) => v.preview?.status === 'UP') || vs[0])?.n; } if (!n) throw new HttpError(409, '돌릴 버전이 없습니다'); return features.regress(p, req.params.id, n, runner); }));
   app.post('/admin/features/:project/:id/acceptance/from-task', admin, wrap(async (req) => features.acceptanceFromTask(proj(req).name, req.params.id, Number(req.body?.taskId))));
+  app.post('/admin/features/:project/:id/remote/ack', admin, wrap(async (req) => features.ackRemote(proj(req).name, req.params.id)));
+  app.get('/admin/roadmap/:project', admin, wrap(async (req) => (features ? features.roadmap(proj(req).name) : { milestones: [], unassigned: [], summary: {} })));
+  app.get('/admin/milestones/:project', admin, wrap(async (req) => ({ milestones: features ? await features.milestones(proj(req).name) : [] })));
+  app.post('/admin/milestones/:project', admin, wrap(async (req) => features.saveMilestone(proj(req).name, req.body || {})));
+  app.put('/admin/milestones/:project/:id', admin, wrap(async (req) => features.saveMilestone(proj(req).name, req.body || {}, req.params.id)));
+  app.delete('/admin/milestones/:project/:id', admin, wrap(async (req) => features.removeMilestone(proj(req).name, req.params.id)));
   app.post('/admin/features/:project/suggest', admin, wrap(async (req) => features.suggest(proj(req).name, String(req.body?.text || ''))));
   app.post('/admin/features/:project/impact', admin, wrap(async (req) => ({ features: await features.impact(proj(req).name, Array.isArray(req.body?.files) ? req.body.files : []) })));
   app.get('/admin/versions/:project', admin, wrap(async (req) => ({ versions: versions ? await versions.list(proj(req).name) : [], recipe: versions ? versions.recipe(proj(req)) : null, dbTemplate: versions ? (await versions.state(proj(req).name)).dbTemplate || null : null, sandbox: versions ? await versions.sandboxInfo(proj(req)) : {}, lane: runner.laneState().preview || null })));

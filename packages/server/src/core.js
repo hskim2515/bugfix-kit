@@ -45,6 +45,7 @@ export async function createDevLoop({ configFile, log: baseLog = defaultLog } = 
   const notifier = new Notifier(cfg, log);
   const features = new Features(cfg, store, knowledge, log);
   runner.features = features;
+  knowledge.onRemoteChange = (project, prev, next) => features.remoteImpact(project, prev, next, runner, notifier);
   runner.knowledge = knowledge;
   runner.versions = versions;
   runner.notifier = notifier; versions.notifier = notifier; loops.notifier = notifier; insights.notifier = notifier;

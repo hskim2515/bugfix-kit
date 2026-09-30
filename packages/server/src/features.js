@@ -175,6 +175,73 @@ export class Features {
     return { ok: true, api: (spec.api || []).length, steps: (spec.steps || []).length };
   }
 
+  // ── 마일스톤·로드맵 ─────────────────────────────────────────────────────
+  async milestones(project) { const st = await this.state(project); return (st.milestones || []).slice().sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.order ?? 0) - (b.order ?? 0)); }
+  async saveMilestone(project, body, id = null) {
+    const name = String(body.name || '').trim().slice(0, 80);
+    if (!name) throw Object.assign(new Error('마일스톤 이름을 적어 주세요'), { status: 400 });
+    const due = /^\d{4}-\d{2}-\d{2}$/.test(String(body.due || '')) ? body.due : null;
+    let saved = null;
+    await this.save(project, (c) => {
+      const ms = c.milestones || [];
+      if (id != null) {
+        const i = ms.findIndex((m) => m.id === Number(id)); if (i < 0) throw Object.assign(new Error('없는 마일스톤'), { status: 404 });
+        const prevName = ms[i].name;
+        ms[i] = { ...ms[i], name, due, description: String(body.description || '').slice(0, 2000), updatedAt: nowIso() }; saved = ms[i];
+        // 이름이 바뀌면 기능들의 참조도 따라간다
+        const features = prevName !== name ? c.features.map((f) => (f.milestone === prevName ? { ...f, milestone: name } : f)) : c.features;
+        return { ...c, milestones: ms, features };
+      }
+      const mid = (c.milestoneSeq || 0) + 1;
+      saved = { id: mid, name, due, description: String(body.description || '').slice(0, 2000), order: ms.length, createdAt: nowIso(), updatedAt: nowIso() };
+      return { ...c, milestoneSeq: mid, milestones: [...ms, saved] };
+    });
+    return saved;
+  }
+  async removeMilestone(project, id) {
+    await this.save(project, (c) => { const m = (c.milestones || []).find((x) => x.id === Number(id)); return { ...c, milestones: (c.milestones || []).filter((x) => x.id !== Number(id)), features: m ? c.features.map((f) => (f.milestone === m.name ? { ...f, milestone: null } : f)) : c.features }; });
+    return { ok: true };
+  }
+  /** 기능 진행률(%) - 완료면 100, 작업이 있으면 병합된 비율, 없으면 상태로 어림 */
+  progressOf(f) {
+    if (f.status === 'done') return 100;
+    const c = f.counts || {}; const total = f.tasks || 0;
+    if (total) { const merged = (c.MERGED || 0); const ready = (c.READY || 0) + (c.PR_OPENED || 0); return Math.min(99, Math.round(100 * (merged + ready * 0.7) / total)); }
+    return f.status === 'active' ? 10 : f.status === 'review' ? 80 : 0;
+  }
+  /** 로드맵: 마일스톤별 기능 + 진행률, 미배정 */
+  async roadmap(project) {
+    const feats = (await this.list(project)).map((f) => ({ ...f, progress: this.progressOf(f) }));
+    const ms = await this.milestones(project);
+    const byName = new Map(ms.map((m) => [m.name, { ...m, features: [] }]));
+    const unassigned = [];
+    for (const f of feats) { if (f.milestone && byName.has(f.milestone)) byName.get(f.milestone).features.push(f); else if (f.milestone) { byName.set(f.milestone, { id: null, name: f.milestone, due: null, features: [f] }); } else unassigned.push(f); }
+    const milestones = [...byName.values()].map((m) => ({ ...m, progress: m.features.length ? Math.round(m.features.reduce((a, f) => a + f.progress, 0) / m.features.length) : 0, done: m.features.filter((f) => f.status === 'done').length, total: m.features.length, impacted: m.features.filter((f) => f.remoteChanges).length }));
+    return { milestones, unassigned, summary: { features: feats.length, done: feats.filter((f) => f.status === 'done').length, active: feats.filter((f) => f.status === 'active').length, impacted: feats.filter((f) => f.remoteChanges).length, progress: feats.length ? Math.round(feats.reduce((a, f) => a + f.progress, 0) / feats.length) : 0 } };
+  }
+
+  // ── 원격 변경 → 기능 영향 ───────────────────────────────────────────────
+  /** 원격 base 가 prev → next 로 바뀜: 바뀐 파일이 어느 기능 범위와 겹치는지 기록하고 알린다 */
+  async remoteImpact(project, prev, next, runner, notifier) {
+    const st = await this.state(project.name);
+    if (!st.features.length) return;
+    const ex = runner.ex(project); const gh = runner.gh(project); const auth = gh.gitAuthHeader();
+    const { repo } = runner.paths(project, 0);
+    await runner.prepareRepo(project, ex, auth, () => {});
+    await runner.fetch(project, ex, auth, [project.baseBranch]);
+    let out = await ex.execOut(repo, 1, ['git', 'diff', '--name-only', `${prev}..${next}`]);
+    if (!out.trim()) out = await ex.execOut(repo, 1, ['git', 'diff', '--name-only', `${next}~20..${next}`]);   // prev 가 사라졌으면(강제 푸시) 최근 20커밋
+    const files = out.trim().split(/\r?\n/).filter(Boolean);
+    if (!files.length) return;
+    let commits = 0; try { commits = Number((await ex.execOut(repo, 1, ['git', 'rev-list', '--count', `${prev}..${next}`])).trim()) || 0; } catch { /* */ }
+    const hits = await this.impact(project.name, files);
+    if (!hits.length) return;
+    await this.save(project.name, (c) => ({ ...c, features: c.features.map((f) => { const h = hits.find((x) => x.id === f.id); return h ? { ...f, remoteChanges: { at: nowIso(), sha: next, prev, commits, files: [...new Set([...(f.remoteChanges?.sha === prev ? f.remoteChanges.files || [] : []), ...h.files])].slice(0, 40) } } : f; }) }));
+    this.log.info(`[features ${project.name}] 원격 변경 ${prev.slice(0, 7)}→${next.slice(0, 7)} 이 기능 ${hits.map((h) => h.name).join(', ')} 범위와 겹침`);
+    notifier?.send(project, 'feature.impacted', { title: `원격 변경이 기능 범위에 닿음 - ${hits.map((h) => h.name).join(', ')}`, lines: [`${project.baseBranch} ${prev.slice(0, 7)}→${next.slice(0, 7)} (${commits}커밋, 파일 ${files.length}개)`, ...hits.slice(0, 5).map((h) => `${h.name}: ${h.files.slice(0, 4).join(', ')}`)], level: 'warn' }).catch(() => {});
+  }
+  async ackRemote(project, id) { await this.save(project, (c) => ({ ...c, features: c.features.map((f) => (f.id === Number(id) ? { ...f, remoteChanges: null, remoteAckedAt: nowIso() } : f)) })); return { ok: true }; }
+
   /** .devloop/summary.md 에 붙일 기능 설명 */
   describe(f) {
     if (!f) return '';

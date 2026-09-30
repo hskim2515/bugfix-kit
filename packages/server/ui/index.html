@@ -76,6 +76,16 @@
   #rows td:last-child, #rows td:nth-child(7) { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
   .p-PLANNING { background: #2e2650; color: #c4b5fd; } .p-PLANNED { background: #3b2f1f; color: #fcd34d; } .p-STEP_WAIT { background: #1f3350; color: #7dd3fc; }
+  .rm-board { display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
+  .rm-col { min-width: 280px; max-width: 360px; flex: 1; background: var(--card, #161b22); border: 1px solid #2a3140; border-radius: 10px; padding: 10px; }
+  .rm-col__head { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; margin-bottom: 6px; }
+  .rm-col__body { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .rm-feat { border: 1px solid #2a3140; border-radius: 8px; padding: 8px; background: rgba(255,255,255,0.02); cursor: pointer; }
+  .rm-feat__head { display: flex; justify-content: space-between; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .rm-feat__meta { font-size: 11px; margin-top: 4px; }
+  .rm-feat__actions { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+  .rm-bar { height: 6px; background: #2a3140; border-radius: 3px; overflow: hidden; } .rm-bar--ms { height: 8px; }
+  .rm-bar__fill { height: 100%; background: linear-gradient(90deg, #4f8cff, #7fe0a4); }
   .p-feature { background: #2e2650; color: #c4b5fd; } .p-feat { background: #1f2e3a; color: #93c5fd; } .p-improve { background: #1f3a3a; color: #8ee0d0; }
   .p-QUEUED { background: #3b3a1f; color: var(--warn); } .p-RUNNING { background: #1f3350; color: #8ec1ff; } .p-PR_OPENED { background: #3b2a1f; color: #ffb27a; }
   .p-READY { background: #1f3a3a; color: #8ee0d0; } .p-REVERTED { background: #3b2a3a; color: #e0a0d0; } .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
@@ -205,6 +215,7 @@
     <button data-t="reports" class="on">리포트</button>
     <button data-t="insights">제안</button>
     <button data-t="versions">버전</button>
+    <button data-t="roadmap">로드맵</button>
     <button data-t="features">기능</button>
     <button data-t="loops">루프</button>
     <button data-t="knowledge">지식</button>
@@ -296,6 +307,18 @@
     </div>
 
     <!-- 루프 -->
+    <!-- 로드맵 · 마일스톤 -->
+    <div data-tab="roadmap" hidden>
+      <div class="intro"><b>로드맵</b>은 기능들을 마일스톤별로 묶어 진행률을 봅니다. 진행률은 기능 상태와 묶인 작업의 병합 비율로 어림합니다. 원격 저장소에 새 커밋이 올라와 어느 기능의 코드 범위가 바뀌면 <span class="pill p-QUEUED">원격 변경</span> 으로 표시되고 알림이 갑니다(지식 탭의 원격 감시 주기).</div>
+      <div class="toolbar"><span id="rmSummary" class="dim"></span><span style="flex:1"></span><button class="btn" id="rmNewMs">+ 마일스톤</button></div>
+      <div class="card" id="rmForm" hidden style="margin-bottom:12px"><div class="form">
+        <label>이름</label><input id="ms_name" placeholder="예: 10월 배포">
+        <label>목표일</label><input id="ms_due" type="date">
+        <label>설명</label><textarea id="ms_desc" style="min-height:60px"></textarea>
+        <div class="actions"><button class="btn primary" id="ms_save">저장</button><button class="btn" id="ms_cancel">닫기</button><span class="dim" id="ms_msg"></span></div>
+      </div></div>
+      <div id="rmBoard"></div>
+    </div>
     <!-- 기능 · 로드맵 단위 -->
     <div data-tab="features" hidden>
       <div class="intro"><b>기능</b>은 로드맵과 작업의 관리 단위입니다. 기능마다 코드 범위(지식 그래프의 화면·메뉴·기능 노드 + 이어진 파일, 직접 적은 파일)를 두면 그 기능의 작업이 그 코드부터 보고, 어떤 수정이 어느 기능에 영향 주는지 보입니다. 작업의 인수 조건이 통과하면 기능에 쌓여 회귀 검증 재료가 됩니다.</div>
@@ -304,7 +327,7 @@
         <div class="form">
           <label>이름</label><input id="f_name" placeholder="예: 시나리오 버전 관리">
           <label>설명</label><textarea id="f_desc" style="min-height:80px" placeholder="이 기능이 무엇을 하는지, 목표"></textarea>
-          <label>상태</label><div class="inline"><select id="f_status"><option value="planned">계획</option><option value="active">진행</option><option value="review">검토</option><option value="done">완료</option><option value="hold">보류</option></select><input id="f_milestone" placeholder="마일스톤 (선택, 예: 10월 배포)" style="width:200px"></div>
+          <label>상태</label><div class="inline"><select id="f_status"><option value="planned">계획</option><option value="active">진행</option><option value="review">검토</option><option value="done">완료</option><option value="hold">보류</option></select><input id="f_milestone" list="msList" placeholder="마일스톤 (선택)" style="width:200px"><datalist id="msList"></datalist></div>
           <label>코드 범위 <small>지식 그래프</small></label><div class="inline" style="flex-direction:column;align-items:stretch;gap:4px"><div class="inline"><input id="f_scope" placeholder="화면·메뉴·기능 이름 (지식 그래프 노드)" style="flex:1"><button class="btn" id="f_suggest" title="이름·설명으로 지식 그래프에서 후보를 찾습니다">범위 추천</button></div><div class="dim" id="f_cands"></div></div>
           <label>파일 직접 지정 <small>선택</small></label><textarea id="f_files" style="min-height:60px" placeholder="한 줄에 하나 - 지식 그래프에 없는 파일이나 꼭 포함할 파일"></textarea>
           <div class="actions"><button class="btn primary" id="f_save">저장</button><button class="btn" id="f_cancel">닫기</button></div>
@@ -719,7 +742,7 @@
     const fs = await fetchFeatures(fProject);
     $('#fEmpty').hidden = fs.length > 0;
     $('#fRows').innerHTML = fs.map((f) => { const c = f.counts || {}; const active = (c.QUEUED || 0) + (c.RUNNING || 0) + (c.PLANNING || 0); const wait = (c.PLANNED || 0) + (c.STEP_WAIT || 0);
-      return `<tr data-f="${f.id}"><td><b>${esc(f.name)}</b>${f.milestone ? `<div class="dim">${esc(f.milestone)}</div>` : ''}</td>
+      return `<tr data-f="${f.id}"><td><b>${esc(f.name)}</b>${f.milestone ? `<div class="dim">${esc(f.milestone)}</div>` : ''}${f.remoteChanges ? `<div><span class="pill p-QUEUED" title="원격 ${esc((f.remoteChanges.sha || '').slice(0, 7))} · ${esc((f.remoteChanges.files || []).slice(0, 5).join(', '))}">원격 변경 ${(f.remoteChanges.files || []).length}파일</span> <a href="#" data-fack="${f.id}" class="dim">확인</a></div>` : ''}</td>
       <td class="dim">${f.scope?.label ? `${esc(f.scope.label)} → 파일 ${(f.scope.files || []).length}개${f.scope.missing ? ' <span class="pill p-FAILED">그래프에 없음</span>' : ''}` : '<span class="dim">범위 없음</span>'}${(f.extraFiles || []).length ? ` · 직접 ${f.extraFiles.length}개` : ''}${(f.acceptance || []).length ? ` · 인수 조건 ${f.acceptance.length}건` : ''}</td>
       <td><span class="pill ${fStatusPill[f.status] || ''}">${fStatusLabel[f.status] || f.status}</span></td>
       <td>${f.tasks ? `${f.tasks}건${active ? ` · <span class="pill p-RUNNING">진행 ${active}</span>` : ''}${wait ? ` · <span class="pill p-PLANNED">대기 ${wait}</span>` : ''}${c.MERGED ? ` · 병합 ${c.MERGED}` : ''}` : '<span class="dim">없음</span>'}</td>
@@ -729,6 +752,7 @@
     fEditing = f ? f.id : null; $('#fForm').hidden = false;
     $('#f_name').value = f?.name || ''; $('#f_desc').value = f?.description || ''; $('#f_status').value = f?.status || 'planned'; $('#f_milestone').value = f?.milestone || '';
     $('#f_scope').value = f?.scope?.label || ''; $('#f_scope').dataset.nodeId = f?.scope?.nodeId || ''; $('#f_files').value = (f?.extraFiles || []).join('\n'); $('#f_cands').innerHTML = '';
+    api('GET', `/admin/milestones/${fProject}`).then((r) => { $('#msList').innerHTML = (r.milestones || []).map((m) => `<option value="${esc(m.name)}">`).join(''); }).catch(() => {});
     $('#f_name').focus();
   }
   async function saveFeature() {
@@ -765,8 +789,39 @@
     const fe = e.target.closest('[data-fedit]'); if (fe) { openFeatureForm((featureCache[fProject] || []).find((x) => x.id === Number(fe.dataset.fedit))); return; }
     const fr = e.target.closest('[data-fregress]'); if (fr) { const n = prompt('어느 버전의 미리보기에서 돌릴까요? (버전 번호, 비우면 최근 것)', ''); if (n === null) return; fr.disabled = true; $('#fMsg').textContent = '회귀 검증 중… (미리보기 준비 포함 몇 분)'; try { const r = await api('POST', `/admin/features/${fProject}/${fr.dataset.fregress}/regress`, { n: n ? Number(n) : undefined }); $('#fMsg').textContent = `회귀 검증 ${r.passed ? '통과' : '실패'} (v${r.n})`; await loadFeatures(); openFeatureDetail(fr.dataset.fregress); } catch (x) { $('#fMsg').textContent = x.message; } finally { fr.disabled = false; } return; }
     const fi = e.target.closest('[data-fimport]'); if (fi) { e.preventDefault(); const t = prompt('절차를 가져올 작업(리포트) 번호'); if (!t) return; try { const r = await api('POST', `/admin/features/${fProject}/${fi.dataset.fimport}/acceptance/from-task`, { taskId: Number(t) }); $('#fMsg').textContent = `#${t} 의 절차 가져옴 (요청 ${r.api} · 절차 ${r.steps})`; await loadFeatures(); openFeatureDetail(fi.dataset.fimport); } catch (x) { $('#fMsg').textContent = x.message; } return; }
+    const fa = e.target.closest('[data-fack]'); if (fa) { e.preventDefault(); try { await api('POST', `/admin/features/${fProject}/${fa.dataset.fack}/remote/ack`); await loadFeatures(); if (tab === 'roadmap') loadRoadmap(); } catch (x) { $('#fMsg').textContent = x.message; } return; }
     const fd = e.target.closest('[data-fdel]'); if (fd) { if (!confirm('이 기능을 지울까요? 묶인 작업은 남고 연결만 풀립니다.')) return; try { await api('DELETE', `/admin/features/${fProject}/${fd.dataset.fdel}`); await loadFeatures(); } catch (x) { $('#fMsg').textContent = x.message; } return; }
     const ft = e.target.closest('[data-ftask]'); if (ft) { $('#t_feature').dataset.pre = ft.dataset.ftask; document.querySelector('#tabs button[data-t="reports"]').click(); $('#taskForm').hidden = true; openTaskForm(); $('#t_feature').dataset.pre = ''; return; }
+  });
+
+  // ── 로드맵 ──
+  let rmProject = null, msEditing = null;
+  async function loadRoadmap() {
+    rmProject = versionProject(); if (!rmProject) return;
+    let r; try { r = await api('GET', `/admin/roadmap/${rmProject}`); } catch (e) { $('#rmBoard').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+    const sm = r.summary || {};
+    $('#rmSummary').textContent = sm.features ? `기능 ${sm.features}개 · 진행 ${sm.active || 0} · 완료 ${sm.done || 0} · 전체 진행률 ${sm.progress || 0}%${sm.impacted ? ` · 원격 변경 ${sm.impacted}` : ''}` : '기능이 없습니다 - 기능 탭에서 만들고 마일스톤을 적으세요';
+    const card = (f) => `<div class="rm-feat" data-fopen2="${f.id}"><div class="rm-feat__head"><b>${esc(f.name)}</b><span class="pill ${fStatusPill[f.status] || ''}">${fStatusLabel[f.status] || f.status}</span></div>
+      <div class="rm-bar"><div class="rm-bar__fill" style="width:${f.progress}%"></div></div>
+      <div class="dim rm-feat__meta">${f.progress}% · 작업 ${f.tasks || 0}${(f.counts || {}).MERGED ? ` · 병합 ${f.counts.MERGED}` : ''}${f.lastRegression ? ` · 회귀 ${f.lastRegression.passed ? '<span class="pill p-MERGED">통과</span>' : '<span class="pill p-FAILED">실패</span>'}` : ''}${f.remoteChanges ? ` · <span class="pill p-QUEUED" title="${esc((f.remoteChanges.files || []).slice(0, 6).join(', '))}">원격 변경 ${(f.remoteChanges.files || []).length}파일</span>` : ''}</div>
+      <div class="rm-feat__actions"><select data-fstatus="${f.id}" title="상태 바꾸기">${Object.entries(fStatusLabel).map(([k, v]) => `<option value="${k}" ${k === f.status ? 'selected' : ''}>${v}</option>`).join('')}</select><button class="btn" data-ftask="${f.id}">새 작업</button></div></div>`;
+    const col = (m) => `<div class="rm-col"><div class="rm-col__head"><b>${esc(m.name)}</b>${m.due ? `<span class="dim"> · ${esc(m.due)}${daysLeft(m.due)}</span>` : ''}<span class="dim"> · ${m.done}/${m.total} 완료 · ${m.progress}%</span>${m.id != null ? ` <a href="#" data-msedit="${m.id}" class="dim">수정</a> <a href="#" data-msdel="${m.id}" class="dim">삭제</a>` : ''}</div><div class="rm-bar rm-bar--ms"><div class="rm-bar__fill" style="width:${m.progress}%"></div></div>${m.description ? `<div class="dim" style="margin:4px 0">${esc(m.description)}</div>` : ''}<div class="rm-col__body">${m.features.map(card).join('') || '<div class="dim">기능 없음</div>'}</div></div>`;
+    $('#rmBoard').innerHTML = `<div class="rm-board">${(r.milestones || []).map(col).join('')}${(r.unassigned || []).length ? col({ name: '미배정', due: null, done: r.unassigned.filter((f) => f.status === 'done').length, total: r.unassigned.length, progress: Math.round(r.unassigned.reduce((a, f) => a + f.progress, 0) / r.unassigned.length), features: r.unassigned }) : ''}</div>`;
+    rmMilestones = r.milestones || [];
+  }
+  let rmMilestones = [];
+  function daysLeft(due) { const d = Math.ceil((new Date(due) - new Date()) / 86400000); return d < 0 ? ` (${-d}일 지남)` : d === 0 ? ' (오늘)' : ` (D-${d})`; }
+  function openMsForm(m) { msEditing = m ? m.id : null; $('#rmForm').hidden = false; $('#ms_name').value = m?.name || ''; $('#ms_due').value = m?.due || ''; $('#ms_desc').value = m?.description || ''; $('#ms_msg').textContent = ''; $('#ms_name').focus(); }
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('#rmNewMs')) { openMsForm(null); return; }
+    if (e.target.closest('#ms_cancel')) { $('#rmForm').hidden = true; return; }
+    if (e.target.closest('#ms_save')) { const body = { name: $('#ms_name').value.trim(), due: $('#ms_due').value, description: $('#ms_desc').value.trim() }; try { if (msEditing != null) await api('PUT', `/admin/milestones/${rmProject}/${msEditing}`, body); else await api('POST', `/admin/milestones/${rmProject}`, body); $('#rmForm').hidden = true; loadRoadmap(); } catch (x) { $('#ms_msg').textContent = x.message; } return; }
+    const me = e.target.closest('[data-msedit]'); if (me) { e.preventDefault(); openMsForm(rmMilestones.find((m) => m.id === Number(me.dataset.msedit))); return; }
+    const md = e.target.closest('[data-msdel]'); if (md) { e.preventDefault(); if (!confirm('마일스톤을 지울까요? 기능은 남고 마일스톤만 비워집니다.')) return; try { await api('DELETE', `/admin/milestones/${rmProject}/${md.dataset.msdel}`); loadRoadmap(); } catch (x) { $('#rmSummary').textContent = x.message; } return; }
+    const fo2 = e.target.closest('[data-fopen2]'); if (fo2 && !e.target.closest('select,button')) { fProject = rmProject; await fetchFeatures(fProject); document.querySelector('#tabs button[data-t="features"]').click(); openFeatureDetail(fo2.dataset.fopen2); return; }
+  });
+  document.addEventListener('change', async (e) => {
+    const sel = e.target.closest('[data-fstatus]'); if (sel) { try { await api('PUT', `/admin/features/${rmProject}/${sel.dataset.fstatus}`, { status: sel.value }); loadRoadmap(); } catch (x) { $('#rmSummary').textContent = x.message; } }
   });
 
   async function loadVersions() {
@@ -1245,7 +1300,7 @@
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
-    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); if (tab === 'loops') loadLoops(); if (tab === 'features') loadFeatures(); return; }
+    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); if (tab === 'loops') loadLoops(); if (tab === 'features') loadFeatures(); if (tab === 'roadmap') loadRoadmap(); return; }
     const sh = e.target.closest('.shots figure'); if (sh) { const img = sh.querySelector('img'); if (img) { const big = document.createElement('div'); big.className = 'shotbig'; big.innerHTML = `<img src="${img.src}"><div class="dim">${esc(sh.dataset.shot)} (눌러서 닫기)</div>`; big.onclick = () => big.remove(); document.body.appendChild(big); } return; }
     const sb = e.target.closest('.shotbig'); if (sb) { sb.remove(); return; }
     const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
