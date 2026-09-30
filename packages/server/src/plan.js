@@ -195,8 +195,29 @@ ${mods}
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!changed) {
         const reason = await readIfExists(path.join(wt, '.devloop/result.md'));
-        await this.updateFix(project, id, { fixStatus: mode === 'step' && from > 0 ? 'STEP_WAIT' : 'PLANNED', fixSummary: `AI 가 코드를 바꾸지 않았습니다. ${firstLine(reason, 200)}` });
-        await L(`✗ 변경 없음 - 결과:\n${reason.trim().slice(0, 1500)}`);
+        if (from === 0) {
+          // 첫 구현부터 아무것도 안 바꿨으면 실패 - 계획으로 되돌린다
+          await this.updateFix(project, id, { fixStatus: 'PLANNED', fixSummary: `AI 가 코드를 바꾸지 않았습니다. ${firstLine(reason, 200)}` });
+          await L(`✗ 변경 없음 - 결과:\n${reason.trim().slice(0, 1500)}`);
+          return;
+        }
+        // 검증·확인만 하는 단계(빌드 검증 등)는 코드 변경이 없어도 완료로 친다
+        await L(`이 단계는 코드 변경이 없습니다(검증·확인 단계로 봄) - 완료 처리\n${reason.trim().slice(0, 800)}`);
+        await this.updateFix(project, id, { planStep: to });
+        if (!last) {
+          await this.updateFix(project, id, { fixStatus: 'STEP_WAIT' });
+          await L(`■ ${to}/${plan.steps.length} 단계 완료 - 다음 단계 대기`);
+          return;
+        }
+        const n0 = r.fixVersion;
+        if (n0 == null) throw new Error('커밋된 변경이 없어 내보낼 것이 없습니다');
+        if (!await readIfExists(path.join(wt, '.devloop/repro.json')) && (plan.acceptance.api.length || plan.acceptance.steps.length)) {
+          await fs.writeFile(path.join(wt, '.devloop/repro.json'), JSON.stringify({ api: plan.acceptance.api, steps: plan.acceptance.steps }, null, 2), 'utf8');
+          await L('인수 조건(계획의 acceptance)을 재현 절차로 사용합니다');
+        }
+        const repro0 = await this.afterFix(project, id, ex, wt, branch, base, r.fixSummary || this.taskTitle(r), n0, [], sid);
+        const prBody0 = `${this.kindLabel(r)} 요청 #${id}: ${this.taskTitle(r)}\n\n## 계획\n${plan.summary}\n${plan.steps.map((s) => `${s.n}. ${s.title}`).join('\n')}${repro0.ran ? `\n\n## 인수 조건 검증\n${repro0.passed ? '✓ 통과' : '✗ 실패'} (${repro0.rounds}회)\n${repro0.note}` : ''}${plan.acceptance.manual.length ? `\n\n## 사람이 확인할 것\n${plan.acceptance.manual.map((m) => `- [ ] ${m}`).join('\n')}` : ''}\n\n---\n이 PR 은 DevLoop 의 ${this.kindLabel(r)} 요청 흐름(계획 → 구현 → 검증)으로 만들어졌습니다.`;
+        await this.deliver(project, ex, gh, id, wt, branch, auth, { summary: r.fixSummary || this.taskTitle(r), prBody: prBody0, existingPr: null }, []);
         return;
       }
       await L(`변경 파일:\n${changed}`);
