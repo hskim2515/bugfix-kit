@@ -274,7 +274,6 @@
           <div class="actions"><button class="btn primary" id="t_submit">작업 만들기</button><button class="btn" id="t_cancel">닫기</button><span class="dim" id="t_msg"></span></div>
         </div>
       </div>
-      </div>
       <table id="rTable"><thead><tr><th>#</th><th class="pcol">프로젝트</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead><tbody id="rows"></tbody></table>
       <div class="empty" id="empty" hidden>리포트가 없습니다</div>
     </div>
@@ -1364,7 +1363,7 @@
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
-    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); if (tab === 'loops') loadLoops(); if (tab === 'features') loadFeatures(); if (tab === 'roadmap') loadRoadmap(); return; }
+    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); if (tab === 'loops') loadLoops(); if (tab === 'features') loadFeatures(); if (tab === 'roadmap') loadRoadmap(); if (tab === 'dashboard') loadDashboard(); return; }
     const sh = e.target.closest('.shots figure'); if (sh) { const img = sh.querySelector('img'); if (img) { const big = document.createElement('div'); big.className = 'shotbig'; big.innerHTML = `<img src="${img.src}"><div class="dim">${esc(sh.dataset.shot)} (눌러서 닫기)</div>`; big.onclick = () => big.remove(); document.body.appendChild(big); } return; }
     const sb = e.target.closest('.shotbig'); if (sb) { sb.remove(); return; }
     const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }
