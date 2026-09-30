@@ -7,6 +7,7 @@ import { GitHub } from './github.js';
 import { GitLab } from './gitlab.js';
 import { runClaudeStream, sessionIdOf, resultTextOf, claudeSummary, loginState, errorOf } from './claude.js';
 import { writeReportFiles } from './reportFiles.js';
+import { planMixin } from './plan.js';
 import { Shots, mergeShots } from './shots.js';
 import { firstLine, hhmmss, notBlank, nowIso, orDash, parseResult, sleep, stamp } from './util.js';
 
@@ -1187,3 +1188,5 @@ export function gitClient(project, cfg, log = console) {
   if (project.host === 'gitlab') return new GitLab(project.gitlabUrl, project.gitlabProject, () => cfg.githubToken(project), log);
   return new GitHub(project.githubRepo, () => cfg.githubToken(project), log);
 }
+
+Object.assign(Runner.prototype, planMixin);

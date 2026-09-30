@@ -75,6 +75,8 @@
   td.prob { max-width: 520px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #rows td:last-child, #rows td:nth-child(7) { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
+  .p-PLANNING { background: #2e2650; color: #c4b5fd; } .p-PLANNED { background: #3b2f1f; color: #fcd34d; } .p-STEP_WAIT { background: #1f3350; color: #7dd3fc; }
+  .p-feature { background: #2e2650; color: #c4b5fd; } .p-improve { background: #1f3a3a; color: #8ee0d0; }
   .p-QUEUED { background: #3b3a1f; color: var(--warn); } .p-RUNNING { background: #1f3350; color: #8ec1ff; } .p-PR_OPENED { background: #3b2a1f; color: #ffb27a; }
   .p-READY { background: #1f3a3a; color: #8ee0d0; } .p-REVERTED { background: #3b2a3a; color: #e0a0d0; } .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
   .sev-CRITICAL { color: #ff6b7a; } .sev-HIGH { color: #ffb27a; } .sev-MEDIUM { color: var(--warn); } .sev-LOW { color: var(--ok); }
@@ -239,9 +241,24 @@
       <div class="toolbar">
         <span class="seg" id="filterSeg">
           <button data-f="all" class="on">전체</button><button data-f="active">진행 중</button><button data-f="FAILED">실패</button>
+          <button data-f="PLANNED">계획 대기</button><button data-f="STEP_WAIT">단계 대기</button>
           <button data-f="READY">수정본 준비</button><button data-f="PR_OPENED">PR 열림</button><button data-f="MERGED">병합됨</button><button data-f="REVERTED">되돌림</button><button data-f="NONE">요청 전</button>
         </span>
         <input type="search" id="q" placeholder="문제·보고자 검색">
+        <button class="btn primary" id="newTask" title="버그가 아닌 기능·개선 요청도 여기서 만듭니다 - AI 가 계획을 세우고, 승인하면 구현합니다">+ 새 작업</button>
+      </div>
+      <div class="card" id="taskForm" hidden style="margin-bottom:12px">
+        <div class="toolbar"><b>새 작업</b><span class="dim">기능·개선 요청은 AI 가 먼저 계획(건드릴 파일·단계·인수 조건)을 쓰고, 개입 방식에 따라 승인 뒤 구현합니다. 버그는 바로 수정 흐름입니다.</span></div>
+        <div class="form">
+          <label>프로젝트</label><select id="t_project"></select>
+          <label>종류</label><div class="inline"><select id="t_kind"><option value="feature">기능 요청</option><option value="improve">개선·리팩터링</option><option value="bug">버그</option></select>
+            <select id="t_mode" title="사람 개입 방식"><option value="plan">계획 승인 뒤 끝까지 자동</option><option value="step">단계마다 확인(미리보기 보고 다음 단계)</option><option value="auto">끝까지 자동</option></select></div>
+          <label>제목</label><input id="t_title" placeholder="예: 시나리오 목록에 즐겨찾기 추가">
+          <label>설명 <small>무엇을, 왜, 어디에</small></label><textarea id="t_desc" style="min-height:120px" placeholder="원하는 동작, 화면 위치, 참고할 기존 기능, 제약 … 자세할수록 계획이 정확해집니다"></textarea>
+          <label>관련 범위 <small>선택</small></label><input id="t_scope" placeholder="메뉴·기능·파일 이름 (지식 그래프가 관련 코드를 찾는 힌트)">
+          <div class="actions"><button class="btn primary" id="t_submit">작업 만들기</button><button class="btn" id="t_cancel">닫기</button><span class="dim" id="t_msg"></span></div>
+        </div>
+      </div>
       </div>
       <table id="rTable"><thead><tr><th>#</th><th class="pcol">프로젝트</th><th>심각도</th><th>문제</th><th>수정</th><th>PR</th><th>보고자</th><th>갱신</th></tr></thead><tbody id="rows"></tbody></table>
       <div class="empty" id="empty" hidden>리포트가 없습니다</div>
@@ -345,6 +362,7 @@
             · <b>PR 까지</b> - 브랜치를 올리고 기준 브랜치로 향하는 PR/MR 을 만듭니다. 병합은 사람이.<br>
             · <b>자동 병합</b> - PR 을 만든 뒤 기준 브랜치와 합쳐 재검증하고 통과하면 병합, 배포까지 추적합니다.
           </div>
+          <label>작업 개입 방식 <small>기능·개선 요청 기본값</small></label><div class="inline"><select id="p_taskMode"><option value="plan">계획 승인 뒤 끝까지 자동</option><option value="step">단계마다 확인</option><option value="auto">끝까지 자동</option></select><span class="dim">작업을 만들 때 바꿀 수 있습니다</span></div>
           <label>수정 뒤 검증 <small>미리보기·재현</small></label><div class="inline" style="flex-direction:column;align-items:flex-start;gap:4px">
             <label class="dim"><input type="checkbox" id="p_reproCheck"> <b>재현 검증</b> - 고친 수정본을 미리보기로 띄워 신고된 요청·화면 절차를 다시 돌려 고쳐졌는지 확인. 실패하면 응답·서버 로그를 증거로 AI 가 다시 고침(최대 <input id="p_reproRounds" type="number" min="1" max="5" value="2" style="width:50px"> 회). 레시피가 있어야 함</label>
             <label class="dim"><input type="checkbox" id="p_previewAuto"> <b>미리보기 자동 생성</b> - 재현 검증을 끈 경우에도 수정이 끝나면 미리보기를 띄움</label>
@@ -455,7 +473,8 @@
   const setLog = (el, text) => { const h = logHtml(text); if (h != null) el.innerHTML = h; else el.textContent = text; };
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
-  const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패', REVERTED: '되돌림' };
+  const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', PLANNING: '계획 중', PLANNED: '계획 승인 대기', STEP_WAIT: '다음 단계 대기', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패', REVERTED: '되돌림' };
+  const kindLabel = { bug: '버그', feature: '기능', improve: '개선' };
   const deliveryLabel = { merge: '자동 병합까지', pr: 'PR/MR 까지', branch: '원격 브랜치만', local: '보관만(이 서버)' };
   const H = () => ({ 'X-Devloop-Admin': key, 'Content-Type': 'application/json' });
   async function api(method, path, body) {
@@ -567,19 +586,19 @@
     $('#cards').innerHTML = `
       <div class="card"><h3>리포트 <span class="dim">${data.projects.map((p) => `${esc(p.name)} ${esc(p.githubRepo)} · ${esc(p.baseBranch)}${p.delivery && p.delivery !== 'merge' ? ` · ${deliveryLabel[p.delivery] || p.delivery}` : ''}`).join(' / ')}</span></h3>
         <div class="big">${total}</div>
-        <div class="row">${['RUNNING', 'QUEUED', 'PR_OPENED', 'FAILED', 'MERGED'].filter((k) => counts[k]).map((k) => `<span class="pill p-${k}">${fixLabel[k]} ${counts[k]}</span>`).join('') || '<span>수정 요청 없음</span>'}</div>
+        <div class="row">${['RUNNING', 'QUEUED', 'PLANNING', 'PLANNED', 'STEP_WAIT', 'PR_OPENED', 'FAILED', 'MERGED'].filter((k) => counts[k]).map((k) => `<span class="pill p-${k}">${fixLabel[k]} ${counts[k]}</span>`).join('') || '<span>수정 요청 없음</span>'}</div>
       </div>` + (running ? `
       <div class="card running"><h3>지금 진행 중 · ${esc(running.project)} #${running.bugReportId} <span class="pill p-${running.fixStatus}">${fixLabel[running.fixStatus]}</span> <span class="dim">${running.fixRequestedAt ? '요청 ' + ago(running.fixRequestedAt) : ''}</span></h3>
         <div>${esc((running.problem || '').slice(0, 160))}</div><pre class="log">${esc(running.logTail || '(로그 없음)')}</pre></div>` : '');
     const rows = data.projects.flatMap((p) => p.reports.map((r) => ({ ...r, project: p.name }))).filter((r) => {
       const st = r.fixStatus || 'NONE';
-      if (filter === 'active' && !['QUEUED', 'RUNNING'].includes(st)) return false;
+      if (filter === 'active' && !['QUEUED', 'RUNNING', 'PLANNING'].includes(st)) return false;
       if (filter !== 'all' && filter !== 'active' && st !== filter) return false;
       return !q || `${r.problem} ${r.reporter} ${r.project} ${r.fixSummary || ''}`.toLowerCase().includes(q.toLowerCase());
     }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
     $('#rows').innerHTML = rows.map((r) => { const st = r.fixStatus || 'NONE';
       const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
-      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" title="${esc(r.problem)}">${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px" title="AI 수정본이 담긴 작업 브랜치. '푸시됨' 이면 원격 저장소에 같은 이름으로 있고, '키트 안' 이면 아직 이 서버에만 있습니다">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 원격에 푸시됨(PR 없음)' : ' · 키트 저장소 안(원격에 없음)'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : st === 'MERGED' && r.fixMergeSha ? `<div style="margin-top:4px"><button class="btn danger" data-revert="${r.bugReportId}" title="병합된 수정을 revert 하는 브랜치·PR 을 만듭니다(자동 병합 프로젝트면 병합까지)">되돌리기</button></div>` : st === 'REVERTED' && r.fixRevertPrUrl ? `<div class="dim" style="margin-top:4px"><a href="${esc(r.fixRevertPrUrl)}" target="_blank">되돌리기 PR</a></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
+      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" data-kind="${esc(r.kind || 'bug')}" title="${esc(r.problem)}">${r.kind && r.kind !== 'bug' ? `<span class="pill p-${r.kind}">${kindLabel[r.kind]}</span> ` : ''}${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px" title="AI 수정본이 담긴 작업 브랜치. '푸시됨' 이면 원격 저장소에 같은 이름으로 있고, '키트 안' 이면 아직 이 서버에만 있습니다">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 원격에 푸시됨(PR 없음)' : ' · 키트 저장소 안(원격에 없음)'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : st === 'MERGED' && r.fixMergeSha ? `<div style="margin-top:4px"><button class="btn danger" data-revert="${r.bugReportId}" title="병합된 수정을 revert 하는 브랜치·PR 을 만듭니다(자동 병합 프로젝트면 병합까지)">되돌리기</button></div>` : st === 'REVERTED' && r.fixRevertPrUrl ? `<div class="dim" style="margin-top:4px"><a href="${esc(r.fixRevertPrUrl)}" target="_blank">되돌리기 PR</a></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
     $('#empty').hidden = rows.length > 0;
   }
 
@@ -643,6 +662,29 @@
   const pvLabel = { NONE: '없음', QUEUED: '대기', BUILDING: '빌드 중', STARTING: '시작 중', UP: '떠 있음', DOWN: '중지됨', FAILED: '실패' };
   const pvClass = { UP: 'p-MERGED', BUILDING: 'p-RUNNING', STARTING: 'p-RUNNING', QUEUED: 'p-QUEUED', FAILED: 'p-FAILED', DOWN: 'p-NONE', NONE: 'p-NONE' };
   function versionProject() { if (scope) return scope; const names = allProjects.length ? allProjects : (data?.projects || []).map((p) => p.name); return names[0] || null; }
+  // ── 새 작업 ──
+  function openTaskForm() {
+    const f = $('#taskForm'); f.hidden = !f.hidden; if (f.hidden) return;
+    const sel = $('#t_project'); const names = (data?.projects || []).map((p) => p.name);
+    sel.innerHTML = names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join(''); if (scopeProject()) sel.value = scopeProject();
+    const p = (settings?.projects || []).find((x) => x.name === sel.value); $('#t_mode').value = p?.taskMode || 'plan';
+    $('#t_msg').textContent = ''; $('#t_title').focus();
+  }
+  function scopeProject() { try { return new URLSearchParams(location.search).get('project') || ''; } catch { return ''; } }
+  async function submitTask() {
+    const project = $('#t_project').value; const body = { kind: $('#t_kind').value, mode: $('#t_mode').value, title: $('#t_title').value.trim(), description: $('#t_desc').value.trim(), scope: $('#t_scope').value.trim() };
+    if (!body.title && !body.description) { $('#t_msg').textContent = '제목이나 설명을 적어 주세요'; return; }
+    $('#t_submit').disabled = true; $('#t_msg').textContent = '만드는 중…';
+    try { const r = await api('POST', `/p/${project}/tasks`, body); $('#t_msg').textContent = `작업 #${r.bugReportId} 등록 - ${body.kind === 'bug' ? '수정' : '계획'} 시작`; $('#t_title').value = ''; $('#t_desc').value = ''; $('#t_scope').value = ''; await load(); }
+    catch (e) { $('#t_msg').textContent = e.message; }
+    finally { $('#t_submit').disabled = false; }
+  }
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#newTask')) { openTaskForm(); return; }
+    if (e.target.closest('#t_cancel')) { $('#taskForm').hidden = true; return; }
+    if (e.target.closest('#t_submit')) { submitTask(); return; }
+  });
+
   async function loadVersions() {
     vProject = versionProject(); if (!vProject) return;
     let r; try { r = await api('GET', `/admin/versions/${vProject}`); } catch (e) { $('#vEmpty').hidden = false; $('#vEmpty').textContent = e.message; return; }
@@ -1034,6 +1076,7 @@
     v('#p_repo', p?.repo); v('#p_githubRepo', p?.githubRepo); v('#p_baseBranch', p?.baseBranch || 'main');
     $('#p_delivery').value = p ? (p.delivery || (p.autoMerge === false ? 'pr' : 'merge')) : 'merge';
     $('#p_notify_webhook').value = p?.notify?.webhook || ''; $('#p_notify_mention').value = p?.notify?.mention || '';
+    $('#p_taskMode').value = p?.taskMode || 'plan';
     $('#p_reproCheck').checked = p ? p.reproCheck !== false : true; $('#p_previewAuto').checked = p ? p.previewAuto !== false : true; $('#p_reproRounds').value = p?.reproRounds || 2; $('#p_restBase').value = p?.restBase || '';
     renderNotifyEvents(p?.notify?.events);
     $('#p_fixFrom').value = p?.fixFrom === 'admin' ? 'admin' : 'app';
@@ -1050,7 +1093,7 @@
     const fc = $('#p_fc_cmd').value.trim() ? { cwd: $('#p_fc_cwd').value.trim() || '.', command: $('#p_fc_cmd').value.trim(), when: csv($('#p_fc_when').value) } : null;
     return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', delivery: $('#p_delivery').value, autoMerge: $('#p_delivery').value === 'merge',
       notify: { webhook: $('#p_notify_webhook').value.trim(), mention: $('#p_notify_mention').value.trim(), events: [...document.querySelectorAll('#p_notify_events input:checked')].map((x) => x.value) },
-      reproCheck: $('#p_reproCheck').checked, previewAuto: $('#p_previewAuto').checked, reproRounds: Number($('#p_reproRounds').value) || 2, restBase: $('#p_restBase').value.trim(), fixFrom: $('#p_fixFrom').value,
+      taskMode: $('#p_taskMode').value, reproCheck: $('#p_reproCheck').checked, previewAuto: $('#p_previewAuto').checked, reproRounds: Number($('#p_reproRounds').value) || 2, restBase: $('#p_restBase').value.trim(), fixFrom: $('#p_fixFrom').value,
       cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), protectedPaths: lines($('#p_protectedPaths').value), env };
   }
 

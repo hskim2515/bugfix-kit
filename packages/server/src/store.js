@@ -77,8 +77,8 @@ export class FileStore {
   }
 
   static light(r) {
-    const { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, tool, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec } = r;
-    return { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, ...(tool ? { tool: true } : {}) };
+    const { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, tool, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, kind, mode, title, plan, planStep, planMd } = r;
+    return { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, kind, mode, title, plan, planStep, planMd, ...(tool ? { tool: true } : {}) };
   }
   /** 진행 상태 폴링용 - 스크린샷·로그·컨텍스트 제외 */
   static fixState(r) {
@@ -120,7 +120,7 @@ export class FileStore {
         if (!n.endsWith('.json')) continue;
         const id = Number(n.replace('.json', ''));
         const r = await this.get(p, id);
-        if (!r || !['QUEUED', 'RUNNING'].includes(r.fixStatus)) continue;
+        if (!r || !['QUEUED', 'RUNNING', 'PLANNING'].includes(r.fixStatus)) continue;
         const hasPr = r.fixPrNumber != null;
         // 후속 대화 중이었나: 마지막 대화가 사용자 메시지면 그 요청을 다시 보낸다
         let chat = [];
@@ -133,7 +133,7 @@ export class FileStore {
           fixLog: (c.fixLog || '') + `${new Date().toTimeString().slice(0, 8)}  ↻ 서버 재시작으로 끊김${hasPr ? ' - PR 은 열려 있습니다. 새로고침으로 상태를 맞추거나 직접 병합하세요' : ' - 다시 큐에 넣습니다'}\n`,
           fixUpdatedAt: nowIso(),
         }));
-        if (!hasPr) redo.push(followup ? { project: p, id, kind: 'followup', message: followup.text, mode: /^추천 개선 실행:|수정|고쳐/.test(followup.text) ? 'change' : 'ask', prevStatus: null } : { project: p, id, kind: 'fix' });
+        if (!hasPr) redo.push(followup ? { project: p, id, kind: 'followup', message: followup.text, mode: /^추천 개선 실행:|수정|고쳐/.test(followup.text) ? 'change' : 'ask', prevStatus: null } : (r.kind && r.kind !== 'bug' ? { project: p, id, kind: (r.fixStatus === 'PLANNING' || !r.plan) ? 'plan' : 'implement' } : { project: p, id, kind: 'fix' }));
         log.warn(`[devloop] ${p}#${id} 재시작으로 끊김 → ${hasPr ? 'PR_OPENED' : '다시 큐에'}`);
       }
     }

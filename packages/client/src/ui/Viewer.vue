@@ -96,7 +96,8 @@
               <!-- AI 자동 수정: 머리줄(제목·상태·경과·도구) → 요청 전이면 큰 버튼 하나, 아니면 PR·요약 → 진행 로그 → 추천 개선 → 대화 -->
               <div class="brv-section brv-ai">
                 <div class="brv-ai__head">
-                  <span class="brv-label brv-ai__title">AI 자동 수정</span>
+                  <span class="brv-label brv-ai__title">{{ detail.kind && detail.kind !== 'bug' ? `AI ${kindLabel} 작업` : 'AI 자동 수정' }}</span>
+                  <span v-if="detail.kind && detail.kind !== 'bug'" class="brv-kind">{{ kindLabel }} · {{ modeLabel }}</span>
                   <span :class="['brv-fix', `brv-fix--${(detail.fixStatus || 'none').toLowerCase()}`]">{{ fixLabel(detail.fixStatus) }}</span>
                   <span v-if="fixBusy || fixInProgress" class="brv-spin brv-spin--sm"></span>
                   <span v-if="fixInProgress && fixElapsed" class="brv-fix-elapsed">{{ fixElapsed }}</span>
@@ -117,6 +118,37 @@
                 </div>
 
                 <template v-else>
+                  <!-- 기능·개선 작업의 계획: 단계 목록 · 승인/다시 계획 · 단계 모드의 다음 단계 -->
+                  <div v-if="planObj" class="brv-plan">
+                    <div class="brv-plan__head"><b>계획</b> <span class="brv-ai__hint">{{ planObj.steps.length }}단계 · 파일 {{ planObj.files.length }}개{{ planObj.estimate ? ' · ' + planObj.estimate : '' }}</span></div>
+                    <div class="brv-plan__summary brv-selectable">{{ planObj.summary }}</div>
+                    <ol class="brv-plan__steps">
+                      <li v-for="(st, i) in planObj.steps" :key="i" :class="{ 'brv-plan__step--done': i < planStep, 'brv-plan__step--next': i === planStep && detail.fixStatus === 'STEP_WAIT' }">
+                        <b>{{ st.title }}</b><span v-if="i < planStep" class="brv-plan__done">✓</span>
+                        <div class="brv-plan__detail brv-selectable">{{ st.detail }}</div>
+                      </li>
+                    </ol>
+                    <details v-if="planObj.approach || planObj.risks.length || planObj.questions.length || planObj.files.length" class="brv-plan__more">
+                      <summary>접근 · 파일 · 위험{{ planObj.questions.length ? ' · 확인 질문 ' + planObj.questions.length : '' }}</summary>
+                      <div v-if="planObj.questions.length" class="brv-plan__q"><b>확인 질문</b><ul><li v-for="(q, i) in planObj.questions" :key="'q' + i">{{ q }}</li></ul></div>
+                      <div v-if="planObj.approach" class="brv-selectable" v-html="md(planObj.approach)"></div>
+                      <div v-if="planObj.risks.length"><b>위험</b><ul><li v-for="(x, i) in planObj.risks" :key="'r' + i">{{ x }}</li></ul></div>
+                      <div v-if="planObj.files.length"><b>파일</b><ul class="brv-plan__files"><li v-for="(f, i) in planObj.files" :key="'f' + i"><code>{{ f }}</code></li></ul></div>
+                      <div v-if="planObj.acceptance && planObj.acceptance.manual && planObj.acceptance.manual.length"><b>사람이 확인할 것</b><ul><li v-for="(x, i) in planObj.acceptance.manual" :key="'m' + i">{{ x }}</li></ul></div>
+                    </details>
+                    <div v-if="detail.fixStatus === 'PLANNED' && fixable" class="brv-plan__actions">
+                      <button class="brv-fix-btn" :disabled="fixBusy" @click="approvePlan">계획 승인 → 구현 시작</button>
+                      <label class="brv-ai__hint">개입
+                        <select v-model="approveMode" class="brv-plan__mode"><option value="plan">계획 승인 뒤 끝까지 자동</option><option value="step">단계마다 확인</option><option value="auto">자동</option></select>
+                      </label>
+                      <input v-model="replanNote" class="brv-plan__note" placeholder="계획을 바꾸고 싶으면 메모 (질문의 답, 범위 조정 …)">
+                      <button class="brv-ai__tool" :disabled="fixBusy" @click="replan">다시 계획</button>
+                    </div>
+                    <div v-else-if="detail.fixStatus === 'STEP_WAIT' && fixable" class="brv-plan__actions">
+                      <span class="brv-ai__hint">{{ planStep }}/{{ planObj.steps.length }} 단계 완료 · 미리보기로 확인한 뒤</span>
+                      <button class="brv-fix-btn" :disabled="fixBusy" @click="nextStep">다음 단계 → {{ planObj.steps[planStep] ? planObj.steps[planStep].title : '' }}</button>
+                    </div>
+                  </div>
                   <div v-if="detail.fixPrUrl || detail.fixBranch" class="brv-ai__meta">
                     <a v-if="detail.fixPrUrl" class="brv-link brv-ai__pr" :href="detail.fixPrUrl" target="_blank" rel="noopener">PR #{{ prNumber }}</a>
                     <a v-if="detail.fixRevertPrUrl" class="brv-link" :href="detail.fixRevertPrUrl" target="_blank" rel="noopener">되돌리기 PR</a>
@@ -388,13 +420,16 @@ const FIX_LABELS = {
   none:      '요청 전',
   QUEUED:    '대기 중',
   RUNNING:   'AI 가 고치는 중',
+  PLANNING:  'AI 가 계획을 세우는 중',
+  PLANNED:   '계획 승인 대기 · 계획을 확인하고 승인하면 구현을 시작합니다',
+  STEP_WAIT: '다음 단계 대기 · 미리보기로 확인한 뒤 다음 단계를 누르세요',
   READY:     '수정본 준비 · 작업 브랜치에 커밋됨, 아직 PR·병합 전(콘솔 버전 탭에서 내보내기)',
   PR_OPENED: 'PR 올라옴 · 병합 안 됨(로그 확인)',
   MERGED:    '병합 완료',
   REVERTED:  '되돌림 - 수정이 취소됨(되돌리기 PR 참고)',
   FAILED:    '실패 · 진행 로그 확인',
 };
-const FIX_SHORT = { QUEUED: '대기', RUNNING: '수정중', READY: '준비', PR_OPENED: 'PR', MERGED: '병합', FAILED: '실패', REVERTED: '되돌림' };
+const FIX_SHORT = { QUEUED: '대기', RUNNING: '수정중', READY: '준비', PR_OPENED: 'PR', MERGED: '병합', FAILED: '실패', REVERTED: '되돌림', PLANNING: '계획 중', PLANNED: '계획 승인', STEP_WAIT: '단계 대기' };
 
 const STATUSES = [
   { value: 'OPEN',        label: '접수' },
@@ -425,6 +460,8 @@ export default {
       statusSaving: false,
       fixBusy: false,
       chatInput: '',
+      approveMode: 'plan',
+      replanNote: '',
       now: Date.now(),
       notice: null,
       canFix: true,            // 프로젝트 설정(fixFrom) - 앱 사용자에게 수정 요청을 열어 두었는가
@@ -482,7 +519,11 @@ export default {
     viewProjects() { return this.kit?.options?.adminKey ? [] : this.projects.filter((p) => this.info[p.key]?.canFix !== false); },
     prNumber() { return this.detail?.fixPrNumber || (this.detail?.fixPrUrl || '').split('/').pop(); },
     logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
-    fixInProgress() { return ['QUEUED', 'RUNNING'].includes(this.detail?.fixStatus); },
+    fixInProgress() { return ['QUEUED', 'RUNNING', 'PLANNING'].includes(this.detail?.fixStatus); },
+    planObj() { try { return this.detail?.plan ? JSON.parse(this.detail.plan) : null; } catch { return null; } },
+    planStep() { return Number(this.detail?.planStep) || 0; },
+    kindLabel() { return ({ feature: '기능', improve: '개선', bug: '버그' })[this.detail?.kind || 'bug']; },
+    modeLabel() { return ({ auto: '자동', plan: '계획 승인', step: '단계마다 확인' })[this.detail?.mode || 'plan']; },
     // 병합 뒤 배포(GitHub Actions) 추적이 아직 진행 중인가 - 로그에 끝났다는 줄이 없고 갱신이 최근(35분 안)이면
     previewPending() { return ['QUEUED', 'BUILDING', 'STARTING'].includes(this.detail?.preview?.status); },
     previewLabel() { return ({ QUEUED: '대기', BUILDING: '빌드', STARTING: '시작' })[this.detail?.preview?.status] || ''; },
@@ -661,6 +702,28 @@ export default {
     // ── AI 자동 수정 ──
     fixLabel(st) { return FIX_LABELS[st || 'none'] || st; },
     fixShort(st) { return FIX_SHORT[st] || st; },
+    // ── 작업 계획 ──
+    async approvePlan() {
+      const id = this.detail?.bugReportId; if (!id) return;
+      this.fixBusy = true;
+      try { const r = await this.kit.api.planApprove(id, { mode: this.approveMode }); this.detail = { ...this.detail, ...r }; this._syncListFix(r); this.showNotice('계획 승인', '구현을 시작합니다. 진행 로그가 여기에 쌓입니다.', 'success'); this._startFixPolling(); }
+      catch (e) { this.showNotice('승인 실패', e?.message || '요청에 실패했습니다.', 'error'); }
+      finally { this.fixBusy = false; }
+    },
+    async nextStep() {
+      const id = this.detail?.bugReportId; if (!id) return;
+      this.fixBusy = true;
+      try { const r = await this.kit.api.planNext(id); this.detail = { ...this.detail, ...r }; this._syncListFix(r); this._startFixPolling(); }
+      catch (e) { this.showNotice('다음 단계 실패', e?.message || '요청에 실패했습니다.', 'error'); }
+      finally { this.fixBusy = false; }
+    },
+    async replan() {
+      const id = this.detail?.bugReportId; if (!id) return;
+      this.fixBusy = true;
+      try { const r = await this.kit.api.planReplan(id, this.replanNote.trim()); this.replanNote = ''; this.detail = { ...this.detail, ...r }; this._syncListFix(r); this._startFixPolling(); }
+      catch (e) { this.showNotice('다시 계획 실패', e?.message || '요청에 실패했습니다.', 'error'); }
+      finally { this.fixBusy = false; }
+    },
     async requestFix() {
       if (!this.detail || this.fixBusy) return;
       const id = this.detail.bugReportId;
@@ -972,6 +1035,25 @@ export default {
 .brv-section { margin-bottom: 16px; }
 .brv-fix { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; background: #e9eef3; color: #445; }
 .brv-fix--queued    { background: #fff3cd; color: #7a5a00; }
+.brv-fix--planning  { background: #ede9fe; color: #4c1d95; }
+.brv-fix--planned   { background: #fef3c7; color: #78350f; }
+.brv-fix--step_wait { background: #e0f2fe; color: #0c4a6e; }
+.brv-kind { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #ede9fe; color: #4c1d95; margin-left: 4px; }
+.brv-plan { margin: 8px 0; padding: 8px 12px; border: 1px solid rgba(127,127,127,0.25); border-radius: 8px; font-size: 13px; }
+.brv-plan__head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+.brv-plan__summary { margin-bottom: 6px; }
+.brv-plan__steps { margin: 0; padding-left: 20px; }
+.brv-plan__steps li { margin: 3px 0; }
+.brv-plan__step--done b { opacity: 0.6; text-decoration: line-through; }
+.brv-plan__step--next b { color: #0c4a6e; }
+.brv-plan__done { margin-left: 6px; color: #15803d; }
+.brv-plan__detail { font-size: 12px; opacity: 0.8; white-space: pre-wrap; }
+.brv-plan__more { margin-top: 6px; font-size: 12px; }
+.brv-plan__more summary { cursor: pointer; opacity: 0.8; }
+.brv-plan__files code { font-size: 11px; }
+.brv-plan__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.brv-plan__note { flex: 1; min-width: 200px; font-size: 12px; padding: 4px 8px; border: 1px solid rgba(127,127,127,0.35); border-radius: 6px; background: transparent; color: inherit; }
+.brv-plan__mode { font-size: 12px; }
 .brv-fix--running   { background: #dbeafe; color: #1e3a8a; }
 .brv-fix--pr_opened { background: #e0f2fe; color: #075985; }
 .brv-fix--ready     { background: #ccfbf1; color: #115e59; }

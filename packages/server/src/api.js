@@ -184,6 +184,52 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
 
   pr.get('/reports', wrap((req) => store.list(req.project.name)));
 
+  /** 작업 만들기(버그 아닌 기능·개선 요청도) - 버그는 바로 수정 흐름, 기능·개선은 계획부터 */
+  pr.post('/tasks', fixGuard, wrap(async (req) => {
+    const p = req.project; const b = req.body || {};
+    const kind = ['bug', 'feature', 'improve'].includes(b.kind) ? b.kind : 'feature';
+    const title = String(b.title || '').trim().slice(0, 200);
+    const description = String(b.description || b.problem || '').trim();
+    if (!title && !description) throw new HttpError(400, '제목이나 설명을 적어 주세요');
+    if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, '저장소 토큰이 없습니다(키·계정 탭)');
+    const mode = ['auto', 'plan', 'step'].includes(b.mode) ? b.mode : (p.taskMode || 'plan');
+    const report = { severity: ['HIGH', 'MEDIUM', 'LOW'].includes(b.severity) ? b.severity : 'MEDIUM', problem: description || title, reproSteps: b.notes || null, expectedResult: b.expected || null, kind, mode, title: title || null, scope: b.scope ? String(b.scope).slice(0, 200) : null };
+    report.reporter = req.get('X-Devloop-User') || b.reporter || (req.isAdmin ? 'admin' : 'anonymous');
+    const saved = await store.save(p.name, report);
+    log.info(`[devloop ${p.name}] 작업 #${saved.bugReportId} (${kind}/${mode}) ${title}`);
+    await store.update(p.name, saved.bugReportId, (c) => ({ ...c, fixStatus: 'QUEUED', fixRequestedAt: new Date().toISOString(), fixUpdatedAt: new Date().toISOString(), status: 'IN_PROGRESS' }));
+    if (kind === 'bug') await runner.enqueue(p, saved.bugReportId); else await runner.enqueuePlan(p, saved.bugReportId);
+    return FileStore.fixState(await store.get(p.name, saved.bugReportId));
+  }));
+  /** 계획 승인(수정된 계획을 같이 보낼 수 있음) → 구현 시작 */
+  pr.post('/reports/:id/plan/approve', fixGuard, wrap(async (req) => {
+    const p = req.project; const r = await loadFixable(req);
+    if (r.fixStatus !== 'PLANNED') throw new HttpError(409, '승인 대기 중인 계획이 없습니다');
+    const patch = {};
+    if (req.body?.plan) { const { normalizePlan } = await import('./plan.js'); const np = normalizePlan(typeof req.body.plan === 'string' ? JSON.parse(req.body.plan) : req.body.plan); if (!np) throw new HttpError(400, '계획 형식이 맞지 않습니다(steps 필요)'); patch.plan = JSON.stringify(np); }
+    if (['auto', 'plan', 'step'].includes(req.body?.mode)) patch.mode = req.body.mode;
+    await store.update(p.name, r.bugReportId, (c) => ({ ...c, ...patch, planStep: 0, planApprovedAt: new Date().toISOString(), planApprovedBy: req.get('X-Devloop-User') || (req.isAdmin ? 'admin' : 'user'), fixStatus: 'QUEUED', fixUpdatedAt: new Date().toISOString() }));
+    await runner.logLine(p, r.bugReportId, `✓ 계획 승인 (${patch.plan ? '수정된 계획' : '그대로'}${patch.mode ? ` · 개입 ${patch.mode}` : ''})`);
+    await runner.enqueueImplement(p, r.bugReportId);
+    return FileStore.fixState(await store.get(p.name, r.bugReportId));
+  }));
+  /** 단계 모드: 다음 단계 진행 */
+  pr.post('/reports/:id/plan/next', fixGuard, wrap(async (req) => {
+    const p = req.project; const r = await loadFixable(req);
+    if (r.fixStatus !== 'STEP_WAIT') throw new HttpError(409, '다음 단계 대기 상태가 아닙니다');
+    await store.update(p.name, r.bugReportId, (c) => ({ ...c, fixStatus: 'QUEUED', fixUpdatedAt: new Date().toISOString() }));
+    await runner.logLine(p, r.bugReportId, '▶ 다음 단계 진행 요청');
+    await runner.enqueueImplement(p, r.bugReportId);
+    return FileStore.fixState(await store.get(p.name, r.bugReportId));
+  }));
+  /** 다시 계획(메모를 주면 반영) */
+  pr.post('/reports/:id/plan/replan', fixGuard, wrap(async (req) => {
+    const p = req.project; const r = await loadFixable(req);
+    if (['QUEUED', 'RUNNING', 'PLANNING'].includes(r.fixStatus)) throw new HttpError(409, '작업이 진행 중입니다');
+    await runner.enqueuePlan(p, r.bugReportId, { note: String(req.body?.note || '').slice(0, 2000) });
+    return FileStore.fixState(await store.get(p.name, r.bugReportId));
+  }));
+
   // front-check 스크린샷 (fixShots / 제안 분석의 shots 에 적힌 file). 보관 디렉터리 밖은 404
   const shots = new Shots(cfg.server.dataDir);
   pr.get('/shots/*', (req, res, next) => {
@@ -244,7 +290,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     const p = req.project;
     if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(DEVLOOP_GITHUB_TOKEN 또는 github.tokenFile)');
     const r = await loadFixable(req);
-    if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '이미 수정이 진행 중입니다.');
+    if (['QUEUED', 'RUNNING', 'PLANNING'].includes(r.fixStatus)) throw new HttpError(409, '이미 수정이 진행 중입니다.');
     await store.update(p.name, r.bugReportId, (c) => ({
       ...c,
       fixStatus: 'QUEUED', fixBranch: null, fixPrUrl: null, fixPrNumber: null, fixSummary: null, fixLog: '', fixSessionId: null, fixChat: null, fixSuggestions: null,
@@ -261,7 +307,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (!notBlank(message)) throw new HttpError(400, '메시지가 비어 있습니다.');
     const r = await loadFixable(req);
     if (!r.fixStatus) throw new HttpError(409, "먼저 '수정 요청' 을 실행한 뒤에 이어서 대화할 수 있습니다.");
-    if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '작업이 진행 중입니다. 끝난 뒤에 보내세요.');
+    if (['QUEUED', 'RUNNING', 'PLANNING'].includes(r.fixStatus)) throw new HttpError(409, '작업이 진행 중입니다. 끝난 뒤에 보내세요.');
     await runner.appendChat(p, r.bugReportId, 'user', message.trim());
     await runner.enqueueFollowUp(p, r.bugReportId, message.trim(), mode === 'change' ? 'change' : 'ask');
     return FileStore.fixState(await store.get(p.name, r.bugReportId));

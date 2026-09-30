@@ -11,8 +11,10 @@ export async function writeReportFiles(dir, r) {
   await fs.mkdir(dir, { recursive: true });
   const w = async (name, content) => { if (content) await fs.writeFile(path.join(dir, name), content, 'utf8'); };
 
-  await w('summary.md',
-    `# 버그 리포트 #${r.bugReportId}\n\n- 심각도: ${orDash(r.severity)}\n- 일시: ${r.insertDate || '-'}\n\n`
+  const kind = r.kind && r.kind !== 'bug' ? ({ feature: '기능 요청', improve: '개선 요청' }[r.kind] || '작업') : null;
+  await w('summary.md', kind
+    ? `# ${kind} #${r.bugReportId}${r.title ? `: ${r.title}` : ''}\n\n- 일시: ${r.insertDate || '-'}\n- 개입 방식: ${r.mode || 'plan'}\n\n## 요청\n${orDash(r.problem)}\n${r.reproSteps ? `\n## 참고\n${r.reproSteps}\n` : ''}${r.expectedResult ? `\n## 기대 결과\n${r.expectedResult}\n` : ''}`
+    : `# 버그 리포트 #${r.bugReportId}\n\n- 심각도: ${orDash(r.severity)}\n- 일시: ${r.insertDate || '-'}\n\n`
     + `## 문제\n${orDash(r.problem)}\n\n## 재현 절차\n${orDash(r.reproSteps)}\n\n## 기대 결과\n${orDash(r.expectedResult)}\n`);
 
   if (r.screenshot) {

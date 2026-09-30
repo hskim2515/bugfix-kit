@@ -55,6 +55,8 @@ export async function createDevLoop({ configFile, log: baseLog = defaultLog } = 
       const project = cfg.projects[r.project];
       if (!project) continue;
       if (r.kind === 'followup') await runner.enqueueFollowUp(project, r.id, r.message, r.mode);
+      else if (r.kind === 'plan') await runner.enqueuePlan(project, r.id);
+      else if (r.kind === 'implement') await runner.enqueueImplement(project, r.id);
       else await runner.enqueue(project, r.id);
     }
     if (redo.length) log.info(`[devloop] 재시작으로 끊긴 작업 ${redo.length}건을 다시 큐에 넣었습니다`);
