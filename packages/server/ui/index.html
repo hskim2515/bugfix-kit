@@ -76,6 +76,7 @@
   #rows td:last-child, #rows td:nth-child(7) { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
   .p-PLANNING { background: #2e2650; color: #c4b5fd; } .p-PLANNED { background: #3b2f1f; color: #fcd34d; } .p-STEP_WAIT { background: #1f3350; color: #7dd3fc; }
+  .db-proj { border-top: 1px solid #2a3140; padding-top: 8px; margin-top: 8px; } .db-proj__head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; } .db-recent { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; } .db-recent__row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .rm-board { display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; padding-bottom: 8px; }
   .rm-col { min-width: 280px; max-width: 360px; flex: 1; background: var(--card, #161b22); border: 1px solid #2a3140; border-radius: 10px; padding: 10px; }
   .rm-col__head { display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; margin-bottom: 6px; }
@@ -212,6 +213,7 @@
   <select id="scopeSel" class="btn" title="보는 프로젝트 - 한 서버에 여러 앱이 등록될 수 있다" style="display:none"></select>
   <span class="sub" id="meta">관리</span>
   <nav class="tabs" id="tabs">
+    <button data-t="dashboard">대시보드</button>
     <button data-t="reports" class="on">리포트</button>
     <button data-t="insights">제안</button>
     <button data-t="versions">버전</button>
@@ -307,6 +309,20 @@
     </div>
 
     <!-- 루프 -->
+    <!-- 대시보드: 이 워커 + 다른 워커들을 한 화면에 -->
+    <div data-tab="dashboard" hidden>
+      <div class="intro"><b>대시보드</b>는 프로젝트마다 따로 도는 DevLoop 워커들을 한 화면에 모읍니다. 이 서버는 자동으로 들어가고, 다른 서버는 주소와 관리 키를 등록하면 이 브라우저에만 저장돼 같이 보입니다(서버끼리 연결되지 않습니다).</div>
+      <div class="toolbar"><span class="dim" id="dbMsg"></span><span style="flex:1"></span><button class="btn" id="dbAdd">+ 다른 서버</button><button class="btn" id="dbRefresh">새로고침</button></div>
+      <div class="card" id="dbForm" hidden style="margin-bottom:12px"><div class="form">
+        <label>이름</label><input id="db_name" placeholder="예: lhdt 개발서버">
+        <label>콘솔 주소</label><input id="db_url" placeholder="https://lhdt.gaia3d.dev/devloop  (콘솔 /ui/ 앞까지)">
+        <label>관리 키</label><input id="db_key" type="password" placeholder="그 서버의 DEVLOOP_ADMIN_KEY">
+        <div class="actions"><button class="btn primary" id="db_save">추가</button><button class="btn" id="db_cancel">닫기</button></div>
+      </div></div>
+      <div id="dbBoard" class="cards"></div>
+      <div class="card" id="dbIssues" style="margin-top:12px"><div class="toolbar"><b>저장소 이슈</b><select id="is_project"></select><select id="is_state"><option value="open">열림</option><option value="closed">닫힘</option></select><button class="btn" id="is_load">불러오기</button><span class="dim" id="is_msg">GitHub/GitLab 이슈를 가져와 작업으로 만들면 진행 상황이 이슈 댓글로 남습니다(프로젝트 탭의 이슈 연동 설정).</span></div>
+        <table id="isTable" hidden><thead><tr><th style="width:70px">#</th><th>제목</th><th style="width:160px">라벨</th><th style="width:90px">작성</th><th style="width:220px"></th></tr></thead><tbody id="isRows"></tbody></table></div>
+    </div>
     <!-- 로드맵 · 마일스톤 -->
     <div data-tab="roadmap" hidden>
       <div class="intro"><b>로드맵</b>은 기능들을 마일스톤별로 묶어 진행률을 봅니다. 진행률은 기능 상태와 묶인 작업의 병합 비율로 어림합니다. 원격 저장소에 새 커밋이 올라와 어느 기능의 코드 범위가 바뀌면 <span class="pill p-QUEUED">원격 변경</span> 으로 표시되고 알림이 갑니다(지식 탭의 원격 감시 주기).</div>
@@ -405,6 +421,7 @@
             · <b>PR 까지</b> - 브랜치를 올리고 기준 브랜치로 향하는 PR/MR 을 만듭니다. 병합은 사람이.<br>
             · <b>자동 병합</b> - PR 을 만든 뒤 기준 브랜치와 합쳐 재검증하고 통과하면 병합, 배포까지 추적합니다.
           </div>
+          <label>이슈 연동 <small>GitHub/GitLab issues</small></label><div class="inline" style="flex-direction:column;align-items:flex-start;gap:4px"><label class="dim"><input type="checkbox" id="p_issues_comment" checked> 가져온 이슈에 진행 상황(계획·PR·병합·실패)을 댓글로 남김</label><label class="dim"><input type="checkbox" id="p_issues_close"> 병합되면 이슈를 닫음</label></div>
           <label>작업 개입 방식 <small>기능·개선 요청 기본값</small></label><div class="inline"><select id="p_taskMode"><option value="plan">계획 승인 뒤 끝까지 자동</option><option value="step">단계마다 확인</option><option value="auto">끝까지 자동</option></select><span class="dim">작업을 만들 때 바꿀 수 있습니다</span></div>
           <label>수정 뒤 검증 <small>미리보기·재현</small></label><div class="inline" style="flex-direction:column;align-items:flex-start;gap:4px">
             <label class="dim"><input type="checkbox" id="p_reproCheck"> <b>재현 검증</b> - 고친 수정본을 미리보기로 띄워 신고된 요청·화면 절차를 다시 돌려 고쳐졌는지 확인. 실패하면 응답·서버 로그를 증거로 AI 가 다시 고침(최대 <input id="p_reproRounds" type="number" min="1" max="5" value="2" style="width:50px"> 회). 레시피가 있어야 함</label>
@@ -789,7 +806,7 @@
     const fe = e.target.closest('[data-fedit]'); if (fe) { openFeatureForm((featureCache[fProject] || []).find((x) => x.id === Number(fe.dataset.fedit))); return; }
     const fr = e.target.closest('[data-fregress]'); if (fr) { const n = prompt('어느 버전의 미리보기에서 돌릴까요? (버전 번호, 비우면 최근 것)', ''); if (n === null) return; fr.disabled = true; $('#fMsg').textContent = '회귀 검증 중… (미리보기 준비 포함 몇 분)'; try { const r = await api('POST', `/admin/features/${fProject}/${fr.dataset.fregress}/regress`, { n: n ? Number(n) : undefined }); $('#fMsg').textContent = `회귀 검증 ${r.passed ? '통과' : '실패'} (v${r.n})`; await loadFeatures(); openFeatureDetail(fr.dataset.fregress); } catch (x) { $('#fMsg').textContent = x.message; } finally { fr.disabled = false; } return; }
     const fi = e.target.closest('[data-fimport]'); if (fi) { e.preventDefault(); const t = prompt('절차를 가져올 작업(리포트) 번호'); if (!t) return; try { const r = await api('POST', `/admin/features/${fProject}/${fi.dataset.fimport}/acceptance/from-task`, { taskId: Number(t) }); $('#fMsg').textContent = `#${t} 의 절차 가져옴 (요청 ${r.api} · 절차 ${r.steps})`; await loadFeatures(); openFeatureDetail(fi.dataset.fimport); } catch (x) { $('#fMsg').textContent = x.message; } return; }
-    const fa = e.target.closest('[data-fack]'); if (fa) { e.preventDefault(); try { await api('POST', `/admin/features/${fProject}/${fa.dataset.fack}/remote/ack`); await loadFeatures(); if (tab === 'roadmap') loadRoadmap(); } catch (x) { $('#fMsg').textContent = x.message; } return; }
+    const fa = e.target.closest('[data-fack]'); if (fa) { e.preventDefault(); try { await api('POST', `/admin/features/${fProject}/${fa.dataset.fack}/remote/ack`); await loadFeatures(); if (tab === 'roadmap') loadRoadmap(); if (tab === 'dashboard') loadDashboard(); } catch (x) { $('#fMsg').textContent = x.message; } return; }
     const fd = e.target.closest('[data-fdel]'); if (fd) { if (!confirm('이 기능을 지울까요? 묶인 작업은 남고 연결만 풀립니다.')) return; try { await api('DELETE', `/admin/features/${fProject}/${fd.dataset.fdel}`); await loadFeatures(); } catch (x) { $('#fMsg').textContent = x.message; } return; }
     const ft = e.target.closest('[data-ftask]'); if (ft) { $('#t_feature').dataset.pre = ft.dataset.ftask; document.querySelector('#tabs button[data-t="reports"]').click(); $('#taskForm').hidden = true; openTaskForm(); $('#t_feature').dataset.pre = ''; return; }
   });
@@ -822,6 +839,53 @@
   });
   document.addEventListener('change', async (e) => {
     const sel = e.target.closest('[data-fstatus]'); if (sel) { try { await api('PUT', `/admin/features/${rmProject}/${sel.dataset.fstatus}`, { status: sel.value }); loadRoadmap(); } catch (x) { $('#rmSummary').textContent = x.message; } }
+  });
+
+  // ── 대시보드 ──
+  function dbServers() { try { return JSON.parse(localStorage.getItem('devloop-servers') || '[]'); } catch { return []; } }
+  function dbSaveServers(arr) { localStorage.setItem('devloop-servers', JSON.stringify(arr)); }
+  async function dbFetch(srv) {
+    if (!srv) return api('GET', '/admin/dashboard');
+    const res = await fetch(`${srv.url.replace(/\/+$/, '')}/admin/dashboard`, { headers: { 'X-Devloop-Admin': srv.key } });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.message || `HTTP ${res.status}`);
+    return j.content ?? j;
+  }
+  async function loadDashboard() {
+    const servers = [{ name: '이 서버', url: '', key: '', self: true }, ...dbServers()];
+    $('#dbMsg').textContent = '불러오는 중…';
+    const results = await Promise.all(servers.map(async (srv) => { try { return { srv, d: await dbFetch(srv.self ? null : srv) }; } catch (e) { return { srv, err: e.message }; } }));
+    $('#dbMsg').textContent = `${new Date().toLocaleTimeString()} 갱신`;
+    const st = (k, n) => n ? `<span class="pill p-${k}">${fixLabel[k] || k} ${n}</span>` : '';
+    $('#dbBoard').innerHTML = results.map(({ srv, d, err }) => {
+      if (err) return `<div class="card"><div class="toolbar"><b>${esc(srv.name)}</b><span class="pill p-FAILED">연결 실패</span>${srv.self ? '' : `<a href="#" data-dbdel="${esc(srv.url)}" class="dim">삭제</a>`}</div><div class="dim">${esc(err)}</div></div>`;
+      const base = srv.self ? location.pathname.replace(/\/ui\/?.*$/, '') : srv.url.replace(/\/+$/, '');
+      return `<div class="card"><div class="toolbar"><b>${esc(srv.name)}</b><span class="dim">DevLoop ${esc(d.version || '')}</span>${d.claude?.loggedIn ? '' : `<span class="pill p-FAILED" title="${esc(d.claude?.hint || '')}">Claude 로그인 안 됨</span>`}${d.queue ? `<span class="pill p-QUEUED">큐 ${d.queue}</span>` : ''}${srv.self ? '' : `<a href="${esc(base)}/ui/" target="_blank" class="dim">콘솔 ↗</a> <a href="#" data-dbdel="${esc(srv.url)}" class="dim">삭제</a>`}</div>
+        ${(d.projects || []).map((p) => `<div class="db-proj"><div class="db-proj__head"><b>${esc(p.name)}</b><span class="dim">${esc(p.repo || '')} · ${esc(p.baseBranch || '')} · ${deliveryLabel[p.delivery] || p.delivery || ''}</span></div>
+          <div class="row">${['RUNNING', 'QUEUED', 'PLANNING', 'PLANNED', 'STEP_WAIT', 'READY', 'PR_OPENED', 'FAILED', 'MERGED'].map((k) => st(k, p.counts?.[k])).join(' ')}${p.total ? '' : '<span class="dim">리포트 없음</span>'}</div>
+          <div class="dim" style="margin-top:4px">${p.roadmap && p.roadmap.features ? `로드맵 ${p.roadmap.progress}% (기능 ${p.roadmap.features}·완료 ${p.roadmap.done}${p.roadmap.impacted ? ` · <span class="pill p-QUEUED">원격 변경 ${p.roadmap.impacted}</span>` : ''})${(p.roadmap.milestones || []).slice(0, 3).map((m) => ` · ${esc(m.name)} ${m.progress}%${m.due ? ` (${esc(m.due)})` : ''}`).join('')}` : '로드맵 없음'} · 미리보기 ${p.previewsUp}/${p.versions} · 루프 ${p.loops}${p.knowledge ? ` · 지식 ${esc(p.knowledge.head || '-')}${p.knowledge.behind ? ' <span class="pill p-QUEUED">원격 앞섬</span>' : ''}` : ''}</div>
+          ${p.waiting ? `<div style="margin-top:4px"><span class="pill p-PLANNED">사람 대기 ${p.waiting}</span> <span class="dim">계획 승인·다음 단계</span></div>` : ''}
+          <div class="db-recent">${(p.recent || []).map((r) => `<div class="db-recent__row">${srv.self ? `<a href="#" data-open="${r.id}" data-ip="${esc(p.name)}">#${r.id}</a>` : `<a href="${esc(base)}/ui/?project=${encodeURIComponent(p.name)}#report-${r.id}" target="_blank">#${r.id}</a>`} <span class="pill p-${esc(r.kind)}">${kindLabel[r.kind] || r.kind}</span> ${esc(r.title)} <span class="pill p-${esc(r.fixStatus)}">${fixLabel[r.fixStatus] || r.fixStatus}</span> <span class="dim">${ago(r.at)}</span></div>`).join('')}</div>
+        </div>`).join('')}</div>`;
+    }).join('');
+    const sel = $('#is_project'); const names = (data?.projects || []).map((p) => p.name); sel.innerHTML = names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  }
+  async function loadIssues() {
+    const project = $('#is_project').value; if (!project) return;
+    $('#is_msg').textContent = '이슈 불러오는 중…'; $('#isTable').hidden = true;
+    try { const r = await api('GET', `/admin/issues/${project}?state=${$('#is_state').value}`); const fs = await fetchFeatures(project);
+      $('#isRows').innerHTML = (r.issues || []).map((i) => `<tr><td><a href="${esc(i.url)}" target="_blank">#${i.number}</a></td><td>${esc(i.title)}<div class="dim">${esc((i.body || '').slice(0, 140))}</div></td><td>${(i.labels || []).map((l) => `<span class="pill">${esc(l)}</span>`).join(' ')}</td><td class="dim">${esc(i.author || '')}<br>${ago(i.updatedAt)}</td><td>${i.taskId ? `<a href="#" data-open="${i.taskId}" data-ip="${esc(project)}">작업 #${i.taskId}</a>` : `<select data-iskind="${i.number}"><option value="">종류 자동</option><option value="bug">버그</option><option value="feature">기능</option><option value="improve">개선</option></select> <select data-isfeat="${i.number}"><option value="">기능 없음</option>${fs.map((f) => `<option value="${f.id}">${esc(f.name)}</option>`).join('')}</select> <button class="btn primary" data-isimport="${i.number}">작업으로</button>`}</td></tr>`).join('') || '<tr><td colspan="5" class="dim">이슈가 없습니다</td></tr>';
+      $('#isTable').hidden = false; $('#is_msg').textContent = `${r.provider} 이슈 ${(r.issues || []).length}건`; }
+    catch (e) { $('#is_msg').textContent = e.message; }
+  }
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('#dbRefresh')) { loadDashboard(); return; }
+    if (e.target.closest('#dbAdd')) { $('#dbForm').hidden = false; $('#db_name').focus(); return; }
+    if (e.target.closest('#db_cancel')) { $('#dbForm').hidden = true; return; }
+    if (e.target.closest('#db_save')) { const url = $('#db_url').value.trim().replace(/\/ui\/?$/, ''); if (!url || !$('#db_key').value) return; dbSaveServers([...dbServers().filter((x) => x.url !== url), { name: $('#db_name').value.trim() || url, url, key: $('#db_key').value }]); $('#dbForm').hidden = true; $('#db_key').value = ''; loadDashboard(); return; }
+    const dd = e.target.closest('[data-dbdel]'); if (dd) { e.preventDefault(); dbSaveServers(dbServers().filter((x) => x.url !== dd.dataset.dbdel)); loadDashboard(); return; }
+    if (e.target.closest('#is_load')) { loadIssues(); return; }
+    const ii = e.target.closest('[data-isimport]'); if (ii) { const n = ii.dataset.isimport; const project = $('#is_project').value; if (!confirm(`이슈 #${n} 을 작업으로 가져와 바로 시작할까요? (이슈에 댓글이 달리고 Claude 비용이 듭니다)`)) return; ii.disabled = true; try { const r = await api('POST', `/admin/issues/${project}/import`, { number: Number(n), kind: document.querySelector(`[data-iskind="${n}"]`)?.value || undefined, featureId: document.querySelector(`[data-isfeat="${n}"]`)?.value || null }); $('#is_msg').textContent = `이슈 #${n} → 작업 #${r.bugReportId}`; loadIssues(); load(); } catch (x) { $('#is_msg').textContent = x.message; ii.disabled = false; } return; }
   });
 
   async function loadVersions() {
@@ -1215,7 +1279,7 @@
     v('#p_repo', p?.repo); v('#p_githubRepo', p?.githubRepo); v('#p_baseBranch', p?.baseBranch || 'main');
     $('#p_delivery').value = p ? (p.delivery || (p.autoMerge === false ? 'pr' : 'merge')) : 'merge';
     $('#p_notify_webhook').value = p?.notify?.webhook || ''; $('#p_notify_mention').value = p?.notify?.mention || '';
-    $('#p_taskMode').value = p?.taskMode || 'plan';
+    $('#p_taskMode').value = p?.taskMode || 'plan'; $('#p_issues_comment').checked = p ? p.issues?.comment !== false : true; $('#p_issues_close').checked = !!p?.issues?.closeOnMerge;
     $('#p_reproCheck').checked = p ? p.reproCheck !== false : true; $('#p_previewAuto').checked = p ? p.previewAuto !== false : true; $('#p_reproRounds').value = p?.reproRounds || 2; $('#p_restBase').value = p?.restBase || '';
     renderNotifyEvents(p?.notify?.events);
     $('#p_fixFrom').value = p?.fixFrom === 'admin' ? 'admin' : 'app';
@@ -1232,7 +1296,7 @@
     const fc = $('#p_fc_cmd').value.trim() ? { cwd: $('#p_fc_cwd').value.trim() || '.', command: $('#p_fc_cmd').value.trim(), when: csv($('#p_fc_when').value) } : null;
     return { name: $('#p_name').value.trim(), repo: $('#p_repo').value.trim(), githubRepo: $('#p_githubRepo').value.trim(), baseBranch: $('#p_baseBranch').value.trim() || 'main', delivery: $('#p_delivery').value, autoMerge: $('#p_delivery').value === 'merge',
       notify: { webhook: $('#p_notify_webhook').value.trim(), mention: $('#p_notify_mention').value.trim(), events: [...document.querySelectorAll('#p_notify_events input:checked')].map((x) => x.value) },
-      taskMode: $('#p_taskMode').value, reproCheck: $('#p_reproCheck').checked, previewAuto: $('#p_previewAuto').checked, reproRounds: Number($('#p_reproRounds').value) || 2, restBase: $('#p_restBase').value.trim(), fixFrom: $('#p_fixFrom').value,
+      taskMode: $('#p_taskMode').value, issues: { comment: $('#p_issues_comment').checked, closeOnMerge: $('#p_issues_close').checked }, reproCheck: $('#p_reproCheck').checked, previewAuto: $('#p_previewAuto').checked, reproRounds: Number($('#p_reproRounds').value) || 2, restBase: $('#p_restBase').value.trim(), fixFrom: $('#p_fixFrom').value,
       cors: csv($('#p_cors').value), apiKey: $('#p_apiKey').value.trim() || undefined, description: $('#p_description').value.trim(), conventions: $('#p_conventions').value, modules, frontCheck: fc, allowedTools: lines($('#p_allowedTools').value), protectedPaths: lines($('#p_protectedPaths').value), env };
   }
 

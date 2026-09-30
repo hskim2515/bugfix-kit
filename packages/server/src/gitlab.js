@@ -98,6 +98,15 @@ export class GitLab {
     });
   }
 
+  // ── 이슈 (number = iid) ──
+  async listIssues(state = 'open', limit = 50) {
+    const arr = await this.call('GET', `/issues?state=${state === 'closed' ? 'closed' : 'opened'}&per_page=${Math.min(100, limit)}&order_by=updated_at`);
+    return (arr || []).map((i) => ({ number: i.iid, title: i.title, body: i.description || '', labels: i.labels || [], url: i.web_url, author: i.author?.username || '', updatedAt: i.updated_at, state: i.state }));
+  }
+  async getIssue(number) { const i = await this.call('GET', `/issues/${number}`); return { number: i.iid, title: i.title, body: i.description || '', labels: i.labels || [], url: i.web_url, author: i.author?.username || '', updatedAt: i.updated_at, state: i.state }; }
+  async commentIssue(number, body) { await this.call('POST', `/issues/${number}/notes`, { body }); }
+  async closeIssue(number) { await this.call('PUT', `/issues/${number}`, { state_event: 'close' }); }
+
   async deleteBranch(branch) {
     try { await this.call('DELETE', `/repository/branches/${encodeURIComponent(branch)}`); }
     catch (e) { this.log.warn(`[devloop] 브랜치 삭제 실패 ${branch}: ${e.message}`); }

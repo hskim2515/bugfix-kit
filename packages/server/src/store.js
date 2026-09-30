@@ -77,8 +77,8 @@ export class FileStore {
   }
 
   static light(r) {
-    const { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, tool, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, kind, mode, title, plan, planStep, planMd, featureId, fixRegression } = r;
-    return { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, kind, mode, title, plan, planStep, planMd, featureId, fixRegression, ...(tool ? { tool: true } : {}) };
+    const { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, tool, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, kind, mode, title, plan, planStep, planMd, featureId, fixRegression, externalIssue } = r;
+    return { bugReportId, severity, status, problem, reporter, insertDate, fixStatus, fixPrUrl, fixSummary, fixUpdatedAt, fixDeploy, fixMergeSha, fixMergedAt, fixPushed, fixBranch, fixVersion, fixRevertPrUrl, fixRevertedAt, fixFiles, fixRepro, fixReproSpec, kind, mode, title, plan, planStep, planMd, featureId, fixRegression, externalIssue, ...(tool ? { tool: true } : {}) };
   }
   /** 진행 상태 폴링용 - 스크린샷·로그·컨텍스트 제외 */
   static fixState(r) {

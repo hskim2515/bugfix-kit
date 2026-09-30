@@ -41,7 +41,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Devloop-Key, X-Devloop-User, Authorization');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Devloop-Key, X-Devloop-User, X-Devloop-Admin, Authorization');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
     }
     if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -122,6 +122,54 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   app.post('/admin/milestones/:project', admin, wrap(async (req) => features.saveMilestone(proj(req).name, req.body || {})));
   app.put('/admin/milestones/:project/:id', admin, wrap(async (req) => features.saveMilestone(proj(req).name, req.body || {}, req.params.id)));
   app.delete('/admin/milestones/:project/:id', admin, wrap(async (req) => features.removeMilestone(proj(req).name, req.params.id)));
+  // ── 외부 이슈(GitHub/GitLab) ──
+  app.get('/admin/issues/:project', admin, wrap(async (req) => {
+    const p = proj(req); const gh = runner.gh(p);
+    if (!gh.isConfigured()) throw new HttpError(409, '저장소 토큰이 없습니다');
+    const issues = await gh.listIssues(req.query.state === 'closed' ? 'closed' : 'open', 60);
+    const reports = await store.list(p.name);
+    const linked = new Map(); for (const r of reports) { try { const x = r.externalIssue ? JSON.parse(r.externalIssue) : null; if (x?.number) linked.set(Number(x.number), r.bugReportId); } catch { /* */ } }
+    return { provider: p.host || 'github', issues: issues.map((i) => ({ ...i, body: (i.body || '').slice(0, 400), taskId: linked.get(Number(i.number)) || null })) };
+  }));
+  app.post('/admin/issues/:project/import', admin, wrap(async (req) => {
+    const p = proj(req); const gh = runner.gh(p); const b = req.body || {};
+    const number = Number(b.number); if (!number) throw new HttpError(400, '이슈 번호가 필요합니다');
+    const reports = await store.list(p.name);
+    for (const r of reports) { try { const x = r.externalIssue ? JSON.parse(r.externalIssue) : null; if (x && Number(x.number) === number) throw new HttpError(409, `이미 작업 #${r.bugReportId} 로 가져왔습니다`); } catch (e) { if (e instanceof HttpError) throw e; } }
+    const iss = await gh.getIssue(number);
+    const labels = (iss.labels || []).map((l) => String(l).toLowerCase());
+    const kind = ['bug', 'feature', 'improve'].includes(b.kind) ? b.kind : (labels.some((l) => /bug|버그|defect|fix/.test(l)) ? 'bug' : labels.some((l) => /refactor|improve|개선|enhancement/.test(l)) ? 'improve' : 'feature');
+    const mode = ['auto', 'plan', 'step'].includes(b.mode) ? b.mode : (p.taskMode || 'plan');
+    const featureId = b.featureId != null && b.featureId !== '' ? Number(b.featureId) : null;
+    const report = { severity: labels.some((l) => /critical|urgent|high|긴급/.test(l)) ? 'HIGH' : 'MEDIUM', problem: `${iss.body || iss.title}\n\n(원본 이슈: ${iss.url})`, kind, mode, title: iss.title.slice(0, 200), featureId, externalIssue: JSON.stringify({ provider: p.host || 'github', number: iss.number, url: iss.url, title: iss.title }) };
+    report.reporter = iss.author ? `issue:${iss.author}` : 'issue';
+    const saved = await store.save(p.name, report);
+    await store.update(p.name, saved.bugReportId, (c) => ({ ...c, fixStatus: 'QUEUED', fixRequestedAt: new Date().toISOString(), fixUpdatedAt: new Date().toISOString(), status: 'IN_PROGRESS' }));
+    if (kind === 'bug') await runner.enqueue(p, saved.bugReportId); else await runner.enqueuePlan(p, saved.bugReportId);
+    if (p.issues?.comment !== false) gh.commentIssue(number, `🤖 DevLoop 가 이 이슈를 ${({ bug: '버그 수정', feature: '기능 구현', improve: '개선' })[kind]} 작업 #${saved.bugReportId} 로 가져왔습니다 (개입 방식: ${mode}). 진행 상황은 여기에 댓글로 남깁니다.`).catch((e) => log.warn(`[devloop ${p.name}] 이슈 댓글 실패: ${e.message}`));
+    log.info(`[devloop ${p.name}] 이슈 #${number} → 작업 #${saved.bugReportId} (${kind}/${mode})`);
+    return FileStore.fixState(await store.get(p.name, saved.bugReportId));
+  }));
+  // ── 대시보드: 이 워커의 프로젝트 요약(콘솔이 여러 워커를 한 화면에 모은다) ──
+  app.get('/admin/dashboard', admin, wrap(async () => {
+    const { loginState } = await import('./claude.js');
+    const login = loginState(cfg.server.claudeBin || 'claude');
+    const projects = [];
+    for (const p of Object.values(cfg.projects)) {
+      const list = await store.list(p.name);
+      const counts = {}; for (const r of list) counts[r.fixStatus || 'NONE'] = (counts[r.fixStatus || 'NONE'] || 0) + 1;
+      const recent = list.slice().sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate)).slice(0, 8).map((r) => ({ id: r.bugReportId, kind: r.kind || 'bug', title: r.title || String(r.problem || '').split('\n')[0].slice(0, 80), fixStatus: r.fixStatus || 'NONE', at: r.fixUpdatedAt || r.insertDate, featureId: r.featureId || null }));
+      const rm = features ? await features.roadmap(p.name).catch(() => null) : null;
+      const vs = versions ? await versions.list(p.name).catch(() => []) : [];
+      const kn = knowledge ? await knowledge.summary(p.name).catch(() => null) : null;
+      projects.push({ name: p.name, repo: p.githubRepo || p.repo, baseBranch: p.baseBranch, delivery: p.delivery, counts, total: list.length, waiting: (counts.PLANNED || 0) + (counts.STEP_WAIT || 0), active: (counts.QUEUED || 0) + (counts.RUNNING || 0) + (counts.PLANNING || 0), recent,
+        roadmap: rm ? { ...rm.summary, milestones: rm.milestones.map((m) => ({ name: m.name, due: m.due, progress: m.progress, done: m.done, total: m.total })) } : null,
+        previewsUp: vs.filter((v) => v.preview?.status === 'UP').length, versions: vs.length,
+        loops: (p.loops || []).filter((l) => l.enabled !== false).length,
+        knowledge: kn ? { status: kn.status, head: (kn.head || '').slice(0, 7), behind: !!kn.remotePending, updatedAt: kn.updatedAt || kn.builtAt || null } : null });
+    }
+    return { at: new Date().toISOString(), version: (() => { try { return JSON.parse(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'package.json'), 'utf8')).version; } catch { return ''; } })(), claude: { loggedIn: login.loggedIn, hint: login.hint }, queue: runner.pending, lanes: runner.laneState(), projects };
+  }));
   app.post('/admin/features/:project/suggest', admin, wrap(async (req) => features.suggest(proj(req).name, String(req.body?.text || ''))));
   app.post('/admin/features/:project/impact', admin, wrap(async (req) => ({ features: await features.impact(proj(req).name, Array.isArray(req.body?.files) ? req.body.files : []) })));
   app.get('/admin/versions/:project', admin, wrap(async (req) => ({ versions: versions ? await versions.list(proj(req).name) : [], recipe: versions ? versions.recipe(proj(req)) : null, dbTemplate: versions ? (await versions.state(proj(req).name)).dbTemplate || null : null, sandbox: versions ? await versions.sandboxInfo(proj(req)) : {}, lane: runner.laneState().preview || null })));

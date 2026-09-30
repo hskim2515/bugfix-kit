@@ -73,6 +73,8 @@ export function loadConfig(file) {
       // 수정 뒤 미리보기 자동 생성 · 재현 검증(미리보기에 신고된 요청/절차를 다시 돌려 고쳐졌는지 확인, 실패하면 증거를 주고 다시 고침) · 재시도 횟수 · 앱 REST 접두 경로(요청 경로 변환용)
       // 기능·개선 작업의 사람 개입 기본값: auto(끝까지 자동) · plan(계획 승인 뒤 구현) · step(단계마다 확인)
       taskMode: ['auto', 'plan', 'step'].includes(p.taskMode) ? p.taskMode : 'plan',
+      // 외부 이슈(GitHub/GitLab issues) 연동: 가져온 이슈에 진행 상황 댓글 · 병합되면 닫기
+      issues: { comment: p.issues?.comment !== false, closeOnMerge: p.issues?.closeOnMerge === true },
       previewAuto: p.previewAuto !== false,
       reproCheck: p.reproCheck !== false,
       reproRounds: Number(p.reproRounds) > 0 ? Number(p.reproRounds) : 2,

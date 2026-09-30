@@ -90,6 +90,15 @@ export class GitHub {
   }
 
   /** 병합 뒤 작업 브랜치 정리 - 실패해도 치명적이지 않다 */
+  // ── 이슈 ──
+  async listIssues(state = 'open', limit = 50) {
+    const arr = await this.call('GET', `/issues?state=${state === 'closed' ? 'closed' : 'open'}&per_page=${Math.min(100, limit)}&sort=updated`);
+    return (arr || []).filter((i) => !i.pull_request).map((i) => ({ number: i.number, title: i.title, body: i.body || '', labels: (i.labels || []).map((l) => (typeof l === 'string' ? l : l.name)), url: i.html_url, author: i.user?.login || '', updatedAt: i.updated_at, state: i.state }));
+  }
+  async getIssue(number) { const i = await this.call('GET', `/issues/${number}`); return { number: i.number, title: i.title, body: i.body || '', labels: (i.labels || []).map((l) => (typeof l === 'string' ? l : l.name)), url: i.html_url, author: i.user?.login || '', updatedAt: i.updated_at, state: i.state }; }
+  async commentIssue(number, body) { await this.call('POST', `/issues/${number}/comments`, { body }); }
+  async closeIssue(number) { await this.call('PATCH', `/issues/${number}`, { state: 'closed' }); }
+
   async deleteBranch(branch) {
     try { await this.call('DELETE', `/git/refs/heads/${branch}`); }
     catch (e) { this.log.warn(`[devloop] 브랜치 삭제 실패 ${branch}: ${e.message}`); }

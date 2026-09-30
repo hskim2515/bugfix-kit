@@ -108,8 +108,30 @@ export class Runner {
       return { ...c, ...clean, fixUpdatedAt: nowIso() };
     });
     // 상태가 바뀌었으면 알림 (실패해도 작업은 계속)
+    if (after && before && after.fixStatus !== before.fixStatus) this.issueSync(project, before, after).catch((e) => this.log.warn(`[devloop ${project.name}#${id}] 이슈 댓글 실패: ${firstLine(e.message, 120)}`));
     if (after && before && after.fixStatus !== before.fixStatus) this.notifyFix(project, before, after).catch(() => {});
     return after;
+  }
+  /** 외부 이슈에서 가져온 작업이면 진행 상황을 이슈 댓글로 남기고, 설정에 따라 병합 때 닫는다 */
+  async issueSync(project, before, r) {
+    let iss = null; try { iss = r.externalIssue ? JSON.parse(r.externalIssue) : null; } catch { iss = null; }
+    if (!iss?.number || project.issues?.comment === false) return;
+    const console_ = this.notifier?.consoleUrl(project) || '';
+    const link = console_ ? `${console_}?project=${encodeURIComponent(project.name)}#report-${r.bugReportId}` : '';
+    const msgs = {
+      PLANNED: `🗂 DevLoop 가 구현 계획을 세웠습니다 - 승인 대기 중입니다.${link ? ` ${link}` : ''}`,
+      STEP_WAIT: `⏸ ${Number(r.planStep) || 0}단계까지 구현·검증됐습니다(v${r.fixVersion ?? '-'}). 다음 단계 진행을 기다립니다.${link ? ` ${link}` : ''}`,
+      READY: `✅ 수정본이 준비됐습니다(버전 v${r.fixVersion ?? '-'}, 브랜치 \`${r.fixBranch || '-'}\`). ${r.fixPushed ? '원격 브랜치에 있습니다.' : 'DevLoop 서버에 보관 중이며 콘솔에서 내보낼 수 있습니다.'}${link ? ` ${link}` : ''}`,
+      PR_OPENED: `🔀 PR/MR 이 열렸습니다: ${r.fixPrUrl || '-'}`,
+      MERGED: `🎉 ${project.baseBranch} 에 병합됐습니다 (${(r.fixMergeSha || '').slice(0, 8)}).${r.fixPrUrl ? ` ${r.fixPrUrl}` : ''}`,
+      FAILED: `❌ 자동 처리 실패: ${firstLine(r.fixSummary || '', 200)}${link ? ` ${link}` : ''}`,
+      REVERTED: `↩️ 병합이 되돌려졌습니다.${r.fixRevertPrUrl ? ` ${r.fixRevertPrUrl}` : ''}`,
+    };
+    const body = msgs[r.fixStatus];
+    if (!body) return;
+    const gh = this.gh(project);
+    await gh.commentIssue(iss.number, `${body}\n\n_DevLoop #${r.bugReportId} · ${firstLine(r.fixSummary || r.title || '', 80)}_`);
+    if (r.fixStatus === 'MERGED' && project.issues?.closeOnMerge) await gh.closeIssue(iss.number).catch((e) => this.log.warn(`[devloop ${project.name}] 이슈 닫기 실패: ${e.message}`));
   }
   async notifyFix(project, before, r) {
     if (!this.notifier) return;
