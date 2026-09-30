@@ -9,7 +9,11 @@ version = (findProperty('kitVersion') ?: new groovy.json.JsonSlurper().parse(fil
 java { withSourcesJar() }
 // JDK 17 이상 어느 것으로 빌드해도 17 바이트코드로 (툴체인 강제 안 함 - JitPack 은 openjdk17)
 tasks.withType(JavaCompile).configureEach { options.release = 17; options.compilerArgs << '-parameters' }   // Spring 6.1+ 는 파라미터 이름이 필요
-repositories { mavenCentral() }
+// JitPack 빌드가 Maven Central 의 요청 제한(429)에 자주 걸린다 - Google 의 Central 미러를 먼저, Central 은 예비로
+repositories {
+    maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+    mavenCentral()
+}
 
 // 컴파일에만 Boot 3.4 를 쓰고 앱의 Boot 버전(3.x·4.x)에 따라간다 - 안정적인 API(AutoConfiguration·ConfigurationProperties·RestController·SmartLifecycle)만 쓴다
 def bootVersion = '3.4.5'
