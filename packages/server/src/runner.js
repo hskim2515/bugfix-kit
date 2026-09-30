@@ -401,6 +401,75 @@ export class Runner {
    * 여전히 실패하면 응답·미리보기 백엔드 로그·절차 실패를 증거로 Claude 를 이어 돌려 다시 고치고(최대 reproRounds 회) 검증·커밋·버전 갱신·미리보기 재시작.
    * 돌려주는 값: { ran, passed, rounds, note }
    */
+  /** 미리보기 v{n} 을 띄우고(또는 이미 떠 있으면 그대로) UP 이 될 때까지 기다린다. 못 뜨면 null */
+  async ensurePreviewUp(project, n, { restart = false, waitMin = 15 } = {}) {
+    const cur = await this.versions.get(project.name, n);
+    if (restart || cur?.preview?.status !== 'UP') await this.versions.start(project, n).catch((e) => { if (e.status !== 409) throw e; });
+    const deadline = Date.now() + waitMin * 60_000;
+    let v;
+    for (;;) { v = await this.versions.get(project.name, n); if (!['QUEUED', 'BUILDING', 'STARTING'].includes(v?.preview?.status)) break; if (Date.now() > deadline) break; await sleep(8000); }
+    return v?.preview?.status === 'UP' ? v : null;
+  }
+
+  /**
+   * 절차(api·steps)를 미리보기 v 에 다시 돌린다. 재현 검증·인수 조건·기능 회귀 검증이 모두 이것을 쓴다.
+   * 요청은 사용자가 쓰는 공개 경로(앱 프록시 → 워커 → 미리보기)로, 안 닿을 때만 백엔드 직접. 돌려주는 값 { failed, evid[] }
+   */
+  async replaySpec(project, v, spec, { ex, cwd, id = null, label = '', tag = '' } = {}) {
+    const recipe = this.versions.recipe(project);
+    const evid = [];
+    let failed = false;
+    const pre = tag ? `[${tag}] ` : '';
+    const appUrl0 = this.notifier?.appUrl(project) || '';
+    const publicBack = appUrl0 ? `${appUrl0}${String(v.preview.url || '').replace(/\/+$/, '')}/back` : '';
+    const directBack = `http://${recipe.host}:${v.preview.port}`;
+    const prefixes = [...new Set([project.restBase, '/rest', '/api', '/lhdt-rest', ''].filter((x) => x != null))];
+    for (const a of (spec.api || []).slice(0, 12)) {
+      let p = String(a.path || '').replace(/^https?:\/\/[^/]+/, '');
+      const m = p.match(/\/v\/[^/]+\/\d+\/back(\/.*)$/); if (m) p = m[1];
+      if (a.query && typeof a.query === 'object') p += (p.includes('?') ? '&' : '?') + new URLSearchParams(Object.entries(a.query).map(([k, val]) => [k, typeof val === 'string' ? val : JSON.stringify(val)])).toString();
+      const cands = [p, ...prefixes.filter((pf) => pf && p.startsWith(pf + '/')).map((pf) => p.slice(pf.length))];
+      let res = null;
+      for (const [via, backBase] of [['공개 경로', publicBack], ['백엔드 직접', directBack]]) {
+        if (!backBase) continue;
+        for (const cp of [...new Set(cands)]) {
+          try {
+            const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), Math.min(600, Number(a.timeoutSec) || 120) * 1000);
+            const { body, headers } = reqBody(a);
+            const resp = await fetch(backBase + cp, { method: a.method || 'GET', headers, body, signal: ctl.signal });
+            clearTimeout(t);
+            const text = (await resp.text().catch(() => '')).slice(0, 400);
+            res = { path: cp, status: resp.status, text, via };
+            if (resp.status !== 404) break;
+          } catch (e) { res = { path: cp, status: 'ERR', text: e.message, via }; }
+        }
+        if (res && res.status !== 'ERR' && ![502, 503, 504].includes(res.status)) break;
+      }
+      const ok = res && typeof res.status === 'number' && (a.expect?.status ? res.status === Number(a.expect.status) : res.status < (Number(a.expect?.statusLt) || 500));
+      if (!ok) failed = true;
+      evid.push(`${ok ? '✓' : '✗'} ${pre}${a.method || 'GET'} ${res?.path || p} (${res?.via || '-'}) → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
+    }
+    if (spec.steps?.length) {
+      const appUrl = this.notifier?.appUrl(project) || (project.cors || [])[0] || '';
+      const url = appUrl ? `${appUrl}${v.preview.url}` : null;
+      if (!url) evid.push(`- ${pre}화면 절차: 앱 주소(프로젝트 탭)가 없어 건너뜀`);
+      else {
+        try {
+          const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
+          const outDir = path.join(cwd, '.devloop', 'repro-out');
+          const txt = await ex.exec(cwd, 10, ['node', bin, 'check', '--url', url, '--no-serve', '--json', '--out', outDir, '--steps', JSON.stringify(spec.steps.slice(0, 30))], { env: { ...process.env, ...(project.env || {}) } });
+          const i = txt.indexOf('{'); const j = i >= 0 ? JSON.parse(txt.slice(i)) : null;
+          const c = j?.collected || {};
+          const bad = (j?.failures || []).length > 0 || (c.pageErrors || 0) > 0;
+          if (bad) failed = true;
+          evid.push(`${bad ? '✗' : '✓'} ${pre}화면 절차: 절차 실패 ${(j?.failures || []).length} · 페이지 예외 ${c.pageErrors || 0} · 실패 요청 ${c.failedRequests || 0}`, ...(j?.failures || []).slice(0, 3).map((f) => `  - ${firstLine(f, 160)}`));
+          if (id != null) await this.keepShots(project, id, j, cwd, label || '재현 검증').catch(() => []);
+        } catch (e) { evid.push(`- ${pre}화면 절차 실행 실패: ${firstLine(e.message, 160)}`); }
+      }
+    }
+    return { failed, evid };
+  }
+
   async reproLoop(project, id, ex, wt, branch, base, summary, n, mods, sessionId) {
     const L = (s) => this.logLine(project, id, s);
     const out = { ran: false, passed: null, rounds: 0, note: '' };
@@ -433,67 +502,30 @@ export class Runner {
     await this.updateFix(project, id, { fixReproSpec: JSON.stringify(repro).slice(0, 20_000) });
     await L(`재현 절차: 요청 ${repro.api.length}건${repro.api.map((a) => ` · ${a.method} ${a.path}`).join('').slice(0, 300)} · 화면 절차 ${repro.steps.length}단계`);
     out.ran = true;
+    // 기능 단위 회귀: 이 작업이 속한 기능 + 바뀐 파일이 범위와 겹치는 기능들에 쌓인 인수 조건(다른 작업들 것)
+    let regGroups = [];
+    try {
+      const files = (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim().split(/\r?\n/).filter(Boolean);
+      regGroups = this.features ? await this.features.regressionGroups(project.name, { excludeTaskId: id, featureId: r.featureId, files }) : [];
+    } catch { regGroups = []; }
+    if (regGroups.length) await L(`기능 회귀 검증도 같이: ${regGroups.map((g) => `${g.name}(#${g.taskId})`).join(', ')}`);
     const maxRounds = Number(project.reproRounds) > 0 ? Number(project.reproRounds) : 2;
     let sid = sessionId;
     for (let round = 1; round <= maxRounds + 1; round++) {
       await L(`▶ 재현 검증 ${round}회: 미리보기 v${n} 준비…`);
-      await this.versions.start(project, n).catch((e) => { if (e.status !== 409) throw e; });
-      const deadline = Date.now() + 15 * 60_000;
-      let v;
-      for (;;) { v = await this.versions.get(project.name, n); if (!['QUEUED', 'BUILDING', 'STARTING'].includes(v?.preview?.status)) break; if (Date.now() > deadline) break; await sleep(8000); }
-      if (v?.preview?.status !== 'UP') { out.note = `미리보기가 뜨지 않아 재현 검증을 못 했습니다(${v?.preview?.status || '?'}: ${firstLine(v?.preview?.error || '', 120)})`; await L(`✗ ${out.note}`); return out; }
-      const evid = [];
-      let failed = false;
-      // 1) API 재실행 - 사용자가 쓰는 경로 그대로(앱 프록시 → 워커 → 미리보기 백엔드). 앱 주소가 없거나 그 경로가 안 닿으면 백엔드로 직접
-      const appUrl0 = this.notifier?.appUrl(project) || '';
-      const publicBack = appUrl0 ? `${appUrl0}${String(v.preview.url || '').replace(/\/+$/, '')}/back` : '';
-      const directBack = `http://${recipe.host}:${v.preview.port}`;
-      const prefixes = [...new Set([project.restBase, '/rest', '/api', '/lhdt-rest', ''].filter((x) => x != null))];
-      for (const a of repro.api.slice(0, 8)) {
-        let p = String(a.path || '').replace(/^https?:\/\/[^/]+/, '');
-        const m = p.match(/\/v\/[^/]+\/\d+\/back(\/.*)$/); if (m) p = m[1];
-        if (a.query && typeof a.query === 'object') p += (p.includes('?') ? '&' : '?') + new URLSearchParams(Object.entries(a.query).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])).toString();
-        const cands = [p, ...prefixes.filter((pf) => pf && p.startsWith(pf + '/')).map((pf) => p.slice(pf.length))];
-        let res = null;
-        for (const [via, backBase] of [['공개 경로', publicBack], ['백엔드 직접', directBack]]) {
-          if (!backBase) continue;
-          for (const cp of [...new Set(cands)]) {
-            try {
-              const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), Math.min(600, Number(a.timeoutSec) || 120) * 1000);
-              const { body, headers } = reqBody(a);
-              const resp = await fetch(backBase + cp, { method: a.method, headers, body, signal: ctl.signal });
-              clearTimeout(t);
-              const text = (await resp.text().catch(() => '')).slice(0, 400);
-              res = { path: cp, status: resp.status, text, via };
-              if (resp.status !== 404) break;
-            } catch (e) { res = { path: cp, status: 'ERR', text: e.message, via }; }
-          }
-          // 공개 경로가 아예 안 닿을 때(연결 실패·502/503 게이트웨이)만 백엔드 직접으로 - 500 은 그대로 실패로 친다
-          if (res && res.status !== 'ERR' && ![502, 503, 504].includes(res.status)) break;
-        }
-        const ok = res && typeof res.status === 'number' && (a.expect?.status ? res.status === Number(a.expect.status) : res.status < (Number(a.expect?.statusLt) || 500));
-        if (!ok) failed = true;
-        evid.push(`${ok ? '✓' : '✗'} ${a.method} ${res?.path || p} (${res?.via || '-'}) → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
+      const v = await this.ensurePreviewUp(project, n, { restart: true });
+      if (!v) { const cur = await this.versions.get(project.name, n); out.note = `미리보기가 뜨지 않아 재현 검증을 못 했습니다(${cur?.preview?.status || '?'}: ${firstLine(cur?.preview?.error || '', 120)})`; await L(`✗ ${out.note}`); return out; }
+      const own = await this.replaySpec(project, v, repro, { ex, cwd: wt, id, label: `재현 검증 ${round}회` });
+      const evid = [...own.evid];
+      let failed = own.failed;
+      const regResults = [];
+      for (const g of regGroups) {
+        const rr = await this.replaySpec(project, v, { api: g.api, steps: g.steps }, { ex, cwd: wt, id, label: `회귀 ${g.name}`, tag: `회귀 ${g.name} #${g.taskId}` });
+        regResults.push({ featureId: g.featureId, name: g.name, taskId: g.taskId, passed: !rr.failed, checks: (g.api || []).length + ((g.steps || []).length ? 1 : 0) });
+        evid.push(...rr.evid); if (rr.failed) failed = true;
       }
-      // 2) 화면 절차 - front-check 로 공개 미리보기 주소에서
-      if (repro.steps?.length) {
-        const appUrl = this.notifier?.appUrl(project) || (project.cors || [])[0] || '';
-        const url = appUrl ? `${appUrl}${v.preview.url}` : null;
-        if (!url) evid.push('- 화면 절차: 앱 주소(프로젝트 탭)가 없어 건너뜀');
-        else {
-          try {
-            const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
-            const outDir = path.join(wt, '.devloop', 'repro-out');
-            const txt = await ex.exec(wt, 10, ['node', bin, 'check', '--url', url, '--no-serve', '--json', '--out', outDir, '--steps', JSON.stringify(repro.steps.slice(0, 30))], { env: { ...process.env, ...(project.env || {}) } });
-            const i = txt.indexOf('{'); const j = i >= 0 ? JSON.parse(txt.slice(i)) : null;
-            const c = j?.collected || {};
-            const bad = (j?.failures || []).length > 0 || (c.pageErrors || 0) > 0;
-            if (bad) failed = true;
-            evid.push(`${bad ? '✗' : '✓'} 화면 절차: 절차 실패 ${(j?.failures || []).length} · 페이지 예외 ${c.pageErrors || 0} · 실패 요청 ${c.failedRequests || 0}`, ...(j?.failures || []).slice(0, 3).map((f) => `  - ${firstLine(f, 160)}`));
-            await this.keepShots(project, id, j, wt, `재현 검증 ${round}회`).catch(() => []);
-          } catch (e) { evid.push(`- 화면 절차 실행 실패: ${firstLine(e.message, 160)}`); }
-        }
-      }
+      if (regGroups.length) await this.updateFix(project, id, { fixRegression: JSON.stringify({ at: nowIso(), round, results: regResults }) });
+      if (regResults.some((x) => !x.passed)) this.notifier?.send(project, 'regression.failed', { title: `기능 회귀 실패 - #${id}`, lines: regResults.filter((x) => !x.passed).map((x) => `${x.name} (#${x.taskId})`), url: `/reports/${id}`, level: 'bad' }).catch(() => {});
       out.rounds = round;
       await L(`재현 검증 ${round}회 결과:\n${evid.join('\n')}`);
       if (!failed) {
@@ -507,7 +539,7 @@ export class Runner {
       // 3) 증거 모아 다시 고치기
       const logs = (await ex.execOut(wt, 1, ['docker', 'logs', '--tail', '300', v.preview.container])).split(/\r?\n/);
       const errLines = logs.filter((l) => /exception|error|caused by|\tat /i.test(l)).slice(-60);
-      const msg = `재현 검증 ${round}회에서 **여전히 실패**했습니다. 수정본을 실제로 띄워(미리보기 v${n}) 신고된 요청·절차를 다시 돌린 결과입니다:\n${evid.join('\n')}\n\n미리보기 백엔드 로그(오류 부분):\n${errLines.join('\n').slice(0, 6000) || '(오류 줄 없음)'}\n\n증상 은폐(오류 메시지만 고치기)가 아니라 **실제 원인**을 찾아 고치세요. 요청은 사용자가 쓰는 경로 그대로(앱 → devloop 프록시 → 미리보기 백엔드) 보냈으니, 백엔드 로그에 요청이 정상 파라미터로 도착했는지부터 보세요. 필요하면 로그의 스택트레이스를 따라가세요. 고친 뒤 검증 명령을 통과시키고 \`.devloop/result.md\` 를 갱신하고, 재현 절차가 잘못됐으면 \`.devloop/repro.json\` 도 고치세요. git 커밋은 하지 마세요.`;
+      const msg = `재현 검증 ${round}회에서 **여전히 실패**했습니다. 수정본을 실제로 띄워(미리보기 v${n}) 신고된 요청·절차${regGroups.length ? '와 관련 기능의 인수 조건([회귀 …] 표시 - 앞선 작업들이 통과시킨 것이라 이번 수정으로 깨지면 안 됩니다)' : ''}를 다시 돌린 결과입니다:\n${evid.join('\n')}\n\n미리보기 백엔드 로그(오류 부분):\n${errLines.join('\n').slice(0, 6000) || '(오류 줄 없음)'}\n\n증상 은폐(오류 메시지만 고치기)가 아니라 **실제 원인**을 찾아 고치세요. 요청은 사용자가 쓰는 경로 그대로(앱 → devloop 프록시 → 미리보기 백엔드) 보냈으니, 백엔드 로그에 요청이 정상 파라미터로 도착했는지부터 보세요. 필요하면 로그의 스택트레이스를 따라가세요. 고친 뒤 검증 명령을 통과시키고 \`.devloop/result.md\` 를 갱신하고, 재현 절차가 잘못됐으면 \`.devloop/repro.json\` 도 고치세요. git 커밋은 하지 마세요.`;
       await L(`Claude 에게 증거를 주고 다시 고칩니다 (${round}/${maxRounds})…`);
       const o2 = await this.claudeResume(project, ex, id, wt, sid, msg, this.allowedTools(project), 40);
       sid = sessionIdOf(o2) || sid; if (sid) await this.updateFix(project, id, { fixSessionId: sid });

@@ -170,6 +170,7 @@
                   <details v-if="detail.fixReport || fixFiles.length" class="brv-result" open>
                     <summary>수정 결과 <span class="brv-suggest__hint">원인 · 고친 내용 · 검증 · 확인이 필요한 점</span></summary>
                     <div v-if="fixRepro" :class="['brv-result__repro', fixRepro.passed ? 'ok' : 'bad']"><b>재현 검증</b> {{ fixRepro.passed ? '✓ 통과' : '✗ 실패' }} · {{ fixRepro.rounds }}회<span v-if="fixRepro.note"> · {{ fixRepro.note }}</span><ul v-if="fixRepro.evidence?.length"><li v-for="(e, i) in fixRepro.evidence.slice(0, 6)" :key="i"><code>{{ e }}</code></li></ul></div>
+                    <div v-if="fixRegression" :class="['brv-result__repro', fixRegression.results.every((x) => x.passed) ? 'ok' : 'bad']"><b>기능 회귀 검증</b> <span v-for="(x, i) in fixRegression.results" :key="i">{{ x.passed ? '✓' : '✗' }} {{ x.name }}(#{{ x.taskId }}) </span></div>
                     <div v-if="detail.fixReport" class="brv-result__body brv-selectable" v-html="md(detail.fixReport)"></div>
                     <div v-if="fixFiles.length" class="brv-result__files"><span class="brv-field-label">바뀐 파일 ({{ fixFiles.length }})</span><ul><li v-for="f in fixFiles" :key="f"><code>{{ f }}</code></li></ul></div>
                   </details>
@@ -539,6 +540,7 @@ export default {
     },
     fixChat() { try { return this.detail?.fixChat ? JSON.parse(this.detail.fixChat) : []; } catch { return []; } },
     fixRepro() { try { return this.detail?.fixRepro ? JSON.parse(this.detail.fixRepro) : null; } catch { return null; } },
+    fixRegression() { try { const x = this.detail?.fixRegression ? JSON.parse(this.detail.fixRegression) : null; return x && x.results?.length ? x : null; } catch { return null; } },
     fixFiles() { try { const v = this.detail?.fixFiles ? JSON.parse(this.detail.fixFiles) : []; return Array.isArray(v) ? v : []; } catch { return []; } },
     fixSuggestions() {
       try { const v = this.detail?.fixSuggestions ? JSON.parse(this.detail.fixSuggestions) : []; return Array.isArray(v) ? v : []; } catch { return []; }

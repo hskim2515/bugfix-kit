@@ -128,6 +128,53 @@ export class Features {
     if (!featureId || !spec) return;
     await this.save(project, (c) => ({ ...c, features: c.features.map((f) => f.id !== Number(featureId) ? f : { ...f, acceptance: [...(f.acceptance || []).filter((a) => a.taskId !== taskId), { taskId, at: nowIso(), api: spec.api || [], steps: spec.steps || [] }].slice(-30), updatedAt: nowIso() }) }));
   }
+  /** 회귀 검증 그룹: 이 작업의 기능 + 바뀐 파일이 겹치는 기능들의 인수 조건(다른 작업 것만). [{featureId,name,taskId,api,steps}] */
+  async regressionGroups(project, { excludeTaskId = null, featureId = null, files = [] } = {}) {
+    const st = await this.state(project);
+    const impacted = new Set((await this.impact(project, files)).map((x) => x.id));
+    if (featureId) impacted.add(Number(featureId));
+    const groups = [];
+    for (const f of st.features) {
+      if (!impacted.has(f.id)) continue;
+      for (const a of f.acceptance || []) {
+        if (excludeTaskId != null && a.taskId === excludeTaskId) continue;
+        if (!(a.api || []).length && !(a.steps || []).length) continue;
+        groups.push({ featureId: f.id, name: f.name, taskId: a.taskId, api: a.api || [], steps: a.steps || [] });
+      }
+    }
+    return groups.slice(0, 8);
+  }
+  /** 콘솔 '회귀 검증': 이 기능의 인수 조건 전부를 미리보기 v{n} 에 돌려 결과를 기능에 기록 */
+  async regress(project, id, n, runner) {   // project 는 설정 객체
+    const f = await this.get(project.name, id);
+    if (!f) throw Object.assign(new Error('없는 기능'), { status: 404 });
+    const groups = (f.acceptance || []).filter((a) => (a.api || []).length || (a.steps || []).length);
+    if (!groups.length) throw Object.assign(new Error('이 기능에 쌓인 인수 조건이 없습니다 - 작업의 인수 조건이 통과하면 쌓이고, 작업의 절차를 가져올 수도 있습니다'), { status: 409 });
+    if (!runner.versions?.recipe(project)) throw Object.assign(new Error('미리보기 레시피가 없습니다'), { status: 409 });
+    const v = await runner.ensurePreviewUp(project, n);
+    if (!v) throw Object.assign(new Error(`미리보기 v${n} 이 뜨지 않았습니다`), { status: 409 });
+    const ex = runner.ex(project);
+    const cwd = path.join(runner.versions.previewDir(project.name, n), 'regress'); await fs.mkdir(cwd, { recursive: true });
+    const results = []; const evidence = [];
+    for (const a of groups) {
+      const rr = await runner.replaySpec(project, v, { api: a.api, steps: a.steps }, { ex, cwd, tag: `#${a.taskId}` });
+      results.push({ taskId: a.taskId, passed: !rr.failed }); evidence.push(...rr.evid);
+    }
+    const rec = { at: nowIso(), n, passed: results.every((x) => x.passed), results, evidence: evidence.slice(0, 60) };
+    await this.save(project.name, (c) => ({ ...c, features: c.features.map((x) => x.id !== f.id ? x : { ...x, lastRegression: rec }) }));
+    return rec;
+  }
+  /** 작업이 보관한 재현 절차(fixReproSpec)를 이 기능의 인수 조건으로 가져온다 */
+  async acceptanceFromTask(project, id, taskId) {
+    const r = await this.store.get(project, taskId);
+    if (!r) throw Object.assign(new Error('없는 작업'), { status: 404 });
+    let spec = null; try { spec = JSON.parse(r.fixReproSpec || 'null'); } catch { /* */ }
+    if (!spec || (!(spec.api || []).length && !(spec.steps || []).length)) throw Object.assign(new Error('그 작업에는 보관된 재현 절차가 없습니다'), { status: 409 });
+    await this.recordAcceptance(project, id, Number(taskId), spec);
+    if (r.featureId == null) await this.store.update(project, Number(taskId), (c) => ({ ...c, featureId: Number(id) }));
+    return { ok: true, api: (spec.api || []).length, steps: (spec.steps || []).length };
+  }
+
   /** .devloop/summary.md 에 붙일 기능 설명 */
   describe(f) {
     if (!f) return '';
