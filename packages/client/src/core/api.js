@@ -1,5 +1,5 @@
 /**
- * bugfix-server 클라이언트. 응답 `{ content }` 를 벗겨서 돌려주고, 오류는 서버의 `{ message }` 로 Error 를 만든다.
+ * devloop-server 클라이언트. 응답 `{ content }` 를 벗겨서 돌려주고, 오류는 서버의 `{ message }` 로 Error 를 만든다.
  * endpoint 가 비어 있으면 enabled=false - 신고 UI 는 복사·다운로드만 제공한다.
  */
 export function createApi({ endpoint, project, apiKey, user, adminKey }) {
@@ -10,10 +10,10 @@ export function createApi({ endpoint, project, apiKey, user, adminKey }) {
     if (!enabled) throw new Error('버그 리포트 서버가 설정되지 않았습니다(endpoint).');
     const headers = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (apiKey) headers['X-Bugfix-Key'] = apiKey;
-    if (adminKey) headers['X-Bugfix-Admin'] = adminKey;
+    if (apiKey) headers['X-Devloop-Key'] = apiKey;
+    if (adminKey) headers['X-Devloop-Admin'] = adminKey;
     const u = typeof user === 'function' ? user() : user;
-    if (u) headers['X-Bugfix-User'] = String(u);
+    if (u) headers['X-Devloop-User'] = String(u);
     const qs = query ? '?' + new URLSearchParams(query).toString() : '';
     const res = await fetch(base + path + qs, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     if (blob) { if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status }); return URL.createObjectURL(await res.blob()); }

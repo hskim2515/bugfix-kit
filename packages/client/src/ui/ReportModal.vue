@@ -1,5 +1,5 @@
 <template>
-  <div class="bugfix-root">
+  <div class="devloop-root">
     <!-- 캡처 중 스피너 (모달 열리기 전 즉시 표시) -->
     <div v-if="isCapturing && !isOpen" class="bug-capture-overlay">
       <div class="bug-capture-spinner">
@@ -425,9 +425,9 @@ const SEVERITY_OPTIONS = [
 import * as i18n from '../core/i18n.js';
 
 export default {
-  name: 'BugfixReportModal',
+  name: 'DevloopReportModal',
   components: { ScreenshotEditor },
-  // kit: createBugfix() 결과. Web Component 로 쓸 때는 엘리먼트 프로퍼티(el.kit = kit)로 들어온다
+  // kit: createDevloop() 결과. Web Component 로 쓸 때는 엘리먼트 프로퍼티(el.kit = kit)로 들어온다
   props: { kit: { type: Object, default: null } },
   emits: ['open-viewer'],
   expose: ['open', 'close'],

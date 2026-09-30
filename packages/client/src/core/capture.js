@@ -31,7 +31,7 @@ export async function captureScreen(opt = {}) {
         height: h,
         ignoreElements: (el) => {
           if (canvasSet.has(el)) return true;
-          if (el.tagName && el.tagName.toLowerCase().startsWith('bugfix-')) return true;   // 우리 UI 자체
+          if (el.tagName && el.tagName.toLowerCase().startsWith('devloop-')) return true;   // 우리 UI 자체
           if (opt.ignoreElement?.(el)) return true;
           return ignore.some((sel) => { try { return el.matches?.(sel); } catch { return false; } });
         },

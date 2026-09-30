@@ -8,24 +8,24 @@ import { runClaudeStream, resultTextOf, claudeSummary } from './claude.js';
 import { firstLine, hhmmss, notBlank, nowIso, sleep } from './util.js';
 
 /**
- * 버전 = AI 수정 하나가 끝나 커밋된 소스 상태. 키트 저장소({workDir}/{project}/repo)에 `bugfix/v{n}` 태그로 남는다 -
+ * 버전 = AI 수정 하나가 끝나 커밋된 소스 상태. 키트 저장소({workDir}/{project}/repo)에 `devloop/v{n}` 태그로 남는다 -
  * 원격(GitHub/GitLab)에 올리지 않아도 키트가 소스를 갖고 있고, 버전마다 미리보기(프론트+백엔드+DB 사본)를 띄워 접속할 수 있다.
  *
  *   data/{project}/versions.json  { seq, versions: [{ n, reportId, sha, base, branch, summary, files, createdAt, preview }] }
  *   data/{project}/previews/{n}/front   빌드된 프론트(정적)
  *
  * 미리보기 레시피(프로젝트 설정 preview) - 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}:
- *   base:  /rest/bugfix                   키트가 공개되는 경로(앱 주소 뒤). 미리보기 주소 = {base}/v/{project}/{n}/
+ *   base:  /rest/devloop                   키트가 공개되는 경로(앱 주소 뒤). 미리보기 주소 = {base}/v/{project}/{n}/
  *   host:  192.168.10.182                 워커가 백엔드 컨테이너에 닿는 주소(앱 안 워커가 컨테이너면 127.0.0.1 은 안 됨)
- *   front: { dir, build, dist, env: { VITE_API_URL: '{backUrl}' } }     build 는 sh 명령. BUGFIX_PREVIEW_BASE 는 키트가 넣는다
+ *   front: { dir, build, dist, env: { VITE_API_URL: '{backUrl}' } }     build 는 sh 명령. DEVLOOP_PREVIEW_BASE 는 키트가 넣는다
  *   back:  { dir, build, artifact: 'build/libs/*.jar', image, port, cmd: 'java -jar /app.jar', env: {}, volumes: [], startTimeoutMin: 8 }
- *          volumes: '호스트:컨테이너[:ro|:shared]' - 표시가 없으면 **프로젝트 샌드박스 사본**(<부모>/.bugfix-sandbox/<프로젝트>/<이름>)을 마운트한다.
+ *          volumes: '호스트:컨테이너[:ro|:shared]' - 표시가 없으면 **프로젝트 샌드박스 사본**(<부모>/.devloop-sandbox/<프로젝트>/<이름>)을 마운트한다.
  *          샌드박스는 처음 띄울 때 한 번 만들고(xfs·btrfs 면 reflink 로 즉시) 그 뒤 미리보기들이 같이 쓴다 → 원본 파일 저장소를 건드리지 않고,
  *          디렉터리마다 쓰는 곳인지 가릴 필요가 없다. 콘솔 '샌드박스 초기화' 로 원본에서 다시 만든다(sandboxMaxAgeHours 로 자동 갱신도 가능, 기본 0=수동).
  *          아주 큰 읽기 전용 트리(타일 등)는 :ro 로 원본을 그대로 - 샌드박스 사본 안의 같은 위치는 복사하지 않고 건너뛴다(바로 아래 항목만).
  *          :shared 는 원본을 쓰기 가능으로 그대로(미리보기의 쓰기가 원본에 남음). 옛 ':copy' 는 샌드박스와 같게 본다.
- *          컨테이너 env 에는 항상 BUGFIX_PREVIEW=v{n} · BUGFIX_PREVIEW_N={n} 이 들어간다(앱이 저장 경로·큐 이름에 접두어를 붙이는 데 쓸 수 있음)
- *   db:    { container, name, user, mode }  mode: template(기본 - 키트가 {name}_bugfix_tmpl 템플릿 DB 를 하루 한 번 pg_dump 로 갱신해 두고
+ *          컨테이너 env 에는 항상 DEVLOOP_PREVIEW=v{n} · DEVLOOP_PREVIEW_N={n} 이 들어간다(앱이 저장 경로·큐 이름에 접두어를 붙이는 데 쓸 수 있음)
+ *   db:    { container, name, user, mode }  mode: template(기본 - 키트가 {name}_devloop_tmpl 템플릿 DB 를 하루 한 번 pg_dump 로 갱신해 두고
  *                                          CREATE DATABASE … TEMPLATE 로 초 단위 복제) · clone(매번 라이브 DB 를 pg_dump|psql, 느림) ·
  *                                          shared(사본 없이 라이브 DB 그대로 - 빠르지만 미리보기의 쓰기가 개발 DB 에 남음). {db} = 사본 이름
  *          templateMaxAgeHours: 24        템플릿 갱신 주기
@@ -90,7 +90,7 @@ export class Versions {
     const n = st.seq;
     const ex = this.runner.ex(project);
     const { repo } = this.runner.paths(project, 0);
-    await this.runner.mutex(this.runner.repoKey(project), () => ex.exec(repo, 1, ['git', 'tag', '-f', `bugfix/v${n}`, sha])).catch((e) => this.log.warn(`[versions ${project.name}] 태그 실패: ${e.message}`));
+    await this.runner.mutex(this.runner.repoKey(project), () => ex.exec(repo, 1, ['git', 'tag', '-f', `devloop/v${n}`, sha])).catch((e) => this.log.warn(`[versions ${project.name}] 태그 실패: ${e.message}`));
     return n;
   }
 
@@ -99,7 +99,7 @@ export class Versions {
     await this.update(project.name, n, (v) => ({ sha, ...(files ? { files: files.slice(0, 200) } : {}), retaggedAt: nowIso() }));
     const ex = this.runner.ex(project);
     const { repo } = this.runner.paths(project, 0);
-    await this.runner.mutex(this.runner.repoKey(project), () => ex.exec(repo, 1, ['git', 'tag', '-f', `bugfix/v${n}`, sha])).catch((e) => this.log.warn(`[versions ${project.name}] 태그 갱신 실패: ${e.message}`));
+    await this.runner.mutex(this.runner.repoKey(project), () => ex.exec(repo, 1, ['git', 'tag', '-f', `devloop/v${n}`, sha])).catch((e) => this.log.warn(`[versions ${project.name}] 태그 갱신 실패: ${e.message}`));
   }
 
   /** base 와 이 버전 사이의 변경 - 통계 + 패치(크기 제한) */
@@ -117,12 +117,12 @@ export class Versions {
   recipe(project) {
     const r = project.preview;
     if (!r || typeof r !== 'object' || (!r.front && !r.back)) return null;
-    const db = r.db ? { mode: 'template', templateMaxAgeHours: 24, ...r.db, template: r.db.template || `${r.db.name}_bugfix_tmpl` } : null;
-    return { ttlHours: 12, maxUp: 1, host: '127.0.0.1', proxies: {}, ...r, db, base: String(r.base || '/bugfix').replace(/\/+$/, '') };
+    const db = r.db ? { mode: 'template', templateMaxAgeHours: 24, ...r.db, template: r.db.template || `${r.db.name}_devloop_tmpl` } : null;
+    return { ttlHours: 12, maxUp: 1, host: '127.0.0.1', proxies: {}, ...r, db, base: String(r.base || '/devloop').replace(/\/+$/, '') };
   }
   fill(s, vars) { return String(s ?? '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m)); }
   vars(project, n, extra = {}) {
-    const r = this.recipe(project) || { base: '/bugfix', host: '127.0.0.1' };
+    const r = this.recipe(project) || { base: '/devloop', host: '127.0.0.1' };
     const previewUrl = `${r.base}/v/${project.name}/${n}`;
     return { base: r.base, project: project.name, n, host: r.host, previewUrl, backUrl: `${previewUrl}/back`, ...extra };
   }
@@ -142,12 +142,12 @@ export class Versions {
     if (!await this.runner.fetch(project, ex, auth, [project.baseBranch])) throw new Error(`origin/${project.baseBranch} 를 받지 못했습니다`);
     await this.runner.freshWorktree(ex, repo, jobs, wt, `origin/${project.baseBranch}`);
     try {
-      const prompt = `이 저장소의 앱을 "버전별 미리보기"로 띄우기 위한 bugfix-kit preview 레시피(JSON)를 만드세요. 코드를 바꾸지 말고 파일만 읽으세요.
+      const prompt = `이 저장소의 앱을 "버전별 미리보기"로 띄우기 위한 devloop preview 레시피(JSON)를 만드세요. 코드를 바꾸지 말고 파일만 읽으세요.
 읽을 것: docker-compose*.yml, Dockerfile, .env*, application*.properties/yml, package.json, vite/webpack 설정, CI 파일(.github/workflows, .gitlab-ci.yml), README.
 ${project.description ? `프로젝트: ${project.description}\n` : ''}${hints.note ? `운영자 메모: ${hints.note}\n` : ''}
 레시피 형식(모든 키 선택, 없으면 빼세요):
 {
-  "base": "<키트 공개 경로. 앱 프론트가 REST 를 '/rest' 로 부르면 '/rest/bugfix', lhdt 처럼 nginx 가 /bugfix 를 넘기면 '/bugfix'>",
+  "base": "<키트 공개 경로. 앱 프론트가 REST 를 '/rest' 로 부르면 '/rest/devloop', lhdt 처럼 nginx 가 /devloop 를 넘기면 '/devloop'>",
   "host": "<워커가 컨테이너에 닿는 호스트 주소. 앱이 도커로 배포되면 배포 서버 IP(예: 컴포즈·properties 의 IP), 아니면 127.0.0.1>",
   "front": { "dir": "<프론트 디렉터리>", "build": "<빌드 셸 명령. yarn.lock 이면 'npx -y yarn@1.22.22 install --frozen-lockfile && npx -y yarn@1.22.22 build:dev' 처럼>", "dist": "<빌드 결과 디렉터리>",
              "env": { "<REST 주소를 정하는 환경변수 이름>": "{backUrl}", "<정적 파일 서버 등 다른 절대 주소 변수는 그대로 두거나 상대경로 유지>": "…" } },
@@ -159,7 +159,7 @@ ${project.description ? `프로젝트: ${project.description}\n` : ''}${hints.no
   "ttlHours": 12
 }
 자리표시자: {base} {project} {n} {db} {port} {host} {previewUrl}(={base}/v/{project}/{n}) {backUrl}(={previewUrl}/back).
-프론트는 키트가 BUGFIX_PREVIEW_BASE={previewUrl}/ 환경변수를 넣고 빌드하므로(vite 플러그인이 base 로 씀) 정적 자산 경로는 신경 쓰지 마세요.
+프론트는 키트가 DEVLOOP_PREVIEW_BASE={previewUrl}/ 환경변수를 넣고 빌드하므로(vite 플러그인이 base 로 씀) 정적 자산 경로는 신경 쓰지 마세요.
 DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣습니다. 확신이 없는 값은 빼고, 마지막 답변은 JSON 하나만(설명 없이) 출력하세요.`;
       const out = await runClaudeStream(ex, wt, 20, [this.cfg.server.claudeBin || 'claude', '-p', prompt, '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', 'Read,Glob,Grep,Bash(cat:*),Bash(ls:*),Bash(find:*),Bash(head:*),Bash(grep:*)', ...(notBlank(this.cfg.server.model) ? ['--model', this.cfg.server.model] : [])], (line) => L(`  ${line}`));
       L(`Claude 종료 (${claudeSummary(out)})`);
@@ -207,7 +207,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const { repo, jobs } = this.runner.paths(project, 0);
     const wt = path.join(jobs, `preview-${n}`);
     const out = this.previewDir(name, n);
-    const container = `bugfix-${name}-v${n}`;
+    const container = `devloop-${name}-v${n}`;
     const db = r.db ? (r.db.mode === 'shared' ? r.db.name : `${r.db.name}_v${n}`) : null;
     const port = r.back ? await this.freePort(ex, 21000 + (n % 800)) : null;
     const vars = this.vars(project, n, { db: db || '', port: port || '' });
@@ -223,9 +223,9 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       if (r.front) {
         const fe = path.join(wt, r.front.dir || '.');
         await this.runner.prepareNodeModules(project, ex, wt, L, true);
-        const env = { BUGFIX_PREVIEW_BASE: `${vars.previewUrl}/` };
+        const env = { DEVLOOP_PREVIEW_BASE: `${vars.previewUrl}/` };
         for (const [k, val] of Object.entries(r.front.env || {})) env[k] = this.fill(val, vars);
-        await L(`프론트 빌드: ${r.front.build}  (base ${env.BUGFIX_PREVIEW_BASE})`);
+        await L(`프론트 빌드: ${r.front.build}  (base ${env.DEVLOOP_PREVIEW_BASE})`);
         const exportEnv = Object.entries(env).map(([k, val]) => `export ${k}=${JSON.stringify(val)};`).join(' ');
         await ex.sh(fe, this.cfg.server.verifyTimeoutMinutes || 20, `${exportEnv} ${r.front.build}`);
         const dist = path.join(fe, r.front.dist || 'dist');
@@ -259,11 +259,11 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
           await L('✓ DB 복제 완료');
         } else if (db) await L(`DB: 라이브 DB ${db} 공유(사본 없음 - 미리보기에서 쓴 데이터가 개발 DB 에 남습니다)`);
         await upd({ status: 'STARTING' });
-        const envArgs = Object.entries({ BUGFIX_PREVIEW: `v${n}`, BUGFIX_PREVIEW_N: String(n), ...(r.back.env || {}) }).flatMap(([k, val]) => ['-e', `${k}=${this.fill(val, vars)}`]);
+        const envArgs = Object.entries({ DEVLOOP_PREVIEW: `v${n}`, DEVLOOP_PREVIEW_N: String(n), ...(r.back.env || {}) }).flatMap(([k, val]) => ['-e', `${k}=${this.fill(val, vars)}`]);
         // 볼륨: 표시 없는 것은 프로젝트 샌드박스 사본을 마운트 (원본 파일 저장소 보호) - 없으면 지금 만든다
         const volArgs = await this.sandboxVolumes(project, r, ex, wt, L, vars);
         const cmd = (r.back.cmd || `java -jar /app${artName}`).split(/\s+/);
-        await ex.exec(wt, 5, ['docker', 'run', '-d', '--name', container, '--label', 'bugfix-kit=preview', '--restart', 'no', '-p', `${port}:${r.back.port || 8080}`, '-v', `${artCopy}:/app${artName}:ro`, ...volArgs, ...envArgs, r.back.image || 'eclipse-temurin:21-jdk', ...cmd]);
+        await ex.exec(wt, 5, ['docker', 'run', '-d', '--name', container, '--label', 'devloop=preview', '--restart', 'no', '-p', `${port}:${r.back.port || 8080}`, '-v', `${artCopy}:/app${artName}:ro`, ...volArgs, ...envArgs, r.back.image || 'eclipse-temurin:21-jdk', ...cmd]);
         await L(`컨테이너 시작: ${container} (${vars.host}:${port} → ${r.back.port})`);
         const startMin = Number(r.back.startTimeoutMin) > 0 ? Number(r.back.startTimeoutMin) : 8;
         const ok = await this.waitUp(vars.host, port, startMin * 60_000);
@@ -284,7 +284,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
 
   /** 라이브 DB → 새 DB 복사: custom 포맷으로 덤프한 뒤 병렬(-j 4) 복원 - 파이프 psql 보다 3~4배 빠르다. 실패 줄이 있어도 계속(대개 확장·권한) */
   copySql(db, from, to) {
-    const u = db.user, f = `/tmp/bugfix-${to}.dump`;
+    const u = db.user, f = `/tmp/devloop-${to}.dump`;
     return `dropdb -U ${u} --if-exists --force ${to} 2>/dev/null; createdb -U ${u} -T template0 ${to} && pg_dump -U ${u} -Fc -f ${f} ${from} && (pg_restore -U ${u} -j 4 --no-owner --no-privileges -d ${to} ${f} 2>&1 | grep -c "error" | sed "s/^/restore warnings: /" >&2; true); rm -f ${f}`;
   }
   pgsh(ex, cwd, db, script) { return ex.sh(cwd, 90, `docker exec ${sq(db.container)} sh -c ${sq(script)}`); }
@@ -339,7 +339,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       return { host, ctr: ctr || host, mode: mode === 'copy' ? 'sandbox' : mode, raw: m };
     });
   }
-  sandboxDir(project, host) { return `${path.posix.dirname(host)}/.bugfix-sandbox/${project.name}/${path.posix.basename(host)}`; }
+  sandboxDir(project, host) { return `${path.posix.dirname(host)}/.devloop-sandbox/${project.name}/${path.posix.basename(host)}`; }
   /** 샌드박스 사본 마운트 인자 - 없거나(또는 force·오래됨) 다시 만든다 */
   async sandboxVolumes(project, r, ex, wt, L, vars, { force = false } = {}) {
     const vols = this.parseVolumes(r, vars);
@@ -360,10 +360,10 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
         const skip = vols.filter((o) => o.mode === 'ro' && path.posix.dirname(o.host) === v.host).map((o) => path.posix.basename(o.host));
         await L(`샌드박스 사본 만드는 중: ${v.host} → ${dst}${skip.length ? ` (건너뜀: ${skip.join(', ')})` : ''} - reflink 면 용량은 상관없고 파일 수에 비례(10만 개 ≈ 수 분). 파일이 아주 많은 읽기 전용 트리는 :ro 로 빼세요`);
         const t0 = Date.now();
-        const rel = `/w/.bugfix-sandbox/${project.name}/${base}`;
-        // 키트 자신의 흔적(.bugfix-*)은 절대 복사하지 않는다
-        const skipTest = [...skip.map((k) => `[ "$e" = ${sq(k)} ]`), 'case "$e" in .bugfix-*) true;; *) false;; esac'].join(' || ');
-        const script = `set -e; mkdir -p ${sq(`/w/.bugfix-sandbox/${project.name}`)}; rm -rf ${sq(rel)}.tmp ${sq(rel)}; mkdir -p ${sq(rel)}.tmp; cd ${sq(`/w/${base}`)}; for e in .[!.]* ..?* *; do [ -e "$e" ] || continue; if ${skipTest}; then mkdir -p ${sq(rel)}.tmp/"$e"; continue; fi; cp -a --reflink=auto -- "$e" ${sq(rel)}.tmp/; done; mv ${sq(rel)}.tmp ${sq(rel)}`;
+        const rel = `/w/.devloop-sandbox/${project.name}/${base}`;
+        // 키트 자신의 흔적(.devloop-*)은 절대 복사하지 않는다
+        const skipTest = [...skip.map((k) => `[ "$e" = ${sq(k)} ]`), 'case "$e" in .devloop-*) true;; *) false;; esac'].join(' || ');
+        const script = `set -e; mkdir -p ${sq(`/w/.devloop-sandbox/${project.name}`)}; rm -rf ${sq(rel)}.tmp ${sq(rel)}; mkdir -p ${sq(rel)}.tmp; cd ${sq(`/w/${base}`)}; for e in .[!.]* ..?* *; do [ -e "$e" ] || continue; if ${skipTest}; then mkdir -p ${sq(rel)}.tmp/"$e"; continue; fi; cp -a --reflink=auto -- "$e" ${sq(rel)}.tmp/; done; mv ${sq(rel)}.tmp ${sq(rel)}`;
         await ex.exec(wt, 120, ['docker', 'run', '--rm', '-v', `${parent}:/w`, image, 'sh', '-c', script]);
         const sec = Math.round((Date.now() - t0) / 1000);
         await L(`✓ 샌드박스 사본 완료 (${sec}초)`);
@@ -395,12 +395,12 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     const v = await this.get(project.name, n);
     const r = this.recipe(project);
     const ex = this.runner.ex(project);
-    const container = v?.preview?.container || `bugfix-${project.name}-v${n}`;
+    const container = v?.preview?.container || `devloop-${project.name}-v${n}`;
     await ex.execOut('/', 1, ['docker', 'rm', '-f', container]);
     if (r?.db && r.db.mode !== 'shared' && v?.preview?.db && v.preview.db !== r.db.name) await ex.execOut('/', 5, ['docker', 'exec', r.db.container, 'dropdb', '-U', r.db.user, '--if-exists', '--force', v.preview.db]);
     // 파일 저장소 사본(:copy 볼륨) 제거
     for (const parent of [...new Set((v?.preview?.copies || []).map((c) => c.parent))]) {
-      await ex.execOut('/', 30, ['docker', 'run', '--rm', '-v', `${parent}:/w`, r?.back?.image || 'eclipse-temurin:21-jdk', 'sh', '-c', `rm -rf /w/.bugfix-previews/v${n}; rmdir /w/.bugfix-previews 2>/dev/null; true`]);
+      await ex.execOut('/', 30, ['docker', 'run', '--rm', '-v', `${parent}:/w`, r?.back?.image || 'eclipse-temurin:21-jdk', 'sh', '-c', `rm -rf /w/.devloop-previews/v${n}; rmdir /w/.devloop-previews 2>/dev/null; true`]);
     }
     if (!quiet) await this.plog(project.name, n, '■ 미리보기 중지(컨테이너·DB 사본 제거)');
   }
@@ -415,7 +415,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
     await fs.rm(this.previewDir(project.name, n), { recursive: true, force: true });
     const ex = this.runner.ex(project);
     const { repo } = this.runner.paths(project, 0);
-    await ex.execOut(repo, 1, ['git', 'tag', '-d', `bugfix/v${n}`]);
+    await ex.execOut(repo, 1, ['git', 'tag', '-d', `devloop/v${n}`]);
     await this.save(project.name, (c) => ({ ...c, versions: c.versions.filter((v) => v.n !== Number(n)) }));
   }
 
@@ -499,7 +499,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
       const front = path.join(this.previewDir(project.name, n), 'front');
       if (!fss.existsSync(path.join(front, 'index.html'))) return res.status(503).send(`미리보기 프론트가 준비되지 않았습니다(${pv.status || 'NONE'})`);
       const rel = decodeURIComponent(sub.split('?')[0]);
-      const previewUrl = `${recipe.base || '/bugfix'}/v/${project.name}/${n}`;
+      const previewUrl = `${recipe.base || '/devloop'}/v/${project.name}/${n}`;
       // 일부 플러그인(vite-plugin-cesium 등)은 base 를 출력 경로에도 붙여 dist/<base>/… 에 놓는다 - 그 자리도 본다
       // 캐시: 같은 버전을 다시 빌드(재현 검증 뒤 재시작)해도 CDN(Cloudflare 등)이 옛 파일을 주지 않게 - 해시 이름 파일만 오래 캐시
       // 해시 이름: vite `name-XxYy1234.js`(base64url 8자, 대문자/숫자 포함) · webpack `name.1a2b3c4d.js`(16진수 8자 이상)
@@ -518,7 +518,7 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
 
   /**
    * 웹소켓 업그레이드(`…/v/<p>/<n>/back/...`)를 미리보기 백엔드로 넘긴다 - 독립 워커의 http 서버에 붙인다.
-   * (앱 안의 Spring 프록시(bugfix.path)를 거치는 경로는 업그레이드를 못 넘기니 nginx 가 워커로 직접 보내는 구성에서만 통한다)
+   * (앱 안의 Spring 프록시(devloop.path)를 거치는 경로는 업그레이드를 못 넘기니 nginx 가 워커로 직접 보내는 구성에서만 통한다)
    */
   attachUpgrade(server, mount = '/api') {
     server.on('upgrade', async (req, socket, head) => {
@@ -549,8 +549,8 @@ DB 는 키트가 {db} 이름으로 복제본을 만들어 백엔드 env 에 넣�
   }
 }
 
-/** 프록시 응답 대기 상한 - 긴 가져오기·변환(수 분)이 중간에 끊기지 않게. BUGFIX_PROXY_TIMEOUT_SEC 로 조정 */
-const PROXY_TIMEOUT_MS = (Number(process.env.BUGFIX_PROXY_TIMEOUT_SEC) > 0 ? Number(process.env.BUGFIX_PROXY_TIMEOUT_SEC) : 600) * 1000;
+/** 프록시 응답 대기 상한 - 긴 가져오기·변환(수 분)이 중간에 끊기지 않게. DEVLOOP_PROXY_TIMEOUT_SEC 로 조정 */
+const PROXY_TIMEOUT_MS = (Number(process.env.DEVLOOP_PROXY_TIMEOUT_SEC) > 0 ? Number(process.env.DEVLOOP_PROXY_TIMEOUT_SEC) : 600) * 1000;
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 /** 요청을 그대로 스트리밍해 넘긴다 (헤더·본문·상태 유지). 웹소켓은 안 다룬다 */

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// bugfix-kit 백엔드 로그 어댑터를 앱에 넣는다.
-//   npx bugfix-adapter spring --package com.myapp.debug --out src/main/java/com/myapp/debug [--base /debug] [--resources src/main/resources] [--proxy /bugfix] [--server http://127.0.0.1:8790]
-//   (Express 는 파일 복사 없이 import: bugfix-kit/adapters/express)
+// devloop 백엔드 로그 어댑터를 앱에 넣는다.
+//   npx devloop-adapter spring --package com.myapp.debug --out src/main/java/com/myapp/debug [--base /debug] [--resources src/main/resources] [--proxy /devloop] [--server http://127.0.0.1:8790]
+//   (Express 는 파일 복사 없이 import: devloop/adapters/express)
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -12,13 +12,13 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 
 if (kind !== 'spring') {
   console.log(`사용법:
-  npx bugfix-adapter spring --package <자바 패키지> --out <그 패키지 디렉터리> [--base /debug] [--resources src/main/resources] [--proxy /bugfix] [--server http://127.0.0.1:8790] [--only proxy|logs]
+  npx devloop-adapter spring --package <자바 패키지> --out <그 패키지 디렉터리> [--base /debug] [--resources src/main/resources] [--proxy /devloop] [--server http://127.0.0.1:8790] [--only proxy|logs]
 
-  spring: BugfixLogAppender.java + BugfixLogController.java(최근 로그) + BugfixProxyController.java(앱 REST 서버가 /bugfix/** 를
-          bugfix-kit 인스턴스로 넘김 - nginx 를 안 건드려도 '<REST 경로>/bugfix' 로 닿는다) 를 --out 에 만들고,
+  spring: DevloopLogAppender.java + DevloopLogController.java(최근 로그) + DevloopProxyController.java(앱 REST 서버가 /devloop/** 를
+          devloop 인스턴스로 넘김 - nginx 를 안 건드려도 '<REST 경로>/devloop' 로 닿는다) 를 --out 에 만들고,
           --resources 에 logback-spring.xml 이 없으면 만들어 준다(있으면 appender 두 줄을 직접 넣으라고 알려 준다).
           --proxy 를 'none' 으로 주면 프록시는 만들지 않는다.
-  Express: 파일 복사 없이 \`import { bugfixLogs } from 'bugfix-kit/adapters/express'\` 로 쓴다.`);
+  Express: 파일 복사 없이 \`import { devloopLogs } from 'devloop/adapters/express'\` 로 쓴다.`);
   process.exit(kind ? 1 : 0);
 }
 
@@ -26,12 +26,12 @@ const pkg = opt('--package');
 const out = opt('--out');
 const base = opt('--base', '/debug');
 const resources = opt('--resources', null);
-const proxy = opt('--proxy', '/bugfix');
+const proxy = opt('--proxy', '/devloop');
 const only = opt('--only', null);   // 'proxy' | 'logs' - 이미 한쪽이 있는 앱(예: 자체 로그 끝점)에서 나머지만
 const server = opt('--server', 'http://127.0.0.1:8790');
 if (!pkg || !out) { console.error('--package 와 --out 은 필수'); process.exit(1); }
 fs.mkdirSync(out, { recursive: true });
-const files = [...(only === 'proxy' ? [] : ['BugfixLogAppender.java', 'BugfixLogController.java']), ...(proxy !== 'none' && only !== 'logs' ? ['BugfixProxyController.java'] : [])];
+const files = [...(only === 'proxy' ? [] : ['DevloopLogAppender.java', 'DevloopLogController.java']), ...(proxy !== 'none' && only !== 'logs' ? ['DevloopProxyController.java'] : [])];
 for (const f of files) {
   const src = fs.readFileSync(path.join(here, '..', 'spring', f), 'utf8').replaceAll('__PACKAGE__', pkg).replaceAll('__BASE__', base).replaceAll('__PROXY__', proxy);
   const dest = path.join(out, f);
@@ -42,12 +42,12 @@ for (const f of files) {
 if (resources && only !== 'proxy') {
   const lb = path.join(resources, 'logback-spring.xml');
   if (fs.existsSync(lb)) {
-    console.log(`logback-spring.xml 이 이미 있습니다. 아래 두 줄을 넣어 주세요:\n  <appender name="BUGFIX" class="${pkg}.BugfixLogAppender"/>\n  <root> 안에 <appender-ref ref="BUGFIX"/>`);
+    console.log(`logback-spring.xml 이 이미 있습니다. 아래 두 줄을 넣어 주세요:\n  <appender name="DEVLOOP" class="${pkg}.DevloopLogAppender"/>\n  <root> 안에 <appender-ref ref="DEVLOOP"/>`);
   } else {
     fs.mkdirSync(resources, { recursive: true });
     fs.writeFileSync(lb, fs.readFileSync(path.join(here, '..', 'spring', 'logback-spring.xml'), 'utf8').replaceAll('__PACKAGE__', pkg), 'utf8');
     console.log(`만듦: ${lb}`);
   }
 }
-if (proxy !== 'none') console.log(`\napplication.properties 에:  bugfix.server=${server}   (bugfix-kit 인스턴스 주소)\n앱 SDK 설정에:              endpoint: '<REST 경로>${proxy}'   (예: '/rest${proxy}') - nginx 설정 불필요, 콘솔은 <REST 경로>${proxy}/ui/`);
+if (proxy !== 'none') console.log(`\napplication.properties 에:  devloop.server=${server}   (devloop 인스턴스 주소)\n앱 SDK 설정에:              endpoint: '<REST 경로>${proxy}'   (예: '/rest${proxy}') - nginx 설정 불필요, 콘솔은 <REST 경로>${proxy}/ui/`);
 console.log(`앱의 신고 설정에: backendLogs: () => fetch('<REST 주소>${base}/recent-logs?level=WARN&limit=200').then(r => r.json())`);

@@ -46,7 +46,7 @@ function hasDocker() {
  */
 function rerunInDocker(cfg) {
   const cwd = process.cwd();
-  // 호스트 경로를 컨테이너 안에서도 같은 경로로 쓴다 - 상대 경로(../.bugfix/after 등)와 심볼릭 링크가 그대로 동작하도록
+  // 호스트 경로를 컨테이너 안에서도 같은 경로로 쓴다 - 상대 경로(../.devloop/after 등)와 심볼릭 링크가 그대로 동작하도록
   // 저장소 최상위(없으면 cwd)를 통째로 마운트한다
   const root = gitTopLevel(cwd) || cwd;
   const mounts = ['-v', `${root}:${root}`];

@@ -20,7 +20,7 @@ export function makeExec(server, project, log = console) {
       const lines = out.out.trim().split(/\r?\n/);
       loginPath = out.code === 0 ? lines[lines.length - 1].trim() : '';
     } catch (e) {
-      log.warn('[bugfix] 로그인 셸 PATH 조회 실패:', e.message);
+      log.warn('[devloop] 로그인 셸 PATH 조회 실패:', e.message);
       loginPath = '';
     }
     return loginPath;

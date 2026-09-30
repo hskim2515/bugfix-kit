@@ -4,9 +4,9 @@ function yt({ endpoint: e, project: A, apiKey: t, user: s, adminKey: r }) {
   async function i(a, B, g, { query: l, blob: u } = {}) {
     if (!o) throw new Error("버그 리포트 서버가 설정되지 않았습니다(endpoint).");
     const f = { Accept: "application/json" };
-    g !== void 0 && (f["Content-Type"] = "application/json"), t && (f["X-Bugfix-Key"] = t), r && (f["X-Bugfix-Admin"] = r);
+    g !== void 0 && (f["Content-Type"] = "application/json"), t && (f["X-Devloop-Key"] = t), r && (f["X-Devloop-Admin"] = r);
     const Q = typeof s == "function" ? s() : s;
-    Q && (f["X-Bugfix-User"] = String(Q));
+    Q && (f["X-Devloop-User"] = String(Q));
     const p = l ? "?" + new URLSearchParams(l).toString() : "", F = await fetch(n + B + p, { method: a, headers: f, body: g === void 0 ? void 0 : JSON.stringify(g) });
     if (u) {
       if (!F.ok) throw Object.assign(new Error(`HTTP ${F.status}`), { status: F.status });
@@ -5176,7 +5176,7 @@ async function xg(e = {}) {
         height: t,
         ignoreElements: (l) => {
           var u;
-          return n.has(l) || l.tagName && l.tagName.toLowerCase().startsWith("bugfix-") || (u = e.ignoreElement) != null && u.call(e, l) ? !0 : o.some((f) => {
+          return n.has(l) || l.tagName && l.tagName.toLowerCase().startsWith("devloop-") || (u = e.ignoreElement) != null && u.call(e, l) ? !0 : o.some((f) => {
             var Q;
             try {
               return (Q = l.matches) == null ? void 0 : Q.call(l, f);
@@ -5475,7 +5475,7 @@ function OQ(e = {}) {
     /** Web Component 빌드에서: 두 엘리먼트를 body 에 붙이고 kit 을 넘긴다 */
     mount() {
       if (B._els.modal) return B;
-      const l = document.createElement("bugfix-report-modal"), u = document.createElement("bugfix-viewer");
+      const l = document.createElement("devloop-report-modal"), u = document.createElement("devloop-viewer");
       return l.kit = B, u.kit = B, document.body.append(l, u), B._els = { modal: l, viewer: u }, B;
     },
     openReport: () => {
@@ -5515,7 +5515,7 @@ const xs = (e, A) => {
   { id: "arrow", label: "화살표" },
   { id: "text", label: "글자" }
 ], Tr = ["#ff3b30", "#ffcc00", "#34c759", "#0a84ff", "#ffffff"], Pg = {
-  name: "BugfixScreenshotEditor",
+  name: "DevloopScreenshotEditor",
   props: {
     src: { type: String, required: !0 }
   },
@@ -5651,7 +5651,7 @@ function jg(e, A, t, s, r, n) {
     ])
   ]);
 }
-const zg = /* @__PURE__ */ xs(Pg, [["render", jg], ["__scopeId", "data-v-e3f0b15c"]]), Dr = {
+const zg = /* @__PURE__ */ xs(Pg, [["render", jg], ["__scopeId", "data-v-9785ec7b"]]), Dr = {
   // ── 콘솔 공통 ──
   리포트: "Reports",
   제안: "Insights",
@@ -5664,13 +5664,13 @@ const zg = /* @__PURE__ */ xs(Pg, [["render", jg], ["__scopeId", "data-v-e3f0b15
   점검: "Checks",
   로그: "Logs",
   관리: "Console",
-  "bugfix-kit 관리": "bugfix-kit console",
+  "devloop 관리": "devloop console",
   "키 지우기": "Clear key",
   "저장된 운영자 키 지우기": "Forget the saved admin key",
   "운영자 키": "Admin key",
   들어가기: "Enter",
   "⏳ 잠시만요": "⏳ One moment",
-  "입력한 키는 그대로 둡니다. 계속 이 화면이면 앱 로그의 [bugfix-kit] 줄이나 콘솔 '점검' 탭을 보세요.": "Your key is kept. If this stays, check the app log lines tagged [bugfix-kit] or the Checks tab.",
+  "입력한 키는 그대로 둡니다. 계속 이 화면이면 앱 로그의 [devloop] 줄이나 콘솔 '점검' 탭을 보세요.": "Your key is kept. If this stays, check the app log lines tagged [devloop] or the Checks tab.",
   "워커가 시작 중입니다 (앱 재배포 직후 10초~1분)": "The worker is starting (10 s to 1 min after a redeploy)",
   "앱이 재시작 중입니다": "The app is restarting",
   "운영자 키가 맞지 않습니다": "Wrong admin key",
@@ -5719,7 +5719,7 @@ const zg = /* @__PURE__ */ xs(Pg, [["render", jg], ["__scopeId", "data-v-e3f0b15
   "분석 중…": "analysing…",
   // 버전
   "AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가": "Every AI fix is kept by the kit as a",
-  "으로 갖고 있습니다(키트 저장소 태그 bugfix/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워": "even before it goes to the remote (kit repo tag bugfix/v{n}). Each version can be spun up as front+backend+DB copy and",
+  "으로 갖고 있습니다(키트 저장소 태그 devloop/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워": "even before it goes to the remote (kit repo tag devloop/v{n}). Each version can be spun up as front+backend+DB copy and",
   "해 보고, 마음에 들면": ", and when it looks right you",
   "원격으로 보냅니다": "send it to the remote",
   "(브랜치만 / PR·MR / 자동 병합).": "(branch only / PR·MR / auto-merge).",
@@ -6237,7 +6237,7 @@ xe.push([/^재현 검증 (.*)$/, "Reproduction check $1"], [/(\d+)회/g, "$1 rou
 const qg = [[/(\d+)초 전/g, "$1 s ago"], [/(\d+)분 전/g, "$1 min ago"], [/(\d+)시간 전/g, "$1 h ago"], [/(\d+)일 전/g, "$1 d ago"]], _r = ".bf-md,.bf-log,.bf-diff,pre,code,textarea,.prob,.ktree,.kg-info,.kg-tip,.brv-text,.brv-chat__text,.brv-logbox,.brv-ai__summary,.brv-suggest__text,.brv-problem,.brv-log-msg,.brv-log-payload,.brv-shots__bigcap,[data-i18n-skip],#kLegend,.shots figcaption,.log";
 function vs() {
   try {
-    const A = localStorage.getItem("bugfix-lang");
+    const A = localStorage.getItem("devloop-lang");
     if (A === "ko" || A === "en") return A;
   } catch {
   }
@@ -6301,9 +6301,9 @@ const $g = [
   { value: "MEDIUM", label: "보통" },
   { value: "LOW", label: "낮음" }
 ], Au = {
-  name: "BugfixReportModal",
+  name: "DevloopReportModal",
   components: { ScreenshotEditor: zg },
-  // kit: createBugfix() 결과. Web Component 로 쓸 때는 엘리먼트 프로퍼티(el.kit = kit)로 들어온다
+  // kit: createDevloop() 결과. Web Component 로 쓸 때는 엘리먼트 프로퍼티(el.kit = kit)로 들어온다
   props: { kit: { type: Object, default: null } },
   emits: ["open-viewer"],
   expose: ["open", "close"],
@@ -6566,7 +6566,7 @@ const $g = [
       }, 300), this.close();
     }
   }
-}, eu = { class: "bugfix-root" }, tu = {
+}, eu = { class: "devloop-root" }, tu = {
   key: 0,
   class: "bug-capture-overlay"
 }, su = { class: "bug-report-modal" }, ru = { class: "bug-report-header" }, nu = { class: "bug-report-title" }, ou = {
@@ -7279,7 +7279,7 @@ function kd(e, A, t, s, r, n) {
     ], 32)) : U("", !0)
   ]);
 }
-const NQ = /* @__PURE__ */ xs(Au, [["render", kd], ["__scopeId", "data-v-aeda504d"]]), Ae = (e) => String(e ?? "").replace(/[&<>"']/g, (A) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[A]);
+const NQ = /* @__PURE__ */ xs(Au, [["render", kd], ["__scopeId", "data-v-80543552"]]), Ae = (e) => String(e ?? "").replace(/[&<>"']/g, (A) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[A]);
 function _A(e) {
   let A = Ae(e);
   return A = A.replace(/`([^`]+)`/g, (t, s) => `<code>${s}</code>`), A = A.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>"), A = A.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'), A = A.replace(/(^|[\s(])((?:[\w.-]+\/)+[\w.-]+\.(?:java|js|ts|tsx|jsx|vue|py|xml|yml|yaml|json|properties|gradle|sql|md|scss|css|html)(?::\d+)?)(?=$|[\s,)])/g, (t, s, r) => t.includes("<code>") ? t : `${s}<code class="p">${r}</code>`), A;
@@ -7438,7 +7438,7 @@ const Md = `
   { value: "RESOLVED", label: "해결" },
   { value: "CLOSED", label: "보류" }
 ], Pd = {
-  name: "BugfixViewer",
+  name: "DevloopViewer",
   props: { kit: { type: Object, default: null } },
   expose: ["open", "close"],
   data() {
@@ -7950,7 +7950,7 @@ ${e}`) && this.sendChat("change", `추천 개선 실행: ${e}`);
       return e ? String(e).slice(0, 16).replace("T", " ") : "";
     }
   }
-}, Gd = { class: "bugfix-root" }, Vd = { class: "brv-modal" }, Xd = { class: "brv-header" }, Jd = { class: "brv-title" }, Wd = {
+}, Gd = { class: "devloop-root" }, Vd = { class: "brv-modal" }, Xd = { class: "brv-header" }, Jd = { class: "brv-title" }, Wd = {
   key: 0,
   class: "brv-shortcut"
 }, Yd = {
@@ -8762,12 +8762,12 @@ function DQ(e, A, t, s, r, n) {
     ], 32)) : U("", !0)
   ]);
 }
-const PQ = /* @__PURE__ */ xs(Pd, [["render", DQ], ["__scopeId", "data-v-3539add5"]]);
+const PQ = /* @__PURE__ */ xs(Pd, [["render", DQ], ["__scopeId", "data-v-c4f154f5"]]);
 export {
   NQ as ReportModal,
   PQ as Viewer,
   xg as captureScreen,
-  OQ as createBugfix,
+  OQ as createDevloop,
   RQ as reduxMiddleware,
   MQ as zustandSource
 };

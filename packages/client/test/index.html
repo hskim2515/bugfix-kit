@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>bugfix-kit client smoke</title>
+<title>devloop client smoke</title>
 <style>
   body { font-family: sans-serif; margin: 0; }
   #app { padding: 24px; }
@@ -12,7 +12,7 @@
 </head>
 <body>
 <div id="app">
-  <h1>bugfix-kit client smoke</h1>
+  <h1>devloop client smoke</h1>
   <p>Shift+F9 신고 · Shift+F10 목록</p>
   <button id="btn-report">신고 열기</button>
   <button id="btn-viewer">목록 열기</button>
@@ -20,12 +20,12 @@
   <button id="btn-net">실패 요청 만들기</button>
   <canvas id="gl" width="400" height="200"></canvas>
 </div>
-<script src="../dist/bugfix-client.iife.js"></script>
+<script src="../dist/devloop-client.iife.js"></script>
 <script>
   // WebGL 캔버스 흉내 - 2D 로 그려 두면 toDataURL 로 합성 확인 가능
   const c = document.getElementById('gl'); const g = c.getContext('2d');
   g.fillStyle = '#3b6ea5'; g.fillRect(0, 0, 400, 200); g.fillStyle = '#fff'; g.font = '20px sans-serif'; g.fillText('canvas layer', 20, 40);
-  const kit = BugfixKit.createBugfix({
+  const kit = DevLoop.createDevloop({
     endpoint: 'http://localhost:8791/api',
     project: 'demo',
     apiKey: 'k1',

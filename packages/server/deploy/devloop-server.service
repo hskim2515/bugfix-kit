@@ -1,0 +1,21 @@
+# 사용자 단위 systemd 유닛 (sudo 불필요). 설치:
+#   mkdir -p ~/.config/systemd/user && cp deploy/devloop-server.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now devloop-server
+#   loginctl enable-linger $USER      # 로그아웃 후에도 유지
+#   journalctl --user -u devloop-server -f
+[Unit]
+Description=devloop server (bug report API + Claude Code auto-fix)
+After=network.target
+
+[Service]
+WorkingDirectory=%h/devloop/packages/server
+Environment=DEVLOOP_CONFIG=%h/devloop/packages/server/devloop.yml
+# nvm 등 로그인 셸의 PATH 를 그대로 쓰기 위해 bash -lc 로 띄운다
+ExecStart=/bin/bash -lc 'exec node bin/devloop-server.mjs'
+Restart=on-failure
+RestartSec=5
+# 진행 중이던 Claude 작업이 잘리지 않게 여유 있게 기다린다
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

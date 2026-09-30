@@ -17,25 +17,25 @@ import java.util.Enumeration;
 import java.util.Set;
 
 /**
- * bugfix-kit 프록시 - 앱의 REST 서버가 `__PROXY__/**` 를 bugfix-kit 인스턴스로 넘긴다.
+ * devloop 프록시 - 앱의 REST 서버가 `__PROXY__/**` 를 devloop 인스턴스로 넘긴다.
  * 앱 프론트는 이미 REST 서버에 닿는 경로(예: /rest, /api)를 갖고 있으므로, nginx 를 손대지 않고
  * `endpoint: '<REST 경로>__PROXY__'` 로 신고 서버에 닿는다. 콘솔도 `<REST 경로>__PROXY__/ui/` 로 열린다.
  *
- * 설정(application.properties): bugfix.server=http://127.0.0.1:8790   (인스턴스 주소, /api 없이)
- * 보안 필터가 있는 앱이면 이 경로를 허용 목록에 넣는다(인증은 bugfix-kit 이 API 키·운영자 키로 따로 한다).
+ * 설정(application.properties): devloop.server=http://127.0.0.1:8790   (인스턴스 주소, /api 없이)
+ * 보안 필터가 있는 앱이면 이 경로를 허용 목록에 넣는다(인증은 devloop 이 API 키·운영자 키로 따로 한다).
  */
 @RestController
-public class BugfixProxyController {
+public class DevloopProxyController {
 
     private static final Set<String> SKIP = Set.of("host", "content-length", "connection", "transfer-encoding", "expect", "accept-encoding");
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-    @Value("${bugfix.server:}")
+    @Value("${devloop.server:}")
     private String server;
 
     @RequestMapping("__PROXY__/**")
     public ResponseEntity<byte[]> proxy(HttpServletRequest req) throws IOException, InterruptedException {
-        if (server == null || server.isBlank()) return ResponseEntity.status(503).body("bugfix.server 가 설정되지 않았습니다".getBytes());
+        if (server == null || server.isBlank()) return ResponseEntity.status(503).body("devloop.server 가 설정되지 않았습니다".getBytes());
         String rest = req.getRequestURI().substring(req.getContextPath().length() + "__PROXY__".length());
         String target = server.replaceAll("/+$", "") + "/api" + (rest.isEmpty() ? "/" : rest) + (req.getQueryString() != null ? "?" + req.getQueryString() : "");
 

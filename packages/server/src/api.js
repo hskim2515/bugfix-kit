@@ -23,10 +23,10 @@ const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 's
  *   POST   /api/p/:project/reports/:id/fix-chat { message, mode: 'ask'|'change' }
  *   POST   /api/p/:project/reports/:id/fix-sync
  *
- * 인증: 프로젝트에 apiKey 가 있으면 `X-Bugfix-Key` 헤더가 같아야 한다. 보고자는 `X-Bugfix-User` 헤더(앱이 로그인 사용자를 넣는다) 또는 body.reporter.
+ * 인증: 프로젝트에 apiKey 가 있으면 `X-Devloop-Key` 헤더가 같아야 한다. 보고자는 `X-Devloop-User` 헤더(앱이 로그인 사용자를 넣는다) 또는 body.reporter.
  */
 /**
- * 라우터를 돌려준다(경로는 마운트 지점 기준). 독립 서버는 `app.use('/api', router)`, 앱 내장(bugfix-kit/embed)은 `app.use('/bugfix', router)`.
+ * 라우터를 돌려준다(경로는 마운트 지점 기준). 독립 서버는 `app.use('/api', router)`, 앱 내장(devloop/embed)은 `app.use('/devloop', router)`.
  * 콘솔(/ui/)은 자기 주소의 한 단계 위를 API 기준으로 쓰므로 어디에 마운트해도 맞는다.
  */
 export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null, versions = null, loops = null, notifier = null) {
@@ -41,7 +41,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Bugfix-Key, X-Bugfix-User, Authorization');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Devloop-Key, X-Devloop-User, Authorization');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
     }
     if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -52,7 +52,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
 
   app.get('/health', (req, res) => res.json({ ok: true, projects: Object.keys(cfg.projects), queue: runner.pending, busy: !!runner.busy, lanes: runner.laneState() }));
 
-  // ── 운영자 대시보드: <마운트>/ui/ (독립 서버 /api/ui/, 내장 /bugfix/ui/) ──
+  // ── 운영자 대시보드: <마운트>/ui/ (독립 서버 /api/ui/, 내장 /devloop/ui/) ──
   const here = path.dirname(fileURLToPath(import.meta.url));
   const uiDir = path.join(here, '..', 'ui');
   const clientDist = path.join(here, '..', '..', 'client', 'dist');
@@ -63,14 +63,14 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (!uiHtml) {
       let ver = '';
       try { ver = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8')).version || ''; } catch { /* */ }
-      uiHtml = fs.readFileSync(path.join(uiDir, 'index.html'), 'utf8').replace('client/bugfix-client.iife.js"', `client/bugfix-client.iife.js?v=${encodeURIComponent(ver || Date.now())}"`);
+      uiHtml = fs.readFileSync(path.join(uiDir, 'index.html'), 'utf8').replace('client/devloop-client.iife.js"', `client/devloop-client.iife.js?v=${encodeURIComponent(ver || Date.now())}"`);
     }
     res.setHeader('Cache-Control', 'no-cache'); res.type('html').send(uiHtml);
   });
 
   const admin = (req, res, next) => {
-    if (!notBlank(cfg.server.adminKey)) return next(new HttpError(503, '운영자 키가 설정되지 않았습니다 (BUGFIX_ADMIN_KEY 또는 ~/.config/bugfix-kit/default.env 의 ADMIN_KEY)'));
-    if (req.get('X-Bugfix-Admin') !== cfg.server.adminKey) return next(new HttpError(401, '운영자 키가 맞지 않습니다'));
+    if (!notBlank(cfg.server.adminKey)) return next(new HttpError(503, '운영자 키가 설정되지 않았습니다 (DEVLOOP_ADMIN_KEY 또는 ~/.config/devloop/default.env 의 ADMIN_KEY)'));
+    if (req.get('X-Devloop-Admin') !== cfg.server.adminKey) return next(new HttpError(401, '운영자 키가 맞지 않습니다'));
     next();
   };
   /** 전 프로젝트 요약: 리포트 목록(가벼운 필드 + 수정 상태) · 진행 중 작업의 로그 꼬리 · 큐 길이 · 프로젝트 API 키(뷰어가 쓰게) */
@@ -136,7 +136,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (!insights) throw new HttpError(503, '분석 기능이 꺼져 있습니다');
     const p = proj(req);
     const fix = !!req.body?.fix;
-    if (fix && !notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
+    if (fix && !notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(DEVLOOP_GITHUB_TOKEN 또는 github.tokenFile)');
     // 읽기~reportId 저장을 잠금 안에서 - 중복 클릭·동시 요청이 리포트를 두 번 만들지 않게
     // save() 가 p.name 키로 따로 잠그므로(재진입 불가) 여기서는 다른 키로 잠근다
     return insights.withLock(`report:${p.name}`, async () => {
@@ -157,8 +157,8 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (!project) return next(new HttpError(404, `모르는 프로젝트: ${req.params.project}`));
     const origin = req.headers.origin;
     if (origin && project.cors?.length && !project.cors.includes(origin)) return next(new HttpError(403, `허용되지 않은 origin: ${origin}`));
-    req.isAdmin = notBlank(cfg.server.adminKey) && req.get('X-Bugfix-Admin') === cfg.server.adminKey;
-    if (!req.isAdmin && notBlank(project.apiKey) && req.get('X-Bugfix-Key') !== project.apiKey) return next(new HttpError(401, 'API 키가 맞지 않습니다(X-Bugfix-Key)'));
+    req.isAdmin = notBlank(cfg.server.adminKey) && req.get('X-Devloop-Admin') === cfg.server.adminKey;
+    if (!req.isAdmin && notBlank(project.apiKey) && req.get('X-Devloop-Key') !== project.apiKey) return next(new HttpError(401, 'API 키가 맞지 않습니다(X-Devloop-Key)'));
     req.project = project;
     next();
   }, pr);
@@ -173,11 +173,11 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (!notBlank(b.problem) && !notBlank(b.reproSteps)) throw new HttpError(400, '문제 또는 재현 절차를 적어 주세요');
     const report = {};
     for (const k of REPORT_FIELDS) report[k] = b[k] == null ? null : (typeof b[k] === 'string' ? b[k] : JSON.stringify(b[k]));
-    report.reporter = req.get('X-Bugfix-User') || b.reporter || 'anonymous';
+    report.reporter = req.get('X-Devloop-User') || b.reporter || 'anonymous';
     // 버그 신고 도구 자체의 문제 - 같은 프로젝트에 '도구' 표시로 저장되고 AI 수정 대상이 아니다(운영자가 도구 저장소에서 처리)
     report.tool = b.tool === true || b.tool === 'true';
     const saved = await store.save(req.project.name, report);
-    log.info(`[bugfix ${req.project.name}] 리포트 #${saved.bugReportId} (${report.reporter})`);
+    log.info(`[devloop ${req.project.name}] 리포트 #${saved.bugReportId} (${report.reporter})`);
     notifier?.send(req.project, 'report.new', { title: `새 리포트 #${saved.bugReportId} [${report.severity || '-'}]`, lines: [notBlank(report.problem) ? report.problem.split('\n')[0].slice(0, 160) : '(내용 없음)', `보고자 ${report.reporter || '-'}${report.tool ? ' · 신고 도구 문제' : ''}`], level: 'info', data: { reportId: saved.bugReportId, severity: report.severity } }).catch(() => {});
     return { bugReportId: saved.bugReportId };
   }));
@@ -242,7 +242,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
 
   pr.post('/reports/:id/request-fix', fixGuard, wrap(async (req) => {
     const p = req.project;
-    if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(BUGFIX_GITHUB_TOKEN 또는 github.tokenFile)');
+    if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, 'GitHub 토큰이 없습니다(DEVLOOP_GITHUB_TOKEN 또는 github.tokenFile)');
     const r = await loadFixable(req);
     if (['QUEUED', 'RUNNING'].includes(r.fixStatus)) throw new HttpError(409, '이미 수정이 진행 중입니다.');
     await store.update(p.name, r.bugReportId, (c) => ({
@@ -292,7 +292,7 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     const status = err.status || (err.type === 'entity.too.large' ? 413 : 500);
-    if (status >= 500) log.error('[bugfix] API 오류', err);
+    if (status >= 500) log.error('[devloop] API 오류', err);
     res.status(status).json({ message: err.message || '오류' });
   });
   return app;

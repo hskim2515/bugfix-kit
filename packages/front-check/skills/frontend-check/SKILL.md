@@ -12,14 +12,14 @@ UI(레이아웃·표시·동작) 를 고쳤으면 빌드 통과에서 끝내지 
 
 - 버그 리포트가 화면(위치·크기·겹침·안 보임·클릭 안 됨)에 관한 것일 때 - 고치기 **전**에 한 번 찍어 현재 상태를 확인하고, 고친 **뒤** 다시 찍어 비교한다.
 - 새 콘솔 오류·실패 요청이 생기지 않았는지 확인할 때.
-- 리포트의 `.bugfix/context.json` 이 있으면 신고 당시 화면으로 바로 갈 수 있다.
+- 리포트의 `.devloop/context.json` 이 있으면 신고 당시 화면으로 바로 갈 수 있다.
 
 ## 명령
 
 ```bash
 # 프론트 디렉터리에서 (빌드 결과 dist 를 서빙하므로 먼저 npm run build)
-npx front-check check --context .bugfix/context.json --out .bugfix/before     # 고치기 전
-npx front-check check --context .bugfix/context.json --out .bugfix/after --compare .bugfix/before   # 고친 뒤 + 픽셀 비교
+npx front-check check --context .devloop/context.json --out .devloop/before     # 고치기 전
+npx front-check check --context .devloop/context.json --out .devloop/after --compare .devloop/before   # 고친 뒤 + 픽셀 비교
 npx front-check check --scenario main                                         # 설정의 시나리오
 npx front-check check --steps '[{"goto":"/"},{"click":{"text":"레이어"}},{"waitFor":".dataset-panel"},{"measure":".dataset-panel"},{"screenshot":"layer"}]'
 ```
@@ -41,6 +41,6 @@ npx front-check check --steps '[{"goto":"/"},{"click":{"text":"레이어"}},{"wa
 
 - 계정·토큰을 절차나 설정에 직접 쓰지 않는다. 로그인은 저장된 상태 파일(`login.type: 'state'`, `npx front-check login` 으로 생성) 또는 계정 파일 / `FC_USER`·`FC_PASS` 로만.
 - "로그인 상태 파일이 없습니다 / 세션이 만료됐습니다" 로 실패하면 코드 문제가 아니다 - 사람이 `npx front-check login` 을 다시 실행해야 한다고 결과에 적고, 로그인 없이 볼 수 있는 부분만 확인한다.
-- 결과 디렉터리(`.bugfix/before`, `.bugfix/after`)는 커밋하지 않는다(`.bugfix/` 는 이미 제외).
+- 결과 디렉터리(`.devloop/before`, `.devloop/after`)는 커밋하지 않는다(`.devloop/` 는 이미 제외).
 - 헤드리스에서 WebGL 은 소프트웨어 렌더라 느리다 - `waitFor` 를 넉넉히(2~4초) 준다. 지형·타일이 다 안 그려졌다고 버그로 보지 않는다.
 - 스크린샷이 전부 검거나 비어 있으면 로그인 실패나 서빙 주소 문제다 - `result.json` 의 `login`·`fatal`·`failedRequests` 를 먼저 본다.

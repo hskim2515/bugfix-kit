@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 서버 코드 갱신: pull → npm install → 인스턴스마다(bugfix-server@<이름>) 큐가 빌 때까지 기다렸다가 재시작.
-#   ~/bugfix-kit/packages/server/deploy/update.sh [--now]   --now 면 기다리지 않는다 (끊긴 작업은 재시작 뒤 자동으로 다시 큐에 들어간다)
-# 인스턴스는 ~/.config/bugfix-kit/*/bugfix-kit.yml 로 찾는다. 옛 단일 유닛(bugfix-server.service)이 켜져 있으면 그것도 같이.
+# 서버 코드 갱신: pull → npm install → 인스턴스마다(devloop-server@<이름>) 큐가 빌 때까지 기다렸다가 재시작.
+#   ~/devloop/packages/server/deploy/update.sh [--now]   --now 면 기다리지 않는다 (끊긴 작업은 재시작 뒤 자동으로 다시 큐에 들어간다)
+# 인스턴스는 ~/.config/devloop/*/devloop.yml 로 찾는다. 옛 단일 유닛(devloop-server.service)이 켜져 있으면 그것도 같이.
 set -e
 cd "$(dirname "$0")/../../.."
 git checkout -q -- package-lock.json 2>/dev/null || true
@@ -21,16 +21,16 @@ wait_idle() {  # $1 = 포트
 [ "$1" = "--now" ] && NOW=1
 
 # 옛 단일 유닛
-if systemctl --user is-active --quiet bugfix-server 2>/dev/null; then
-  PORT=$(grep -E '^\s*port:' packages/server/bugfix-kit.yml 2>/dev/null | awk '{print $2}'); PORT=${PORT:-8790}
-  wait_idle "$PORT"; systemctl --user restart bugfix-server && echo "bugfix-server 재시작 ($(systemctl --user is-active bugfix-server))"
+if systemctl --user is-active --quiet devloop-server 2>/dev/null; then
+  PORT=$(grep -E '^\s*port:' packages/server/devloop.yml 2>/dev/null | awk '{print $2}'); PORT=${PORT:-8790}
+  wait_idle "$PORT"; systemctl --user restart devloop-server && echo "devloop-server 재시작 ($(systemctl --user is-active devloop-server))"
 fi
 # 인스턴스들
-for cfg in "$HOME"/.config/bugfix-kit/*/bugfix-kit.yml; do
+for cfg in "$HOME"/.config/devloop/*/devloop.yml; do
   [ -f "$cfg" ] || continue
   name=$(basename "$(dirname "$cfg")")
-  systemctl --user is-enabled --quiet "bugfix-server@$name" 2>/dev/null || continue
+  systemctl --user is-enabled --quiet "devloop-server@$name" 2>/dev/null || continue
   PORT=$(grep -E '^\s*port:' "$cfg" | awk '{print $2}'); PORT=${PORT:-8790}
   wait_idle "$PORT"
-  systemctl --user restart "bugfix-server@$name" && sleep 2 && echo "bugfix-server@$name 재시작 ($(systemctl --user is-active "bugfix-server@$name"), :$PORT)"
+  systemctl --user restart "devloop-server@$name" && sleep 2 && echo "devloop-server@$name 재시작 ($(systemctl --user is-active "devloop-server@$name"), :$PORT)"
 done

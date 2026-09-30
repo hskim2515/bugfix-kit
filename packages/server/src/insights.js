@@ -5,7 +5,7 @@ import { firstLine, hhmmss, nowIso } from './util.js';
 import { Shots } from './shots.js';
 import os from 'node:os';
 
-const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(git blame:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)','Bash(wc:*)', 'Write(.bugfix/insights.json)'];
+const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(git blame:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)','Bash(wc:*)', 'Write(.devloop/insights.json)'];
 
 /**
  * 사람이 신고하기 전에 AI 가 고칠 점을 먼저 찾는다.
@@ -105,7 +105,7 @@ export class Insights {
         try { sug = full?.fixSuggestions ? JSON.parse(full.fixSuggestions) : []; } catch { /* */ }
         lines.push(`- #${r.bugReportId} [${r.severity || '-'}|${r.fixStatus || '요청 전'}] ${firstLine(r.problem, 200)}${r.fixSummary ? `\n    결과: ${firstLine(r.fixSummary, 160)}` : ''}${sug.length ? `\n    남은 추천: ${sug.map((s) => firstLine(s, 120)).join(' / ')}` : ''}`);
       }
-      const dir = path.join(wt, '.bugfix');
+      const dir = path.join(wt, '.devloop');
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, 'reports.md'), `# 최근 리포트 ${reports.length}건\n\n${lines.join('\n') || '(없음)'}\n`, 'utf8');
       await fs.writeFile(path.join(dir, 'recent-commits.txt'), await ex.execOut(wt, 1, ['git', 'log', '-30', '--stat', '--format=%h %ad %an %s', '--date=short']), 'utf8');
@@ -118,7 +118,7 @@ export class Insights {
       const skip = [...new Set([...(prevSt.dismissed || []), ...(prevSt.items || []).filter((x) => x.reportId).map((x) => x.title)])].slice(-60);
       if (skip.length) await fs.writeFile(path.join(dir, 'skip.md'), `# 다시 내지 말 것(이미 리포트로 처리했거나 운영자가 무시한 제안)\n\n${skip.map((t) => `- ${t}`).join('\n')}\n`, 'utf8');
 
-      // 도구는 읽기 전용 목록이지만 결과 파일(.bugfix/insights.json) 은 써야 하므로 acceptEdits 가 필요하다(allowedTools 의 Write(경로) 규칙만으로는 -p 모드에서 거부됨).
+      // 도구는 읽기 전용 목록이지만 결과 파일(.devloop/insights.json) 은 써야 하므로 acceptEdits 가 필요하다(allowedTools 의 Write(경로) 규칙만으로는 -p 모드에서 거부됨).
       // 이 작업 사본은 분석 뒤 버려지고 커밋·푸시도 없으므로 코드가 바뀌어도 어디에도 반영되지 않는다.
       await L('Claude 분석 중… (읽기 전용)');
       // onProgress 는 await 없이 불리므로 기록 프로미스를 모아 두었다가 DONE 저장 전에 모두 끝낸다
@@ -140,7 +140,7 @@ export class Insights {
         const pend2 = [];
         try {
           const out2 = await runClaudeStream(ex, wt, 10,
-            [this.cfg.server.claudeBin || 'claude', '-p', '--resume', sid, '탐색은 여기서 멈추세요. 더 읽거나 검색하지 말고, 지금까지 확인한 것만으로 `.bugfix/insights.json` 을 정해진 형식의 JSON 배열로 지금 바로 쓰세요. 확신이 낮은 항목은 confidence 를 낮게 적으면 됩니다.', '--max-turns', '6', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
+            [this.cfg.server.claudeBin || 'claude', '-p', '--resume', sid, '탐색은 여기서 멈추세요. 더 읽거나 검색하지 말고, 지금까지 확인한 것만으로 `.devloop/insights.json` 을 정해진 형식의 JSON 배열로 지금 바로 쓰세요. 확신이 낮은 항목은 confidence 를 낮게 적으면 됩니다.', '--max-turns', '6', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])],
             (line) => { pend2.push(this.logLine(name, `  ${line}`).catch(() => {})); });
           await Promise.all(pend2);
           await L(`정리 종료 (${claudeSummary(out2)})`);
@@ -166,7 +166,7 @@ export class Insights {
 
   /**
    * 프로젝트에 front-check 설정이 있고 앱 주소(cors[0])가 있으면, 배포된 개발 화면을 모든 시나리오로 열어 본다(빌드 없이 실사이트).
-   * 결과는 .bugfix/front-check.md(요약) + 스크린샷 파일(Claude 가 Read 로 볼 수 있다), 그리고 insights.json 의 shots 에 보관 목록.
+   * 결과는 .devloop/front-check.md(요약) + 스크린샷 파일(Claude 가 Read 로 볼 수 있다), 그리고 insights.json 의 shots 에 보관 목록.
    * 테스트 계정(FC_USER/FC_PASS)은 프로젝트 env 로 실행 환경에 들어간다.
    */
   async headless(project, ex, wt, dir, L) {
@@ -177,7 +177,7 @@ export class Insights {
     const cfgFile = path.join(wt, fc.config || path.join(fc.cwd || '.', 'front-check.config.mjs'));
     if (!(await fs.access(cfgFile).then(() => true, () => false))) { await L(`화면 확인 건너뜀: ${path.relative(wt, cfgFile)} 없음`); return ''; }
     const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
-    const outDir = path.join(wt, '.bugfix', 'front-check');
+    const outDir = path.join(wt, '.devloop', 'front-check');
     await L('화면 확인(front-check, 모든 시나리오)…');
     let r = null;
     try {
@@ -200,7 +200,7 @@ export class Insights {
       ...(r.pageErrors || []).slice(0, 10).map((m) => `- 페이지 예외: ${firstLine(typeof m === 'string' ? m : m.message || JSON.stringify(m), 200)}`),
       ...(r.failedRequests || []).slice(0, 15).map((q) => `- 실패 요청: ${q.method || ''} ${q.url || ''} → ${q.status ?? q.error ?? ''}`),
       ...(r.failures || []).slice(0, 10).map((f) => `- 절차 실패: ${firstLine(f, 200)}`),
-      '', `스크린샷(Read 로 볼 수 있음): ${(r.screenshots || []).map((n) => `.bugfix/front-check/${n}`).join(', ') || '없음'}`].join('\n');
+      '', `스크린샷(Read 로 볼 수 있음): ${(r.screenshots || []).map((n) => `.devloop/front-check/${n}`).join(', ') || '없음'}`].join('\n');
     await fs.writeFile(path.join(dir, 'front-check.md'), md + '\n', 'utf8');
     return line;
   }
@@ -210,13 +210,13 @@ export class Insights {
     return `${project.description || `\`${project.githubRepo}\``} 저장소입니다. 사용자가 신고하기 전에 **고칠 점을 먼저 찾는** 일입니다. 코드는 고치지 마세요 - 찾아서 목록으로만.
 
 재료:
-  - \`.bugfix/reports.md\`: 최근 버그 리포트(문제 · 수정 결과 · 아직 실행 안 한 추천 개선). 반복되는 문제, 실패로 끝난 리포트, 남은 추천을 눈여겨보세요.
-  - \`.bugfix/recent-commits.txt\`: 최근 커밋 30개와 바뀐 파일. 최근에 많이 바뀐 곳이 위험합니다.
-  - \`.bugfix/knowledge.md\` (있으면): 메뉴 → 기능 → 파일 지식 그래프. 어느 기능이 어떤 파일인지 여기서 먼저 찾으세요.${fcNote ? `
-  - \`.bugfix/front-check.md\`: 배포된 개발 화면을 헤드리스로 열어 본 결과(${fcNote}). 콘솔 오류·실패 요청·절차 실패는 실제 사용자가 겪는 문제이므로 우선 후보이고, 스크린샷을 Read 로 열어 화면이 깨졌는지도 보세요.` : ''}
+  - \`.devloop/reports.md\`: 최근 버그 리포트(문제 · 수정 결과 · 아직 실행 안 한 추천 개선). 반복되는 문제, 실패로 끝난 리포트, 남은 추천을 눈여겨보세요.
+  - \`.devloop/recent-commits.txt\`: 최근 커밋 30개와 바뀐 파일. 최근에 많이 바뀐 곳이 위험합니다.
+  - \`.devloop/knowledge.md\` (있으면): 메뉴 → 기능 → 파일 지식 그래프. 어느 기능이 어떤 파일인지 여기서 먼저 찾으세요.${fcNote ? `
+  - \`.devloop/front-check.md\`: 배포된 개발 화면을 헤드리스로 열어 본 결과(${fcNote}). 콘솔 오류·실패 요청·절차 실패는 실제 사용자가 겪는 문제이므로 우선 후보이고, 스크린샷을 Read 로 열어 화면이 깨졌는지도 보세요.` : ''}
   - 코드 자체. 모듈:
 ${mods || '  - (모듈 규칙 없음)'}${skipCount ? `
-  - \`.bugfix/skip.md\`: 이미 리포트로 처리했거나 운영자가 무시한 제안 ${skipCount}건 - 같은 내용은 다시 내지 마세요.` : ''}
+  - \`.devloop/skip.md\`: 이미 리포트로 처리했거나 운영자가 무시한 제안 ${skipCount}건 - 같은 내용은 다시 내지 마세요.` : ''}
 ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
 찾을 것(우선순위 순):
   1. 실제로 동작이 틀리는 결함 - 예외 처리 누락으로 화면이 멈추는 곳, null/undefined 접근, 잘못된 조건, 경합, 리소스 누수, 잘못된 API 사용
@@ -227,14 +227,14 @@ ${focus ? `\n사용자가 특히 보고 싶은 것: ${focus}\n` : ''}
 추측을 적지 마세요 - 파일과 줄을 실제로 확인한 것만, 근거(evidence)에 파일:줄과 코드 한 줄을 인용하세요. 확신이 낮으면 confidence 를 낮게.
 
 턴이 제한돼 있으니 탐색은 20턴 안쪽에서 끊고, 남은 후보가 있어도 **반드시** 결과 파일부터 쓰세요(빈 배열이라도). 결과 파일이 없으면 이 분석은 통째로 버려집니다.
-마지막에 \`.bugfix/insights.json\` 을 이 형식의 JSON 배열로 쓰세요 (최대 12개, 중요한 것부터):
+마지막에 \`.devloop/insights.json\` 을 이 형식의 JSON 배열로 쓰세요 (최대 12개, 중요한 것부터):
 [
   { "title": "한 줄 제목(한국어, 60자 이내)", "severity": "HIGH|MEDIUM|LOW", "kind": "bug|ux|risk|cleanup",
     "files": ["경로:줄"], "evidence": "무엇을 봤는지(코드 인용 포함, 3줄 이내)",
     "proposal": "어떻게 고칠지 - 이 문장을 그대로 AI 에게 수정 요청으로 보낼 수 있게 구체적으로", "confidence": 0.0~1.0 }
 ]
 항목이 화면 확인 스크린샷에서 보이는 문제면 "shots": ["main.png"] 처럼 파일 이름을 넣으세요.
-파일 쓰기는 \`.bugfix/insights.json\` 만 허용됩니다. 다른 파일은 절대 고치지 마세요.`;
+파일 쓰기는 \`.devloop/insights.json\` 만 허용됩니다. 다른 파일은 절대 고치지 마세요.`;
   }
 
   /** 제안 → 리포트 (원하면 바로 수정 요청까지) */

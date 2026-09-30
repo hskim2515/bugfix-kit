@@ -3,7 +3,7 @@ import path from 'node:path';
 import { orDash } from './util.js';
 
 /**
- * 리포트를 작업 사본의 `.bugfix/` 에 파일로 푼다 - Claude 가 읽는 자료.
+ * 리포트를 작업 사본의 `.devloop/` 에 파일로 푼다 - Claude 가 읽는 자료.
  *   summary.md · screenshot.png · context.json · frontend-logs.json · backend-logs.json · network-logs.json · mutation-log.json
  * 개인정보·토큰 소모를 줄인다: 사용자 정보(user·routeHistory)는 빼고, 로그는 오류 우선 + 최근순으로 추린다.
  */

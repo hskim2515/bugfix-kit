@@ -1,4 +1,4 @@
-# @bugfix-kit/front-check
+# @devloop/front-check
 
 헤드리스 브라우저(Playwright)로 프론트 화면을 실제로 열어 **콘솔 오류·페이지 예외·실패 요청·스크린샷·요소 치수**를 모으는 CLI.
 Claude 가 UI 버그를 고친 뒤 "정말 화면이 바뀌었나" 를 확인하는 용도가 첫째고, CI 스모크·전후 비교에도 쓴다.
@@ -12,7 +12,7 @@ Claude 가 UI 버그를 고친 뒤 "정말 화면이 바뀌었나" 를 확인하
 ## 설치·시작
 
 ```bash
-npm i -D github:hskim2515/bugfix-kit#v0.1.1       # 루트에서 front-check 를 노출
+npm i -D github:hskim2515/devloop#v0.1.1       # 루트에서 front-check 를 노출
 npx front-check init                              # front-check.config.mjs + .claude/skills/frontend-check
 npx front-check check --scenario main
 ```
@@ -63,7 +63,7 @@ export default {
 앱마다 인증이 다르므로(폼·SSO·MFA·토큰) **로그인된 브라우저 상태 파일(storageState = 쿠키+localStorage)** 을 공통으로 쓴다.
 
 ```bash
-# 계정은 운영자의 것 - 저장소에 두지 않는다. bugfix-server 가 돌릴 때는 서버의 ~/.config/bugfix-kit/projects/<이름>.env 의
+# 계정은 운영자의 것 - 저장소에 두지 않는다. devloop-server 가 돌릴 때는 서버의 ~/.config/devloop/projects/<이름>.env 의
 #   FC_USER/FC_PASS 가 들어오고, 개발 PC 에서는 환경변수 또는 gitignore 된 ./front-check.account 를 쓴다.
 #   상태 파일(세션)은 자동으로 만들고 만료 때 갱신한다
 
@@ -82,13 +82,13 @@ npx front-check check --scenario main   # login.type: 'state' 면 그 파일을 
 
 상태 파일은 도메인에 묶이고 기계에는 묶이지 않으므로, 개발 PC 에서 만들어 서버로 복사해도 된다. 자격 값은 로그와 result.json 어디에도 남지 않는다.
 
-## bugfix-server 와 함께
+## devloop-server 와 함께
 
-`bugfix-kit.yml` 의 프로젝트에 `frontCheck` 를 주면 검증 통과 뒤 자동으로 한 번 돌고, 결과 요약이 진행 로그와 PR 본문에 들어간다:
+`devloop.yml` 의 프로젝트에 `frontCheck` 를 주면 검증 통과 뒤 자동으로 한 번 돌고, 결과 요약이 진행 로그와 PR 본문에 들어간다:
 
 ```yaml
     frontCheck:
       cwd: lhdt-user-front
-      command: npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json
+      command: npx front-check check --context ../.devloop/context.json --out ../.devloop/after --json
       when: [front]        # 이 모듈이 바뀌었을 때만
 ```

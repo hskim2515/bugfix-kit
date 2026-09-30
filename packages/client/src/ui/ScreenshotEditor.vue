@@ -45,7 +45,7 @@ const TOOLS = [
 const COLORS = ['#ff3b30', '#ffcc00', '#34c759', '#0a84ff', '#ffffff'];
 
 export default {
-  name: 'BugfixScreenshotEditor',
+  name: 'DevloopScreenshotEditor',
   props: {
     src: { type: String, required: true },
   },

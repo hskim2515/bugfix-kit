@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>bugfix-kit 관리</title>
+<title>DevLoop 관리</title>
 <style>
   :root { color-scheme: dark; --bg: #151922; --panel: #1e2431; --line: rgba(255,255,255,0.09); --text: #dfe5ee; --dim: #8b97a8; --accent: #6ea0ff; --ok: #7fe0a4; --bad: #ff9aa8; --warn: #f2d16b; }
   * { box-sizing: border-box; }
@@ -196,7 +196,7 @@
 </head>
 <body>
 <header>
-  <h1 id="brand">bugfix-kit</h1>
+  <h1 id="brand">DevLoop</h1>
   <select id="scopeSel" class="btn" title="보는 프로젝트 - 한 서버에 여러 앱이 등록될 수 있다" style="display:none"></select>
   <span class="sub" id="meta">관리</span>
   <nav class="tabs" id="tabs">
@@ -221,7 +221,7 @@
   <section id="login" hidden>
     <div class="card">
       <h3>운영자 키</h3>
-      <p class="dim"><code>~/.config/bugfix-kit/default.env</code> 의 <code>ADMIN_KEY</code></p>
+      <p class="dim"><code>~/.config/devloop/default.env</code> 의 <code>ADMIN_KEY</code></p>
       <input type="password" id="key" placeholder="ADMIN_KEY" autofocus>
       <button class="btn primary" id="enter">들어가기</button>
       <div class="err" id="loginErr"></div>
@@ -229,7 +229,7 @@
   </section>
 
   <section id="waiting" hidden style="max-width:520px;margin:80px auto">
-    <div class="card"><h3>⏳ 잠시만요</h3><div id="waitMsg" style="margin:6px 0"></div><div class="dim" id="waitFor"></div><div class="dim" style="margin-top:8px">입력한 키는 그대로 둡니다. 계속 이 화면이면 앱 로그의 [bugfix-kit] 줄이나 콘솔 '점검' 탭을 보세요.</div></div>
+    <div class="card"><h3>⏳ 잠시만요</h3><div id="waitMsg" style="margin:6px 0"></div><div class="dim" id="waitFor"></div><div class="dim" style="margin-top:8px">입력한 키는 그대로 둡니다. 계속 이 화면이면 앱 로그의 [devloop] 줄이나 콘솔 '점검' 탭을 보세요.</div></div>
   </section>
   <section id="app" hidden>
     <!-- 리포트 -->
@@ -263,7 +263,7 @@
 
     <!-- 버전 · 미리보기 -->
     <div data-tab="versions" hidden>
-      <div class="intro">AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 <b>버전</b>으로 갖고 있습니다(키트 저장소 태그 bugfix/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워 <b>접속</b>해 보고, 마음에 들면 <b>원격으로 보냅니다</b>(브랜치만 / PR·MR / 자동 병합).</div>
+      <div class="intro">AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가 <b>버전</b>으로 갖고 있습니다(키트 저장소 태그 devloop/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워 <b>접속</b>해 보고, 마음에 들면 <b>원격으로 보냅니다</b>(브랜치만 / PR·MR / 자동 병합).</div>
       <details class="card" id="vRecipeWrap" style="margin-bottom:12px"><summary class="dim">미리보기 레시피 <span id="vRecipeState"></span></summary>
         <div class="dim" style="margin:6px 0">프론트 빌드·백엔드 실행·DB 복제 방법. 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}. db.mode: template(기본, 템플릿 DB 에서 초 단위 복제) · clone(매번 라이브에서, 느림) · shared(사본 없이 개발 DB 공유). maxUp(동시 개수, 기본 1) · volumes '호스트:컨테이너[:ro|:shared]'(표시 없으면 샌드박스 사본) · ttlHours(미사용 자동 중지, 기본 12)</div>
         <textarea id="vRecipe" style="min-height:220px;font-family:ui-monospace,Menlo,monospace;font-size:11px"></textarea>
@@ -290,7 +290,7 @@
           <label>단계 <small>순서대로 · 켠 것만</small></label><div class="steps-list">
             <div class="step"><label><input type="checkbox" id="l_s_knowledge" checked> <b>1. 지식 그래프 갱신</b></label><div class="dim">바뀐 코드를 읽어 화면·기능·파일 관계를 최신으로 맞춥니다. 뒤 단계의 AI 가 이 그래프를 참고합니다.</div></div>
             <div class="step"><label><input type="checkbox" id="l_s_insights" checked> <b>2. 제안 분석</b></label><div class="dim">코드·최근 리포트·헤드리스 화면 확인을 바탕으로 고칠 점(버그·위험·정리)을 찾아 "제안" 탭에 쌓습니다. <input id="l_focus" placeholder="특히 볼 것 (선택)" style="width:220px"></div></div>
-            <div class="step"><label><input type="checkbox" id="l_s_fix"> <b>3. 자동 수정</b></label><div class="dim">2 에서 찾은 제안 중 심각도 <select id="l_sev"><option>CRITICAL</option><option selected>HIGH</option><option>MEDIUM</option><option>LOW</option></select> 이상을 심각한 순으로 최대 <input id="l_max" type="number" value="1" min="1" max="10" style="width:56px"> 건, AI 가 고쳐 검증한 뒤 작업 브랜치(<code>claude/bugfix-…</code>)에 커밋합니다. 종류 제한: <input id="l_kinds" placeholder="bug,risk (비우면 전부)" style="width:170px"><br>고친 결과가 원격 저장소로 어디까지 가는지는 5 단계 또는(5 를 끄면) 프로젝트 설정 <b id="l_delivery_now">-</b> 을 따릅니다.</div></div>
+            <div class="step"><label><input type="checkbox" id="l_s_fix"> <b>3. 자동 수정</b></label><div class="dim">2 에서 찾은 제안 중 심각도 <select id="l_sev"><option>CRITICAL</option><option selected>HIGH</option><option>MEDIUM</option><option>LOW</option></select> 이상을 심각한 순으로 최대 <input id="l_max" type="number" value="1" min="1" max="10" style="width:56px"> 건, AI 가 고쳐 검증한 뒤 작업 브랜치(<code>claude/devloop-…</code>)에 커밋합니다. 종류 제한: <input id="l_kinds" placeholder="bug,risk (비우면 전부)" style="width:170px"><br>고친 결과가 원격 저장소로 어디까지 가는지는 5 단계 또는(5 를 끄면) 프로젝트 설정 <b id="l_delivery_now">-</b> 을 따릅니다.</div></div>
             <div class="step"><label><input type="checkbox" id="l_s_preview"> <b>4. 미리보기</b></label><div class="dim">3 에서 만든 수정본마다 프론트+백엔드+DB 사본을 띄워 접속 주소를 만듭니다(버전 탭·뷰어에서 열기). 레시피가 없으면 건너뜁니다.</div></div>
             <div class="step"><label><input type="checkbox" id="l_s_export"> <b>5. 원격 저장소로 보내기</b></label><div class="dim">3 의 수정본 브랜치를 <select id="l_mode"><option value="branch">원격에 브랜치만 올리기 (PR 없음)</option><option value="pr" selected>PR/MR 까지 만들기 (병합은 사람이)</option><option value="merge">재검증 뒤 자동 병합·배포까지</option></select><br>끄면 3 단계가 프로젝트 설정대로 처리합니다(보관만이면 이 서버에만 남고, 버전 탭에서 나중에 보낼 수 있음).</div></div>
           </div>
@@ -339,7 +339,7 @@
             <option value="local">보관만 - 키트 저장소 안 브랜치 (원격에 안 올림)</option>
           </select></div>
           <label></label><div class="dim" id="p_delivery_help" style="line-height:1.6">
-            AI 가 고친 코드는 항상 <code>claude/bugfix-&lt;리포트번호&gt;-&lt;날짜시각&gt;</code> 이름의 <b>작업 브랜치</b>에 커밋됩니다(기준 브랜치는 건드리지 않음). 어디까지 내보낼지:<br>
+            AI 가 고친 코드는 항상 <code>claude/devloop-&lt;리포트번호&gt;-&lt;날짜시각&gt;</code> 이름의 <b>작업 브랜치</b>에 커밋됩니다(기준 브랜치는 건드리지 않음). 어디까지 내보낼지:<br>
             · <b>보관만</b> - 키트 저장소 안에만 둡니다. 원격(GitHub/GitLab)엔 아무것도 안 생깁니다. 콘솔 버전 탭에서 미리보기로 확인한 뒤 내보내기.<br>
             · <b>브랜치 푸시만</b> - 그 작업 브랜치를 원격에 올립니다. PR/MR 은 안 만듭니다. 팀원이 브랜치를 받아 직접 검토·병합할 때.<br>
             · <b>PR 까지</b> - 브랜치를 올리고 기준 브랜치로 향하는 PR/MR 을 만듭니다. 병합은 사람이.<br>
@@ -362,8 +362,8 @@
           <div class="mods" id="mods"></div>
           <label></label><div><button class="btn" id="addMod">+ 모듈</button></div>
           <label>화면 확인 <small>front-check</small></label>
-          <div class="inline"><input id="p_fc_cwd" class="w140" placeholder="cwd (예: web)"><input id="p_fc_cmd" class="grow" placeholder="npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json"><input id="p_fc_when" class="w120" placeholder="when: front"></div>
-          <label>보호 경로 <small>AI 가 바꾸면 되돌림. 줄마다 하나</small></label><textarea id="p_protectedPaths" style="min-height:44px" placeholder="web/src/utils/bugfixKit.js&#10;.github/workflows/"></textarea>
+          <div class="inline"><input id="p_fc_cwd" class="w140" placeholder="cwd (예: web)"><input id="p_fc_cmd" class="grow" placeholder="npx front-check check --context ../.devloop/context.json --out ../.devloop/after --json"><input id="p_fc_when" class="w120" placeholder="when: front"></div>
+          <label>보호 경로 <small>AI 가 바꾸면 되돌림. 줄마다 하나</small></label><textarea id="p_protectedPaths" style="min-height:44px" placeholder="web/src/utils/devloopKit.js&#10;.github/workflows/"></textarea>
           <label>허용 도구 <small>줄마다 하나</small></label><textarea id="p_allowedTools" style="min-height:50px"></textarea>
           <label>환경변수 <small>KEY=VALUE</small></label><textarea id="p_env" style="min-height:44px" placeholder="NODE_OPTIONS=--openssl-legacy-provider"></textarea>
         </div>
@@ -428,13 +428,13 @@
   </section>
 </main>
 
-<script src="client/bugfix-client.iife.js"></script>
+<script src="client/devloop-client.iife.js"></script>
 <script>
 (() => {
-  // 서버 API 는 이 페이지 위치 기준 - /api/ui/ 에서 서빙되므로 상위(../)가 /api/. nginx 로 /bugfix/ui/ 면 ../ 는 /bugfix/
+  // 서버 API 는 이 페이지 위치 기준 - /api/ui/ 에서 서빙되므로 상위(../)가 /api/. nginx 로 /devloop/ui/ 면 ../ 는 /devloop/
   const API = new URL('../', location.href).href.replace(/\/$/, '');
   const $ = (s) => document.querySelector(s);
-  const KEY = 'bugfix-admin-key';
+  const KEY = 'devloop-admin-key';
   let key = localStorage.getItem(KEY) || '';
   // 한 서버가 여러 앱을 들 수 있다 - 콘솔을 연 주소(앱 도메인)가 어느 프로젝트의 cors 에 있으면 그 프로젝트만 보인다(헤더·제목·파비콘도 그 이름)
   let scope = null, scopeReady = false;
@@ -444,12 +444,12 @@
   const mqR = matchMedia('(max-width: 720px)'), mqI = matchMedia('(max-width: 1000px)');
   const applyCardRows = () => { $('#rTable').classList.toggle('cardrows', mqR.matches); $('#iTable').classList.toggle('cardrows', mqI.matches); $('#vTable').classList.toggle('cardrows', mqI.matches); $('#lTable').classList.toggle('cardrows', mqI.matches); };
   mqR.addEventListener('change', applyCardRows); mqI.addEventListener('change', applyCardRows); applyCardRows();
-  const I18N = window.BugfixKit && BugfixKit.i18n;
+  const I18N = window.DevLoop && DevLoop.i18n;
   const LANG = I18N ? I18N.detectLang() : 'ko';
   document.documentElement.lang = LANG;
   if (I18N) { I18N.translateTree(document.body, LANG); document.title = LANG === 'en' ? document.title.replace('관리', 'console') : document.title; }
   document.querySelectorAll('#langSeg button').forEach((b) => { b.classList.toggle('on', b.dataset.lang === LANG); b.addEventListener('click', () => { if (b.dataset.lang !== LANG) { I18N && I18N.setLang(b.dataset.lang); location.reload(); } }); });
-  const F = window.BugfixKit && BugfixKit.fmt;
+  const F = window.DevLoop && DevLoop.fmt;
   if (F) { const st = document.createElement('style'); st.textContent = F.FMT_CSS; document.head.appendChild(st); }
   const logHtml = (t) => (F ? F.logHtml(t) : null), mdLite = (t) => (F ? F.mdLite(t) : null), diffHtml = (p, st) => (F ? F.diffHtml(p, st) : null);
   const setLog = (el, text) => { const h = logHtml(text); if (h != null) el.innerHTML = h; else el.textContent = text; };
@@ -457,7 +457,7 @@
   const ago = (iso) => { if (!iso) return ''; const s = Math.max(0, (Date.now() - new Date(iso)) / 1000); return s < 60 ? `${Math.floor(s)}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
   const fixLabel = { NONE: '요청 전', QUEUED: '대기', RUNNING: '수정 중', READY: '수정본 준비', PR_OPENED: 'PR 열림', MERGED: '병합', FAILED: '실패', REVERTED: '되돌림' };
   const deliveryLabel = { merge: '자동 병합까지', pr: 'PR/MR 까지', branch: '원격 브랜치만', local: '보관만(이 서버)' };
-  const H = () => ({ 'X-Bugfix-Admin': key, 'Content-Type': 'application/json' });
+  const H = () => ({ 'X-Devloop-Admin': key, 'Content-Type': 'application/json' });
   async function api(method, path, body) {
     const r = await fetch(`${API}${path}`, { method, headers: H(), body: body === undefined ? undefined : JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
@@ -498,18 +498,18 @@
     allProjects = list.map((p) => p.name);
     const origin = location.origin.replace(/\/$/, '');
     const hit = list.filter((p) => (p.cors || []).some((o) => String(o).replace(/\/$/, '') === origin));
-    const saved = localStorage.getItem('bugfix-admin-scope');
+    const saved = localStorage.getItem('devloop-admin-scope');
     // 앱 하나 = 인스턴스 하나가 기본이라 프로젝트가 하나면 그것이 곧 범위. 여럿이면 저장된 선택 → 연 도메인 → 전체
     scope = allProjects.length === 1 ? allProjects[0] : (saved !== null ? (allProjects.includes(saved) ? saved : null) : (hit.length === 1 ? hit[0].name : null));
     applyScope();
   }
   function applyScope() {
-    const name = scope || 'bugfix-kit';
+    const name = scope || 'devloop';
     const sel = $('#scopeSel');
     sel.style.display = allProjects.length > 1 ? '' : 'none';
     sel.innerHTML = `<option value="">전체 (${allProjects.length})</option>` + allProjects.map((n) => `<option value="${esc(n)}" ${n === scope ? 'selected' : ''}>${esc(n)}</option>`).join('');
-    $('#brand').innerHTML = scope ? `${esc(scope)} <span class="dim" style="font-weight:400;font-size:12px">bugfix-kit</span>` : 'bugfix-kit';
-    document.title = scope ? `${scope} · bugfix-kit` : 'bugfix-kit 관리';
+    $('#brand').innerHTML = scope ? `${esc(scope)} <span class="dim" style="font-weight:400;font-size:12px">DevLoop</span>` : 'DevLoop';
+    document.title = scope ? `${scope} · DevLoop` : 'DevLoop 관리';
     // 파비콘: 프로젝트 이름 첫 글자 + 이름에서 뽑은 색 - 탭이 여럿 열려 있어도 어느 프로젝트인지 보이게
     let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
     const hue = h % 360;
@@ -519,7 +519,7 @@
   }
   function ensureKit() {
     if (kit) return;
-    kit = BugfixKit.createBugfix({ endpoint: API, user: 'admin', adminKey: key, hotkeys: false, lang: LANG, interceptors: { console: false }, projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })) }).mount();
+    kit = DevLoop.createDevloop({ endpoint: API, user: 'admin', adminKey: key, hotkeys: false, lang: LANG, interceptors: { console: false }, projects: data.projects.map((p) => ({ key: p.name, label: p.name, apiKey: p.apiKey })) }).mount();
   }
   // 시작 체크리스트 - 설정 상태와 빠른 점검으로 "남은 일" 을 보여 준다
   let quick = null;
@@ -679,7 +679,7 @@
     const pt = e.target.closest('[data-pstop]'); if (pt) { try { await api('DELETE', `/admin/versions/${vProject}/${pt.dataset.pstop}/preview`); await loadVersions(); } catch (x) { alert(x.message); } return; }
     const vd = e.target.closest('[data-vdiff]'); if (vd) { try { const d = await api('GET', `/admin/versions/${vProject}/${vd.dataset.vdiff}/diff`); $('#vDiff').hidden = false; $('#vDiffHead').textContent = `v${d.n} 변경`; { const h = diffHtml(d.patch, d.stat); if (h != null) $('#vDiffBody').innerHTML = h; else $('#vDiffBody').textContent = `${d.stat}\n\n${d.patch}`; } $('#vDiff').scrollIntoView({ behavior: 'smooth' }); } catch (x) { alert(x.message); } return; }
     const vl = e.target.closest('[data-vlog]'); if (vl) { try { const r = await api('GET', `/admin/versions/${vProject}`); const v = (r.versions || []).find((x) => String(x.n) === vl.dataset.vlog); if (v) showVLog(v); } catch (x) { alert(x.message); } return; }
-    const ve = e.target.closest('[data-vexport]'); if (ve) { const mode = prompt('이 수정본 브랜치(claude/bugfix-…)를 어디까지 내보낼까요?\n\n  branch - 원격에 브랜치만 올림 (PR 없음, 팀원이 직접 검토)\n  pr     - 브랜치 + 기준 브랜치로 향하는 PR/MR (병합은 사람이)\n  merge  - PR 만들고 재검증 뒤 자동 병합·배포 추적\n\n입력:', 'merge'); if (!mode || !['branch', 'pr', 'merge'].includes(mode)) return; try { await api('POST', `/p/${vProject}/reports/${ve.dataset.r}/merge`, { mode }); alert('내보내기를 시작했습니다 - 리포트 탭에서 진행을 볼 수 있습니다'); } catch (x) { alert(x.message); } return; }
+    const ve = e.target.closest('[data-vexport]'); if (ve) { const mode = prompt('이 수정본 브랜치(claude/devloop-…)를 어디까지 내보낼까요?\n\n  branch - 원격에 브랜치만 올림 (PR 없음, 팀원이 직접 검토)\n  pr     - 브랜치 + 기준 브랜치로 향하는 PR/MR (병합은 사람이)\n  merge  - PR 만들고 재검증 뒤 자동 병합·배포 추적\n\n입력:', 'merge'); if (!mode || !['branch', 'pr', 'merge'].includes(mode)) return; try { await api('POST', `/p/${vProject}/reports/${ve.dataset.r}/merge`, { mode }); alert('내보내기를 시작했습니다 - 리포트 탭에서 진행을 볼 수 있습니다'); } catch (x) { alert(x.message); } return; }
     const vx = e.target.closest('[data-vdel]'); if (vx) { if (!confirm(`v${vx.dataset.vdel} 을 지울까요? 미리보기·태그도 함께 지웁니다 (원격에 올린 것은 남습니다)`)) return; try { await api('DELETE', `/admin/versions/${vProject}/${vx.dataset.vdel}`); await loadVersions(); } catch (x) { alert(x.message); } return; }
     const op = e.target.closest('[data-open]'); if (op && kit) { e.preventDefault(); kit.setProject(vProject); kit.openViewer(Number(op.dataset.open)); return; }
   });
@@ -1068,13 +1068,13 @@
       + (g.extra?.length ? `<div class="dim">그 밖의 키: ${g.extra.map(esc).join(', ')}</div>` : '')
       + `<div class="secret"><label>새 키 추가</label><input data-scope="global" data-k="__new" placeholder="KEY=VALUE"><div><button class="btn" data-save="__new" data-scope="global">저장</button></div></div>`;
     $('#splist').hidden = settings.projects.length < 2;
-    $('#splist').innerHTML = settings.projects.map((p) => `<button data-sp="${esc(p.name)}" class="${secretProject === p.name ? 'on' : ''}"><div class="n">${esc(p.name)}</div><div class="d">API 키 ${p.secrets.BUGFIX_API_KEY || p.apiKeySet ? '✓' : '–'} · GitHub ${p.secrets.GITHUB_TOKEN ? '전용' : '공용'} · 계정 ${p.secrets.FC_USER ? esc(p.secrets.FC_USER) : (g.FC_USER ? '공용' : '–')}</div></button>`).join('');
+    $('#splist').innerHTML = settings.projects.map((p) => `<button data-sp="${esc(p.name)}" class="${secretProject === p.name ? 'on' : ''}"><div class="n">${esc(p.name)}</div><div class="d">API 키 ${p.secrets.DEVLOOP_API_KEY || p.apiKeySet ? '✓' : '–'} · GitHub ${p.secrets.GITHUB_TOKEN ? '전용' : '공용'} · 계정 ${p.secrets.FC_USER ? esc(p.secrets.FC_USER) : (g.FC_USER ? '공용' : '–')}</div></button>`).join('');
     if (!secretProject || !settings.projects.some((p) => p.name === secretProject)) secretProject = settings.projects[0]?.name || '';
     const p = settings.projects.find((x) => x.name === secretProject);
-    $('#psec').innerHTML = p ? `<h3 style="margin:0 0 10px">${esc(p.name)} <span class="dim">~/.config/bugfix-kit/projects/${esc(p.name)}.env</span></h3>`
+    $('#psec').innerHTML = p ? `<h3 style="margin:0 0 10px">${esc(p.name)} <span class="dim">~/.config/devloop/projects/${esc(p.name)}.env</span></h3>`
       + secretRow(p.name, 'FC_USER', '테스트 계정 아이디', p.secrets.FC_USER, '', false)
       + secretRow(p.name, 'FC_PASS', '테스트 계정 비밀번호', p.secrets.FC_PASS, '', true)
-      + secretRow(p.name, 'BUGFIX_API_KEY', 'API 키', p.secrets.BUGFIX_API_KEY, '', false)
+      + secretRow(p.name, 'DEVLOOP_API_KEY', 'API 키', p.secrets.DEVLOOP_API_KEY, '', false)
       + (p.host === 'gitlab'
         ? secretRow(p.name, 'GITLAB_TOKEN', 'GitLab 토큰', p.secrets.GITLAB_TOKEN, `${p.gitlabUrl}/-/user_settings/personal_access_tokens 에서 api + write_repository 스코프로 발급`, true)
         : secretRow(p.name, 'GITHUB_TOKEN', 'GitHub 토큰 (전용 - 비우면 공용 토큰)', p.secrets.GITHUB_TOKEN, 'classic PAT, repo 스코프', true))
@@ -1149,7 +1149,7 @@
   $('#saveServer').onclick = async () => { const b = {}; for (const k of ['port', 'claudeBin', 'pathExtra', 'javaHome', 'model', 'maxTurns', 'timeoutMinutes', 'verifyTimeoutMinutes', 'workDir', 'dataDir']) b[k] = $(`#s_${k}`).value; $('#smsg').textContent = '저장 중…'; try { const r = await api('PUT', '/admin/server', b); $('#smsg').textContent = r.restartNeeded ? '저장됨 - 포트는 재시작 뒤 적용' : '저장됨 - 바로 적용'; } catch (e) { $('#smsg').textContent = e.message; } };
   $('#loadLogs').onclick = loadLogs;
   $('#scopeSel').addEventListener('change', async (e) => {
-    scope = e.target.value || null; localStorage.setItem('bugfix-admin-scope', scope || '');
+    scope = e.target.value || null; localStorage.setItem('devloop-admin-scope', scope || '');
     applyScope(); data = null; settings = null; kGraphKey = ''; kg3d = null; $('#kGraph').innerHTML = '';
     await load();
     if (['projects', 'secrets', 'server', 'checks'].includes(tab)) await loadSettings().catch((x) => alert(x.message));

@@ -1,4 +1,4 @@
-package dev.bugfixkit.spring;
+package dev.devloop.spring;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -6,31 +6,31 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * application.properties 의 `bugfix.*`. 전부 선택이다.
+ * application.properties 의 `devloop.*`. 전부 선택이다.
  *
- *   bugfix.server=http://127.0.0.1:8790     이미 떠 있는 인스턴스로 프록시만 (워커는 안 띄움)
- *   bugfix.worker.enabled=true              Node 가 있으면 앱과 같이 워커를 띄운다(기본 true, server 가 비어 있을 때만)
- *   bugfix.repo / bugfix.base-branch        저장소 주소·브랜치 (없으면 git.properties 나 작업 디렉터리의 git 에서)
- *   bugfix.project                          프로젝트 이름 (없으면 spring.application.name → 저장소 이름)
- *   bugfix.verify                           검증 명령 목록 (없으면 gradlew 가 있으면 `./gradlew compileJava -x test`)
- *   bugfix.data-dir                         데이터 위치 (기본 ~/.bugfix-data/<프로젝트>)
+ *   devloop.server=http://127.0.0.1:8790     이미 떠 있는 인스턴스로 프록시만 (워커는 안 띄움)
+ *   devloop.worker.enabled=true              Node 가 있으면 앱과 같이 워커를 띄운다(기본 true, server 가 비어 있을 때만)
+ *   devloop.repo / devloop.base-branch        저장소 주소·브랜치 (없으면 git.properties 나 작업 디렉터리의 git 에서)
+ *   devloop.project                          프로젝트 이름 (없으면 spring.application.name → 저장소 이름)
+ *   devloop.verify                           검증 명령 목록 (없으면 gradlew 가 있으면 `./gradlew compileJava -x test`)
+ *   devloop.data-dir                         데이터 위치 (기본 ~/.devloop-data/<프로젝트>)
  */
-@ConfigurationProperties(prefix = "bugfix")
-public class BugfixProperties {
+@ConfigurationProperties(prefix = "devloop")
+public class DevloopProperties {
 
-    /** 이미 떠 있는 bugfix-kit 인스턴스 주소(/api 없이). 비어 있으면 워커를 직접 띄운다 */
+    /** 이미 떠 있는 devloop 인스턴스 주소(/api 없이). 비어 있으면 워커를 직접 띄운다 */
     private String server = "";
     /** 앱 REST 에서 인스턴스로 넘기는 경로 */
-    private String path = "/bugfix";
+    private String path = "/devloop";
     /** 최근 로그 끝점 경로 (앱 프론트의 backendLogs 가 부른다) */
     private String logsPath = "/debug/recent-logs";
     /** 메모리 로그 버퍼 크기 */
     private int logBuffer = 500;
-    /** 이 인스턴스가 bugfix-kit 미리보기면 "v{n}" (키트가 컨테이너 env BUGFIX_PREVIEW 로 넣음). 앱이 저장 경로·큐 이름에 접두어를 붙이거나 화면에 표시하는 데 쓴다 */
+    /** 이 인스턴스가 devloop 미리보기면 "v{n}" (키트가 컨테이너 env DEVLOOP_PREVIEW 로 넣음). 앱이 저장 경로·큐 이름에 접두어를 붙이거나 화면에 표시하는 데 쓴다 */
     private String preview = "";
     /** 프록시(콘솔·미리보기 백엔드) 응답 대기 상한(초) - 긴 가져오기·변환이 중간에 끊기지 않게 */
     private int proxyTimeoutSeconds = 600;
-    /** Spring Security 가 있으면 path 를 허용 목록에 넣는다(인증은 bugfix-kit 이 따로 한다) */
+    /** Spring Security 가 있으면 path 를 허용 목록에 넣는다(인증은 devloop 이 따로 한다) */
     private boolean securityIgnore = true;
 
     private String project = "";
@@ -55,10 +55,10 @@ public class BugfixProperties {
         private String node = "";
         /** 워커가 들을 포트 (0 이면 빈 포트) */
         private int port = 0;
-        /** 설치할 bugfix-kit 버전(git 태그). 비어 있으면 이 스타터와 같은 버전 */
+        /** 설치할 devloop 버전(git 태그). 비어 있으면 이 스타터와 같은 버전 */
         private String kitVersion = "";
-        /** bugfix-kit 패키지 주소 */
-        private String kitSource = "github:hskim2515/bugfix-kit";
+        /** devloop 패키지 주소 */
+        private String kitSource = "github:hskim2515/devloop";
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }

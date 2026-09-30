@@ -26,17 +26,17 @@ const CONFLICT_TOOLS = [
   'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(sed -n:*)',
   'Bash(node --check:*)', 'Bash(npm test:*)',
 ];
-const GIT_ID = ['-c', 'user.name=Claude Bugfix', '-c', 'user.email=claude-bugfix@bugfix-kit.local'];
+const GIT_ID = ['-c', 'user.name=Claude Devloop', '-c', 'user.email=claude-devloop@devloop.local'];
 
 /**
  * 버그 리포트를 Claude Code 로 고쳐 브랜치를 푸시하고 PR 을 만든 뒤 병합까지 한다.
  *
  * 한 번에 하나씩(프로세스 전체 단일 큐 - Claude 를 동시에 여러 개 돌리지 않는다). 작업마다:
  *   1. {workDir}/{project}/repo 가 없으면 clone, 있으면 fetch → {workDir}/{project}/jobs/{id} 에 base 브랜치 worktree
- *   2. 리포트를 worktree/.bugfix/ 에 파일로 푼다
- *   3. claude -p <프롬프트> (stream-json 으로 진행 로그) - Claude 는 .bugfix/result.md 에 결과를 쓴다
+ *   2. 리포트를 worktree/.devloop/ 에 파일로 푼다
+ *   3. claude -p <프롬프트> (stream-json 으로 진행 로그) - Claude 는 .devloop/result.md 에 결과를 쓴다
  *   4. 변경이 없으면 FAILED. 있으면 바뀐 모듈의 verify 명령으로 검증
- *   5. 브랜치 claude/bugfix-{id}-{시각} 커밋·푸시 → PR → PR_OPENED
+ *   5. 브랜치 claude/devloop-{id}-{시각} 커밋·푸시 → PR → PR_OPENED
  *   6. (autoMerge) base 가 움직였으면 합쳐 재검증(충돌은 Claude 가 해결) → 푸시 → 병합 → 실제 반영 확인 → MERGED
  *   7. worktree 정리
  * 단계마다 fixLog 에 한 줄씩 남겨 화면에서 진행을 볼 수 있다. 토큰은 git 의 http.extraheader 로만 넘긴다.
@@ -88,8 +88,8 @@ export class Runner {
   async logLine(project, id, line) {
     const stamped = `${hhmmss()}  ${line}`;
     try { await this.store.update(project.name, id, (c) => ({ ...c, fixLog: (c.fixLog || '') + stamped + '\n', fixUpdatedAt: nowIso() })); }
-    catch (e) { this.log.warn('[bugfix] fixLog 기록 실패:', e.message); }
-    this.log.info(`[bugfix ${project.name}#${id}] ${line}`);
+    catch (e) { this.log.warn('[devloop] fixLog 기록 실패:', e.message); }
+    this.log.info(`[devloop ${project.name}#${id}] ${line}`);
   }
   /** fixStatus 등 부분 갱신 (null 값은 건너뜀) */
   async updateFix(project, id, patch) {
@@ -150,7 +150,7 @@ export class Runner {
     lane.busy = true;
     (async () => {
       try { await item.job(); }
-      catch (e) { this.log.error(`[bugfix ${item.project}#${item.id}] 실패`, e); try { await item.onError(e); } catch { /* */ } }
+      catch (e) { this.log.error(`[devloop ${item.project}#${item.id}] 실패`, e); try { await item.onError(e); } catch { /* */ } }
       finally { lane.busy = false; this.pump(lane); }
     })();
   }
@@ -191,7 +191,7 @@ export class Runner {
     const gh = this.gh(project);
     const base = project.baseBranch;
     const { repo, jobs, wt } = this.paths(project, id);
-    const branch = `claude/bugfix-${id}-${stamp()}`;
+    const branch = `claude/devloop-${id}-${stamp()}`;
     const auth = gh.gitAuthHeader();
     const L = (s) => this.logLine(project, id, s);
 
@@ -201,9 +201,9 @@ export class Runner {
     await L(`작업 사본 준비: ${base} @ ${(await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim()}`);
 
     try {
-      await writeReportFiles(path.join(wt, '.bugfix'), r);
-      const kg = await this.knowledge?.writeFor(project, path.join(wt, '.bugfix'), r).catch(() => false);
-      await L(`리포트 자료 준비 (.bugfix/)${kg ? ' + 지식 그래프 관련 부분' : ''}`);
+      await writeReportFiles(path.join(wt, '.devloop'), r);
+      const kg = await this.knowledge?.writeFor(project, path.join(wt, '.devloop'), r).catch(() => false);
+      await L(`리포트 자료 준비 (.devloop/)${kg ? ' + 지식 그래프 관련 부분' : ''}`);
       await this.prepareNodeModules(project, ex, wt, L);
 
       await L(`Claude Code 실행 중… (최대 ${this.cfg.server.timeoutMinutes}분)`);
@@ -215,7 +215,7 @@ export class Runner {
       await this.revertProtected(project, ex, wt, L);
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!changed) {
-        const reason = await readIfExists(path.join(wt, '.bugfix/result.md'));
+        const reason = await readIfExists(path.join(wt, '.devloop/result.md'));
         const lib = /^#\s*라이브러리 문제/.test(reason.trim());
         await this.updateFix(project, id, { fixStatus: 'FAILED', fixSummary: lib ? `${firstLine(reason, 120)} - 이 저장소가 아니라 해당 패키지 저장소에서 고쳐야 합니다 (진행 로그의 결과 참고)` : `Claude 가 코드를 바꾸지 않았습니다. ${firstLine(reason, 200)}` });
         await L(`✗ 변경 없음 - 결과:\n${reason.trim().slice(0, 1500)}`);
@@ -228,7 +228,7 @@ export class Runner {
       await L('✓ 검증 통과');
       const check = await this.frontCheck(project, ex, id, wt, mods);
 
-      const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
+      const result = parseResult(await readIfExists(path.join(wt, '.devloop/result.md')));
       const summary = result.title || `버그 #${id} 수정`;
       await this.saveSuggestions(project, id, result.body, changed);
       const commitMsg = `fix: ${summary} (버그 #${id})\n\n${result.body || ''}\n\n버그 리포트 #${id}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
@@ -239,8 +239,8 @@ export class Runner {
       const n = await this.recordVersion(project, id, ex, wt, branch, base, summary, L);
       const repro = await this.afterFix(project, id, ex, wt, branch, base, summary, n, mods, sessionIdOf(out));
       // 보고자·문제 원문은 저장소를 보는 모든 사람에게 공개되므로 PR 본문에 넣지 않는다 - 번호로 앱 안에서 찾아본다
-      const latest = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
-      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}${repro.ran ? `\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 bugfix-kit 이 Claude Code 를 돌려 만들었습니다. `;
+      const latest = parseResult(await readIfExists(path.join(wt, '.devloop/result.md')));
+      const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}${repro.ran ? `\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 'Claude 에게 수정 요청' 으로 devloop 이 Claude Code 를 돌려 만들었습니다. `;
       await this.deliver(project, ex, gh, id, wt, branch, auth, { summary: latest.title || summary, prBody, existingPr: null }, mods);
     } finally {
       await this.removeWorktree(ex, repo, wt);
@@ -288,16 +288,16 @@ export class Runner {
     }
     await this.freshWorktree(ex, repo, jobs, wt, startRef);
     if (cont) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', r.fixBranch, startRef]);
-    await writeReportFiles(path.join(wt, '.bugfix'), r);
-    await this.knowledge?.writeFor(project, path.join(wt, '.bugfix'), r).catch(() => false);
+    await writeReportFiles(path.join(wt, '.devloop'), r);
+    await this.knowledge?.writeFor(project, path.join(wt, '.devloop'), r).catch(() => false);
     await this.prepareNodeModules(project, ex, wt, L, true);
 
     try {
       const allowed = allowChange ? this.allowedTools(project) : READ_ONLY_TOOLS;
       const preface = allowChange
         ? '사용자의 추가 요청입니다. 앞서 고친 내용 위에 아래 요청을 반영하세요. 고친 뒤 검증 명령을 통과시키고, '
-          + '`.bugfix/result.md` 를 같은 형식(# 한 줄 요약 / ## 원인 / ## 고친 내용 / ## 검증 / ## 확인이 필요한 점 / ## 추천 개선)으로 다시 쓰세요. '
-          + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. `.bugfix/repro.json`(재현 절차: api·steps, 저장 대상 식별자는 미리보기 전용 값)도 맞게 두세요 - 고친 뒤 서버가 미리보기에서 그 절차를 돌려 확인합니다. '
+          + '`.devloop/result.md` 를 같은 형식(# 한 줄 요약 / ## 원인 / ## 고친 내용 / ## 검증 / ## 확인이 필요한 점 / ## 추천 개선)으로 다시 쓰세요. '
+          + '## 추천 개선 은 이번 요청으로 끝난 항목은 빼고 남은 것만 적습니다. `.devloop/repro.json`(재현 절차: api·steps, 저장 대상 식별자는 미리보기 전용 값)도 맞게 두세요 - 고친 뒤 서버가 미리보기에서 그 절차를 돌려 확인합니다. '
           + 'git 커밋·푸시는 하지 마세요. 마지막 답변은 무엇을 바꿨는지 한국어로 간단히.\n\n요청: '
         : '사용자의 질문입니다. 코드를 바꾸지 말고 한국어로 간결하게 답하세요. 필요하면 파일을 읽어 근거를 대세요.\n\n질문: ';
       let out = await this.claudeResume(project, ex, id, wt, r.fixSessionId, preface + message, allowed, allowChange ? 40 : 20);
@@ -318,16 +318,16 @@ export class Runner {
       await this.revertProtected(project, ex, wt, L);
       const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
       if (!allowChange || !changed) {
-        if (changed) { await ex.exec(wt, 1, ['git', 'checkout', '--', '.']); await ex.exec(wt, 1, ['git', 'clean', '-fdq', '-e', '.bugfix']); await L('질문 모드 - 변경 되돌림'); }
-        // 코드는 안 바꿨지만 재현 절차(.bugfix/repro.json)를 썼으면 보관된 버전으로 재현 검증만 돌린다 - 검증이 다시 고치면 그 커밋을 내보낸다
-        if (allowChange && cont && r.fixVersion != null && (await readIfExists(path.join(wt, '.bugfix/repro.json')) || notBlank(r.fixReproSpec))) {
+        if (changed) { await ex.exec(wt, 1, ['git', 'checkout', '--', '.']); await ex.exec(wt, 1, ['git', 'clean', '-fdq', '-e', '.devloop']); await L('질문 모드 - 변경 되돌림'); }
+        // 코드는 안 바꿨지만 재현 절차(.devloop/repro.json)를 썼으면 보관된 버전으로 재현 검증만 돌린다 - 검증이 다시 고치면 그 커밋을 내보낸다
+        if (allowChange && cont && r.fixVersion != null && (await readIfExists(path.join(wt, '.devloop/repro.json')) || notBlank(r.fixReproSpec))) {
           await L(`코드 변경은 없지만 재현 절차가 있어 v${r.fixVersion} 으로 재현 검증만 합니다`);
           const before = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
           const repro = await this.afterFix(project, id, ex, wt, r.fixBranch, base, r.fixSummary || `버그 #${id}`, r.fixVersion, [], sid || r.fixSessionId);
           const after = (await ex.exec(wt, 1, ['git', 'rev-parse', 'HEAD'])).trim();
           if (after !== before) {
-            const latest = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
-            const prBody = `버그 리포트 #${id} 재현 검증 뒤 수정 (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || ''}\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}\n\n---\n이 PR 은 bugfix-kit 의 재현 검증 루프가 만들었습니다.`;
+            const latest = parseResult(await readIfExists(path.join(wt, '.devloop/result.md')));
+            const prBody = `버그 리포트 #${id} 재현 검증 뒤 수정 (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || ''}\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}\n\n---\n이 PR 은 devloop 의 재현 검증 루프가 만들었습니다.`;
             await this.deliver(project, ex, gh, id, wt, r.fixBranch, auth, { summary: latest.title || r.fixSummary, prBody, existingPr: prOpen && r.fixPrNumber != null ? { number: r.fixPrNumber, url: r.fixPrUrl } : null }, []);
             return;
           }
@@ -341,19 +341,19 @@ export class Runner {
       await this.verify(project, ex, wt, mods);
       await L('✓ 검증 통과');
       const check = await this.frontCheck(project, ex, id, wt, mods);
-      const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
+      const result = parseResult(await readIfExists(path.join(wt, '.devloop/result.md')));
       const summary = result.title || `버그 #${id} 추가 수정`;
       await this.saveSuggestions(project, id, result.body, changed);
       const commitMsg = `fix: ${summary} (버그 #${id} 추가 요청)\n\n${result.body || ''}\n\n요청: ${firstLine(message, 200)}\n\nCo-Authored-By: Claude <noreply@anthropic.com>`;
-      const branch = cont ? r.fixBranch : `claude/bugfix-${id}-${stamp()}`;
+      const branch = cont ? r.fixBranch : `claude/devloop-${id}-${stamp()}`;
       if (!cont) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
       await ex.exec(wt, 1, ['git', 'add', '-A']);
       await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '-F', '-'], { stdin: commitMsg });
       await this.updateFix(project, id, { fixBranch: branch, fixSummary: summary });
       const n = await this.recordVersion(project, id, ex, wt, branch, base, summary, L);
       const repro = await this.afterFix(project, id, ex, wt, branch, base, summary, n, mods, sid || r.fixSessionId);
-      const latest = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
-      const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}${repro.ran ? `\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 bugfix-kit 이 만들었습니다.`;
+      const latest = parseResult(await readIfExists(path.join(wt, '.devloop/result.md')));
+      const prBody = `버그 리포트 #${id} 추가 요청 (앱의 버그 리포트 화면에서 확인)\n\n${latest.body || result.body || ''}${check ? `\n\n## 화면 확인(front-check)\n${check}` : ''}${repro.ran ? `\n\n## 재현 검증\n${repro.passed ? '✓ 통과' : '✗ 실패'} (${repro.rounds}회)\n${repro.note}` : ''}\n\n---\n이 PR 은 버그 리포트 화면의 Claude 자동 수정(추가 요청)으로 devloop 이 만들었습니다.`;
       const existingPr = prOpen && r.fixPrNumber != null ? { number: r.fixPrNumber, url: r.fixPrUrl } : null;
       await this.deliver(project, ex, gh, id, wt, branch, auth, { summary: latest.title || summary, prBody, existingPr }, mods);
     } finally {
@@ -402,8 +402,8 @@ export class Runner {
     if (!recipe) { await L('재현 검증 건너뜀 - 미리보기 레시피가 없습니다(프로젝트 탭)'); return out; }
     const r = await this.store.get(project.name, id);
     let repro = null;
-    try { repro = normRepro(JSON.parse(await readIfExists(path.join(wt, '.bugfix/repro.json')) || 'null')); } catch (e) { await L(`repro.json 을 읽지 못했습니다(${firstLine(e.message, 80)}) - 이전 절차·신고 요청으로 대체`); repro = null; }
-    // 이번에 안 썼으면 지난번 절차(.bugfix 는 커밋되지 않으므로 리포트에 보관해 둔 것)
+    try { repro = normRepro(JSON.parse(await readIfExists(path.join(wt, '.devloop/repro.json')) || 'null')); } catch (e) { await L(`repro.json 을 읽지 못했습니다(${firstLine(e.message, 80)}) - 이전 절차·신고 요청으로 대체`); repro = null; }
+    // 이번에 안 썼으면 지난번 절차(.devloop 는 커밋되지 않으므로 리포트에 보관해 둔 것)
     if (!repro || (!repro.api.length && !repro.steps.length)) { try { repro = normRepro(JSON.parse(r.fixReproSpec || 'null')); } catch { repro = null; } }
     // 그것도 없으면 신고된 실패 요청으로 만든다
     if (!repro || (!repro.api.length && !repro.steps.length)) {
@@ -476,7 +476,7 @@ export class Runner {
         else {
           try {
             const bin = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'front-check', 'bin', 'front-check.mjs');
-            const outDir = path.join(wt, '.bugfix', 'repro-out');
+            const outDir = path.join(wt, '.devloop', 'repro-out');
             const txt = await ex.exec(wt, 10, ['node', bin, 'check', '--url', url, '--no-serve', '--json', '--out', outDir, '--steps', JSON.stringify(repro.steps.slice(0, 30))], { env: { ...process.env, ...(project.env || {}) } });
             const i = txt.indexOf('{'); const j = i >= 0 ? JSON.parse(txt.slice(i)) : null;
             const c = j?.collected || {};
@@ -494,7 +494,7 @@ export class Runner {
       // 3) 증거 모아 다시 고치기
       const logs = (await ex.execOut(wt, 1, ['docker', 'logs', '--tail', '300', v.preview.container])).split(/\r?\n/);
       const errLines = logs.filter((l) => /exception|error|caused by|\tat /i.test(l)).slice(-60);
-      const msg = `재현 검증 ${round}회에서 **여전히 실패**했습니다. 수정본을 실제로 띄워(미리보기 v${n}) 신고된 요청·절차를 다시 돌린 결과입니다:\n${evid.join('\n')}\n\n미리보기 백엔드 로그(오류 부분):\n${errLines.join('\n').slice(0, 6000) || '(오류 줄 없음)'}\n\n증상 은폐(오류 메시지만 고치기)가 아니라 **실제 원인**을 찾아 고치세요. 요청은 사용자가 쓰는 경로 그대로(앱 → bugfix-kit 프록시 → 미리보기 백엔드) 보냈으니, 백엔드 로그에 요청이 정상 파라미터로 도착했는지부터 보세요. 필요하면 로그의 스택트레이스를 따라가세요. 고친 뒤 검증 명령을 통과시키고 \`.bugfix/result.md\` 를 갱신하고, 재현 절차가 잘못됐으면 \`.bugfix/repro.json\` 도 고치세요. git 커밋은 하지 마세요.`;
+      const msg = `재현 검증 ${round}회에서 **여전히 실패**했습니다. 수정본을 실제로 띄워(미리보기 v${n}) 신고된 요청·절차를 다시 돌린 결과입니다:\n${evid.join('\n')}\n\n미리보기 백엔드 로그(오류 부분):\n${errLines.join('\n').slice(0, 6000) || '(오류 줄 없음)'}\n\n증상 은폐(오류 메시지만 고치기)가 아니라 **실제 원인**을 찾아 고치세요. 요청은 사용자가 쓰는 경로 그대로(앱 → devloop 프록시 → 미리보기 백엔드) 보냈으니, 백엔드 로그에 요청이 정상 파라미터로 도착했는지부터 보세요. 필요하면 로그의 스택트레이스를 따라가세요. 고친 뒤 검증 명령을 통과시키고 \`.devloop/result.md\` 를 갱신하고, 재현 절차가 잘못됐으면 \`.devloop/repro.json\` 도 고치세요. git 커밋은 하지 마세요.`;
       await L(`Claude 에게 증거를 주고 다시 고칩니다 (${round}/${maxRounds})…`);
       const o2 = await this.claudeResume(project, ex, id, wt, sid, msg, this.allowedTools(project), 40);
       sid = sessionIdOf(o2) || sid; if (sid) await this.updateFix(project, id, { fixSessionId: sid });
@@ -505,7 +505,7 @@ export class Runner {
       await L(`변경 파일:\n${changed}`);
       const mods2 = uniqBy([...mods, ...this.changedModules(project, changed)], (m) => m.name);
       await L('검증…'); await this.verify(project, ex, wt, mods2); await L('✓ 검증 통과');
-      const result = parseResult(await readIfExists(path.join(wt, '.bugfix/result.md')));
+      const result = parseResult(await readIfExists(path.join(wt, '.devloop/result.md')));
       await this.saveSuggestions(project, id, result.body, (await ex.execOut(wt, 1, ['git', 'diff', '--name-only', `origin/${base}...HEAD`])).trim() + '\n' + changed);
       await ex.exec(wt, 1, ['git', 'add', '-A']);
       await ex.exec(wt, 1, ['git', ...GIT_ID, 'commit', '-q', '-F', '-'], { stdin: `fix: ${result.title || summary} (버그 #${id} · 재현 검증 ${round}회 뒤 수정)\n\n${result.body || ''}\n\nCo-Authored-By: Claude <noreply@anthropic.com>` });
@@ -523,7 +523,7 @@ export class Runner {
     const L = (s) => this.logLine(project, id, s);
     const base = project.baseBranch;
     const mode = modeOverride || project.delivery || 'merge';
-    // 어느 모드든 커밋된 소스 상태는 키트가 버전으로 갖는다(태그 bugfix/v{n}) - 콘솔 '버전' 탭에서 미리보기·diff·내보내기
+    // 어느 모드든 커밋된 소스 상태는 키트가 버전으로 갖는다(태그 devloop/v{n}) - 콘솔 '버전' 탭에서 미리보기·diff·내보내기
     await this.recordVersion(project, id, ex, wt, branch, base, summary, L);
     if (mode === 'local') {
       await this.updateFix(project, id, { fixStatus: 'READY', fixPushed: false });
@@ -565,7 +565,7 @@ export class Runner {
           if (!conflicts) throw new Error('병합 실패(충돌 아님)');
           await L(`충돌 ${conflicts.split(/\r?\n/).length}개 파일 - Claude 가 해결 중…\n${conflicts}`);
           await this.claudeConflict(project, ex, id, wt, conflicts);
-          const markers = await ex.execOut(wt, 1, ['git', 'grep', '-l', '-E', '^(<<<<<<<|=======|>>>>>>>)( |$)', '--', '.', ':!*.md', ':!.bugfix/*']);
+          const markers = await ex.execOut(wt, 1, ['git', 'grep', '-l', '-E', '^(<<<<<<<|=======|>>>>>>>)( |$)', '--', '.', ':!*.md', ':!.devloop/*']);
           if (markers.trim()) throw new Error(`충돌 표시가 남아 있습니다:\n${markers}`);
           // Claude 가 표시는 다 지웠는데 git add 를 못 했으면(경로·권한) 우리가 한다 - 표시가 없으니 해결된 파일이다
           const left = (await ex.exec(wt, 1, ['git', 'diff', '--name-only', '--diff-filter=U'])).trim();
@@ -616,9 +616,9 @@ export class Runner {
       this.knowledge?.afterMerge(project, `#${id} 병합`).catch(() => {});
       await gh.deleteBranch(branch);
       // 배포(GitHub Actions)는 큐를 막지 않고 따로 지켜본다 - 사용자에게 "끝까지" 는 배포까지다
-      this.watchDeploy(project, gh, id, sha).catch((e) => this.log.warn(`[bugfix ${project.name}#${id}] 배포 추적 실패: ${e.message}`));
+      this.watchDeploy(project, gh, id, sha).catch((e) => this.log.warn(`[devloop ${project.name}#${id}] 배포 추적 실패: ${e.message}`));
     } catch (e) {
-      this.log.warn(`[bugfix ${project.name}#${id}] 자동 병합 실패`, e);
+      this.log.warn(`[devloop ${project.name}#${id}] 자동 병합 실패`, e);
       await L(`✗ 자동 병합 실패 - PR 은 열려 있습니다: ${firstLine(e.message, 300)}`);
       await this.updateFix(project, id, { fixStatus: 'PR_OPENED' });
     }
@@ -677,7 +677,7 @@ export class Runner {
         if (!(age < 2 * 3600_000)) { await this.updateFix(project, r.bugReportId, { fixDeploy: 'TIMEOUT' }); continue; }
         await this.logLine(project, r.bugReportId, '워커가 다시 떠서 배포 추적을 이어갑니다…');
         this.watchDeploy(project, this.gh(project), r.bugReportId, r.fixMergeSha, Math.max(5, 30 - Math.floor(age / 60_000)))
-          .catch((e) => this.log.warn(`[bugfix ${project.name}#${r.bugReportId}] 배포 추적 실패: ${e.message}`));
+          .catch((e) => this.log.warn(`[devloop ${project.name}#${r.bugReportId}] 배포 추적 실패: ${e.message}`));
       }
     }
   }
@@ -734,7 +734,7 @@ export class Runner {
       await ex.exec(wt, 5, ['git', '-c', `http.extraheader=${auth}`, 'push', '-u', 'origin', branch]);
       await L(`브랜치 푸시: ${branch}`);
       const prTitle = `revert: 버그 #${id} 수정 되돌림`;
-      const pr = await gh.createPullRequest(prTitle, `버그 리포트 #${id} 의 수정(${r.fixMergeSha.slice(0, 8)})을 되돌립니다.${reason ? `\n\n사유: ${reason}` : ''}\n\n---\nbugfix-kit 콘솔의 '되돌리기' 로 만들었습니다.`, branch, base);
+      const pr = await gh.createPullRequest(prTitle, `버그 리포트 #${id} 의 수정(${r.fixMergeSha.slice(0, 8)})을 되돌립니다.${reason ? `\n\n사유: ${reason}` : ''}\n\n---\ndevloop 콘솔의 '되돌리기' 로 만들었습니다.`, branch, base);
       await L(`✓ 되돌리기 PR: ${pr.url}`);
       await this.updateFix(project, id, { fixRevertPrUrl: pr.url, fixRevertBranch: branch });
       if (project.delivery === 'merge') {
@@ -801,7 +801,7 @@ export class Runner {
         if (mode === 'merge') await this.autoMerge(project, ex, gh, id, wt, r.fixBranch, auth, { number: r.fixPrNumber, url: r.fixPrUrl }, `fix: ${orDash(r.fixSummary)} (버그 #${id})`, mods);
         else { await this.updateFix(project, id, { fixStatus: 'PR_OPENED' }); await L('PR 은 이미 있습니다 - 병합은 merge 모드로'); }
       } else {
-        const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${orDash(r.fixSummary)}\n\n---\n이 PR 은 bugfix-kit 콘솔의 '내보내기' 로 만들었습니다. `;
+        const prBody = `버그 리포트 #${id} (앱의 버그 리포트 화면에서 확인)\n\n${orDash(r.fixSummary)}\n\n---\n이 PR 은 devloop 콘솔의 '내보내기' 로 만들었습니다. `;
         await this.deliver(project, ex, gh, id, wt, r.fixBranch, auth, { summary: orDash(r.fixSummary), prBody, existingPr: null }, mods, mode);
       }
     } finally {
@@ -859,10 +859,10 @@ export class Runner {
     const timeout = Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2));
     if (notBlank(sessionId)) {
       try { return await this.claude(project, ex, id, wt, timeout, ['-p', '--resume', sessionId, prompt, ...tailArgs]); }
-      catch (e) { this.log.warn(`[bugfix] 세션 이어가기 실패, 새 세션으로: ${firstLine(e.message, 200)}`); await this.logLine(project, id, '이전 세션을 못 찾아 새 세션으로 시작'); }
+      catch (e) { this.log.warn(`[devloop] 세션 이어가기 실패, 새 세션으로: ${firstLine(e.message, 200)}`); await this.logLine(project, id, '이전 세션을 못 찾아 새 세션으로 시작'); }
     }
     return this.claude(project, ex, id, wt, timeout,
-      ['-p', '이전 대화 세션을 찾지 못해 새로 시작합니다. `.bugfix/summary.md` 와 `.bugfix/result.md`(있으면), `git log -3` 로 앞서 한 일을 먼저 파악하세요.\n\n' + prompt, ...tailArgs]);
+      ['-p', '이전 대화 세션을 찾지 못해 새로 시작합니다. `.devloop/summary.md` 와 `.devloop/result.md`(있으면), `git log -3` 로 앞서 한 일을 먼저 파악하세요.\n\n' + prompt, ...tailArgs]);
   }
 
   async claudeConflict(project, ex, id, wt, conflicts) {
@@ -870,9 +870,9 @@ export class Runner {
 ${conflicts}
 
 각 파일의 충돌 표시(<<<<<<<, =======, >>>>>>>)를 보고 양쪽 변경의 의도를 모두 살리는 쪽으로 해결하세요.
-HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 쪽은 그사이 base 에 들어온 다른 사람의 변경입니다.
+HEAD 쪽은 이 브랜치의 버그 수정(.devloop/summary.md 참고), 다른 쪽은 그사이 base 에 들어온 다른 사람의 변경입니다.
 한쪽을 통째로 버리지 마세요. 현재 디렉터리가 작업 사본이므로 해결한 파일은 그냥 \`git add <상대경로>\` 로 표시하세요(\`git -C\` 나 절대경로는 허용되지 않습니다). \`node --check\`, \`npm test\` 는 쓸 수 있습니다. 커밋은 하지 마세요.
-충돌 표시를 하나도 남기지 마세요. 해결 내용을 \`.bugfix/result.md\` 끝에 "## 충돌 해결" 절로 덧붙이세요.`;
+충돌 표시를 하나도 남기지 마세요. 해결 내용을 \`.devloop/result.md\` 끝에 "## 충돌 해결" 절로 덧붙이세요.`;
     await this.claude(project, ex, id, wt, Math.max(5, Math.floor(this.cfg.server.timeoutMinutes / 2)),
       ['-p', prompt, '--max-turns', '30', '--permission-mode', 'acceptEdits', '--allowedTools', CONFLICT_TOOLS.join(',')]);
   }
@@ -884,7 +884,7 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
       const items = parseSuggestions(body);
       const files = String(changed || '').split(/\r?\n/).map((l) => l.trim().replace(/^[A-Z?! ]{1,3}\s+/, '')).filter(Boolean);
       await this.updateFix(project, id, { fixSuggestions: items.length ? JSON.stringify(items) : null, fixReport: notBlank(body) ? body.slice(0, 20000) : undefined, fixFiles: files.length ? JSON.stringify(files.slice(0, 100)) : undefined });
-    } catch (e) { this.log.warn(`[bugfix ${project.name}#${id}] 수정 결과 저장 실패: ${e.message}`); }
+    } catch (e) { this.log.warn(`[devloop ${project.name}#${id}] 수정 결과 저장 실패: ${e.message}`); }
   }
 
   /** 기본 도구 + 프로젝트 허용 도구 + 검증 명령의 첫 단어(./gradlew, mvn …) - Claude 가 고친 뒤 스스로 컴파일해 볼 수 있게(승인 요청으로 턴을 낭비하지 않게) */
@@ -900,7 +900,7 @@ HEAD 쪽은 이 브랜치의 버그 수정(.bugfix/summary.md 참고), 다른 �
     return `${project.description || `\`${project.githubRepo}\``} 저장소입니다.
 사용자가 앱 안에서 신고한 버그 리포트 #${r.bugReportId} 를 고쳐 주세요. 이 작업은 서버에서 자동으로 돌고, 끝나면 사람이 검토할 PR 이 만들어집니다.
 
-리포트 자료는 \`.bugfix/\` 에 있습니다 (수정하거나 커밋하지 마세요):
+리포트 자료는 \`.devloop/\` 에 있습니다 (수정하거나 커밋하지 마세요):
   - summary.md: 문제 · 재현 절차 · 기대 결과
   - screenshot.png: 신고 당시 화면 (있으면 반드시 열어 보세요)
   - context.json: 앱 상태(화면·메뉴·켜진 데이터 등)
@@ -917,13 +917,13 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
 진행 방법:
   1. summary.md 와 screenshot.png, 로그의 오류 항목을 보고 무엇이 잘못됐는지 한 문장으로 정리합니다.
   2. 로그의 오류 메시지 · URL · 컴포넌트 이름으로 원인 코드를 찾습니다. 추측으로 여러 곳을 고치지 말고 원인 하나를 확정하세요.
-     원인을 확정할 수 없으면 코드를 고치지 말고 \`.bugfix/result.md\` 에 "원인 미확정" 과 조사 결과, 더 필요한 정보를 적고 끝내세요.
-     원인이 이 저장소 밖(\`node_modules\` 의 패키지 - 예: 버그 신고 창·뷰어 자체는 \`bugfix-kit\` 패키지)에 있으면 **아무 코드도 고치지 말고**
+     원인을 확정할 수 없으면 코드를 고치지 말고 \`.devloop/result.md\` 에 "원인 미확정" 과 조사 결과, 더 필요한 정보를 적고 끝내세요.
+     원인이 이 저장소 밖(\`node_modules\` 의 패키지 - 예: 버그 신고 창·뷰어 자체는 \`devloop\` 패키지)에 있으면 **아무 코드도 고치지 말고**
      result.md 첫 줄을 \`# 라이브러리 문제: <패키지명>\` 으로 쓰고, 패키지 안의 파일·원인·고칠 방법을 적고 끝내세요. node_modules 를 고치거나
      앱 쪽에 우회 코드를 덧대지 마세요 - 그 패키지의 저장소에서 고칩니다.
   3. 최소 범위로 고칩니다.
   4. 고친 모듈의 검증 명령이 통과해야 합니다. 통과하지 못하면 고치거나 되돌리세요. (바깥에서 한 번 더 검증합니다)
-  5. \`.bugfix/repro.json\` 에 **재현 절차**를 씁니다. 고친 뒤 서버가 수정본을 실제로 띄워(미리보기) 이 절차를 돌려 고쳐졌는지 확인하고,
+  5. \`.devloop/repro.json\` 에 **재현 절차**를 씁니다. 고친 뒤 서버가 수정본을 실제로 띄워(미리보기) 이 절차를 돌려 고쳐졌는지 확인하고,
      여전히 실패하면 증거(응답·서버 로그)를 주고 다시 고치게 합니다. 형식:
      \`\`\`
      { "api": [ { "method": "POST", "path": "/network/import/ktdb/save", "contentType": "multipart", "form": { "south": 37.5, "west": 127.0, "north": 37.51, "east": 127.01, "polygon": "[[[127.0,37.5],…]]" }, "timeoutSec": 180, "note": "신고된 500 요청" },
@@ -934,9 +934,9 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
        신고된 실패 요청(network-logs.json 의 status ≥ 400 항목)을 프론트가 실제로 보내는 형식대로. 실패 요청이 없으면 [].
      - steps: 화면에서 재현할 수 있으면 front-check 절차(goto/click/fill/waitFor/expect). 확실하지 않으면 [].
      - 통과 기준: 응답 status < 500 (expect.status 를 주면 그 값). 그러니 400대로 "정상 거절" 되는 요청은 넣지 마세요.
-     - **저장 대상 식별자(versionId·시나리오 키·파일 이름 등)는 실제 데이터 이름을 쓰지 말고 미리보기 전용 값(예: "bugfix-repro")** 으로 바꾸세요.
+     - **저장 대상 식별자(versionId·시나리오 키·파일 이름 등)는 실제 데이터 이름을 쓰지 말고 미리보기 전용 값(예: "devloop-repro")** 으로 바꾸세요.
        재현은 미리보기(DB·파일 사본)에서 돌지만 바깥 자원(SFTP·큐 등)을 공유할 수 있어 실제 데이터를 덮어쓰면 안 됩니다. 읽기는 실제 이름이어도 됩니다.
-  6. 마지막에 \`.bugfix/result.md\` 를 아래 형식으로 씁니다. 첫 줄이 PR 제목이 됩니다(한 줄, 60자 이내, 한국어).
+  6. 마지막에 \`.devloop/result.md\` 를 아래 형식으로 씁니다. 첫 줄이 PR 제목이 됩니다(한 줄, 60자 이내, 한국어).
      \`\`\`
      # <한 줄 요약>
      ## 원인
@@ -1042,7 +1042,7 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
       const saved = await shots.save(project.name, 'fix', id, outDir, r.screenshots, { label });
       if (saved.length) await this.updateFix(project, id, (cur) => ({ fixShots: mergeShots(cur.fixShots, saved) }));
       return saved;
-    } catch (e) { this.log.warn(`[bugfix ${project.name}#${id}] 스크린샷 보관 실패: ${e.message}`); return []; }
+    } catch (e) { this.log.warn(`[devloop ${project.name}#${id}] 스크린샷 보관 실패: ${e.message}`); return []; }
   }
 
   async prepareNodeModules(project, ex, wt, L, quiet = false) {
@@ -1091,7 +1091,7 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
       if (!fss.existsSync(path.join(repo, '.git'))) {
         await L('저장소 복제 중…');
         await ex.exec(root, 20, ['git', '-c', `http.extraheader=${auth}`, 'clone', '--no-checkout', '--branch', project.baseBranch, project.repo, repo]);
-        await fs.writeFile(path.join(repo, '.git', 'info', 'exclude'), '.bugfix/\n', 'utf8');
+        await fs.writeFile(path.join(repo, '.git', 'info', 'exclude'), '.devloop/\n', 'utf8');
       }
     });
   }
@@ -1112,7 +1112,7 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
   async removeWorktree(ex, repo, wt) {
     await this.mutex(`repo:${path.basename(path.dirname(repo))}`, async () => {
       try { await ex.exec(repo, 2, ['git', 'worktree', 'remove', '--force', wt]); }
-      catch (e) { this.log.warn('[bugfix] worktree 정리 실패:', e.message); }
+      catch (e) { this.log.warn('[devloop] worktree 정리 실패:', e.message); }
     });
   }
 }

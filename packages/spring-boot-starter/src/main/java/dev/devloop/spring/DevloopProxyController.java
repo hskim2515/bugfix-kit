@@ -1,4 +1,4 @@
-package dev.bugfixkit.spring;
+package dev.devloop.spring;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,11 +22,11 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * `${bugfix.path}/**` 를 bugfix-kit 인스턴스로 넘긴다 - 앱 프론트는 이미 REST 서버에 닿는 경로가 있으니 nginx 없이 `<REST 경로>/bugfix` 로 신고 서버·콘솔에 닿는다.
- * 대상은 bugfix.server 또는 이 앱이 띄운 워커(BugfixWorker).
+ * `${devloop.path}/**` 를 devloop 인스턴스로 넘긴다 - 앱 프론트는 이미 REST 서버에 닿는 경로가 있으니 nginx 없이 `<REST 경로>/devloop` 로 신고 서버·콘솔에 닿는다.
+ * 대상은 devloop.server 또는 이 앱이 띄운 워커(DevloopWorker).
  */
 @RestController
-public class BugfixProxyController {
+public class DevloopProxyController {
 
     private static final Set<String> SKIP = Set.of("host", "content-length", "connection", "transfer-encoding", "expect", "accept-encoding");
     private final HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(10)).build();
@@ -37,26 +37,26 @@ public class BugfixProxyController {
 
     private final int timeoutSeconds;
 
-    public BugfixProxyController(String path, Supplier<String> target) { this(path, target, () -> false); }
-    public BugfixProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting) { this(path, target, starting, 600); }
+    public DevloopProxyController(String path, Supplier<String> target) { this(path, target, () -> false); }
+    public DevloopProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting) { this(path, target, starting, 600); }
     /** timeoutSeconds: 워커·미리보기 백엔드 응답 대기 상한(긴 가져오기·변환이 끊기지 않게, 기본 600) */
-    public BugfixProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting, int timeoutSeconds) {
+    public DevloopProxyController(String path, Supplier<String> target, java.util.function.BooleanSupplier starting, int timeoutSeconds) {
         this.path = path.replaceAll("/+$", "");
         this.target = target;
         this.starting = starting;
         this.timeoutSeconds = timeoutSeconds > 0 ? timeoutSeconds : 600;
     }
 
-    @RequestMapping("${bugfix.path:/bugfix}/**")
+    @RequestMapping("${devloop.path:/devloop}/**")
     public ResponseEntity<byte[]> proxy(HttpServletRequest req) throws IOException, InterruptedException {
         String server = target.get();
         if (server == null || server.isBlank()) {
             boolean win = System.getProperty("os.name", "").toLowerCase().contains("win");
             String msg = starting.getAsBoolean()
-                ? "bugfix-kit 워커가 시작 중입니다 (앱 재배포 직후 10초~1분). 잠시 뒤 자동으로 다시 시도합니다."
+                ? "devloop 워커가 시작 중입니다 (앱 재배포 직후 10초~1분). 잠시 뒤 자동으로 다시 시도합니다."
                 : win
-                ? "bugfix-kit: Windows 에서는 로컬 워커를 띄우지 않습니다. 로컬 프로파일에 bugfix.server=http://<개발서버>:<워커 포트> 를 적어 개발서버 워커를 쓰거나, WSL2 에서 앱을 실행하세요."
-                : "bugfix-kit 이 아직 준비되지 않았습니다 - 워커가 시작 중이거나(앱 로그의 [bugfix-kit] 줄 확인) bugfix.server 가 비어 있고 node 가 없습니다. 로컬에서는 bugfix.server=http://<개발서버>:<워커 포트> 가 가장 간단합니다.";
+                ? "devloop: Windows 에서는 로컬 워커를 띄우지 않습니다. 로컬 프로파일에 devloop.server=http://<개발서버>:<워커 포트> 를 적어 개발서버 워커를 쓰거나, WSL2 에서 앱을 실행하세요."
+                : "devloop 이 아직 준비되지 않았습니다 - 워커가 시작 중이거나(앱 로그의 [devloop] 줄 확인) devloop.server 가 비어 있고 node 가 없습니다. 로컬에서는 devloop.server=http://<개발서버>:<워커 포트> 가 가장 간단합니다.";
             String json = "{\"message\":\"" + msg.replace("\"", "'") + "\",\"starting\":" + starting.getAsBoolean() + "}";
             return ResponseEntity.status(503).header("Retry-After", "5").contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(json.getBytes(StandardCharsets.UTF_8));
         }
@@ -71,7 +71,7 @@ public class BugfixProxyController {
         String ct = req.getContentType();
         if (body.length == 0 && ct != null && ct.toLowerCase().startsWith("multipart/")) {
             try {
-                String boundary = "----bugfixkit" + Long.toHexString(System.nanoTime());
+                String boundary = "----devloop" + Long.toHexString(System.nanoTime());
                 ByteArrayOutputStream bo = new ByteArrayOutputStream();
                 for (Part part : req.getParts()) {
                     bo.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));

@@ -1,9 +1,9 @@
-// bugfix-kit Spring Boot 스타터 - 의존성 한 줄로: 최근 로그 끝점 + /bugfix/** 프록시 + (Node 가 있으면) bugfix-kit 워커를 자식 프로세스로.
+// devloop Spring Boot 스타터 - 의존성 한 줄로: 최근 로그 끝점 + /devloop/** 프록시 + (Node 가 있으면) devloop 워커를 자식 프로세스로.
 plugins {
     id 'java-library'
     id 'maven-publish'
 }
-group = 'com.github.hskim2515.bugfix-kit'
+group = 'com.github.hskim2515.devloop'
 version = (findProperty('kitVersion') ?: new groovy.json.JsonSlurper().parse(file('../../package.json')).version)
 
 java { withSourcesJar() }
@@ -25,7 +25,7 @@ dependencies {
     compileOnly "com.fasterxml.jackson.core:jackson-databind:2.18.3"
 }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
-processResources { filesMatching('bugfix-kit.properties') { expand(version: project.version) } }
+processResources { filesMatching('devloop.properties') { expand(version: project.version) } }
 
 publishing {
     publications { maven(MavenPublication) { from components.java; artifactId = 'spring-boot-starter' } }

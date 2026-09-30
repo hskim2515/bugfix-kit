@@ -23,13 +23,13 @@ async function run(cmd, args, opts = {}) {
 }
 
 /**
- * 운영자 관리 API (X-Bugfix-Admin 키). 대시보드가 쓴다.
+ * 운영자 관리 API (X-Devloop-Admin 키). 대시보드가 쓴다.
  *   GET  /settings                    서버 설정 · 프로젝트 전체(비밀값은 마스킹) · 환경 상태
  *   PUT  /server                      server 블록 일부 갱신 → yml 저장 → 재로드
  *   PUT  /projects/:name              프로젝트 블록 추가/수정 → yml 저장 → 재로드
  *   DELETE /projects/:name
  *   PUT  /secrets/global              { GITHUB_TOKEN, ADMIN_KEY, ...KEY } → github-token 파일 / default.env
- *   PUT  /secrets/:project            { BUGFIX_API_KEY, GITHUB_TOKEN, FC_USER, FC_PASS, ...KEY } → projects/<name>.env (null 이면 삭제)
+ *   PUT  /secrets/:project            { DEVLOOP_API_KEY, GITHUB_TOKEN, FC_USER, FC_PASS, ...KEY } → projects/<name>.env (null 이면 삭제)
  *   POST /check/github                토큰으로 GitHub /user + 프로젝트별 저장소 접근
  *   POST /check/repo/:name            git ls-remote (토큰 헤더)
  *   POST /check/claude                claude 실행 파일·버전·로그인 흔적
@@ -39,9 +39,9 @@ async function run(cmd, args, opts = {}) {
  */
 export function adminRouter(cfg, store, runner, log = console) {
   const r = express.Router();
-  const CONFIG_DIR = expandHome('~/.config/bugfix-kit');
+  const CONFIG_DIR = expandHome('~/.config/devloop');
   const GLOBAL_ENV = path.join(CONFIG_DIR, 'default.env');
-  const TOKEN_FILE = expandHome(cfg.github.tokenFile || '~/.config/bugfix-kit/github-token');
+  const TOKEN_FILE = expandHome(cfg.github.tokenFile || '~/.config/devloop/github-token');
   const projEnv = (name) => path.join(CONFIG_DIR, 'projects', `${name}.env`);
   // 짧은 값(비밀번호 등)은 끝 글자도 보이지 않는다
   const mask = (v) => (notBlank(v) ? (String(v).length > 12 ? `설정됨 (…${String(v).slice(-4)})` : '설정됨') : '');
@@ -87,8 +87,8 @@ export function adminRouter(cfg, store, runner, log = console) {
         apiKeySet: mask(cfg.projects[name]?.apiKey),
         host: cfg.projects[name]?.host || 'github', gitlabUrl: cfg.projects[name]?.gitlabUrl || '',
         tokenOk: notBlank(cfg.githubToken(cfg.projects[name])),          // 이 프로젝트가 실제로 쓸 저장소 토큰이 있는가(프로젝트 → 공용 → 환경변수)
-        secrets: { BUGFIX_API_KEY: mask(env.BUGFIX_API_KEY), GITHUB_TOKEN: mask(env.GITHUB_TOKEN), GITLAB_TOKEN: mask(env.GITLAB_TOKEN), FC_USER: env.FC_USER || '', FC_PASS: mask(env.FC_PASS),
-          extra: Object.keys(env).filter((k) => !['BUGFIX_API_KEY', 'GITHUB_TOKEN', 'GITLAB_TOKEN', 'FC_USER', 'FC_PASS'].includes(k)) },
+        secrets: { DEVLOOP_API_KEY: mask(env.DEVLOOP_API_KEY), GITHUB_TOKEN: mask(env.GITHUB_TOKEN), GITLAB_TOKEN: mask(env.GITLAB_TOKEN), FC_USER: env.FC_USER || '', FC_PASS: mask(env.FC_PASS),
+          extra: Object.keys(env).filter((k) => !['DEVLOOP_API_KEY', 'GITHUB_TOKEN', 'GITLAB_TOKEN', 'FC_USER', 'FC_PASS'].includes(k)) },
         reports: (await store.list(name)).length,
       });
     }
@@ -167,7 +167,7 @@ export function adminRouter(cfg, store, runner, log = console) {
       try {
         const res = p.host === 'gitlab'
           ? await fetch(`${p.gitlabUrl}/api/v4/user`, { headers: { 'PRIVATE-TOKEN': token } })
-          : await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'bugfix-kit', Accept: 'application/vnd.github+json' } });
+          : await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'devloop', Accept: 'application/vnd.github+json' } });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) { out.projects.push({ name: p.name, ok: false, message: `토큰 거부: HTTP ${res.status} ${j.message || ''}` }); continue; }
         out.token = out.token || { ok: true, login: j.login || j.username, scopes: res.headers.get('x-oauth-scopes') || '' };
@@ -229,14 +229,14 @@ export function adminRouter(cfg, store, runner, log = console) {
       const text = log.recent(n);
       if (text.trim()) return { source: 'worker', text };
     }
-    const j = await run('journalctl', ['--user', '-u', 'bugfix-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { timeout: 20000 });
+    const j = await run('journalctl', ['--user', '-u', 'devloop-server', '-n', String(n), '--no-pager', '-o', 'short-iso'], { timeout: 20000 });
     if (j.status === 0 && j.stdout.trim() && !/^-- No entries --/.test(j.stdout.trim())) return { source: 'journalctl', text: j.stdout };
-    if (/ENOENT/.test(j.stderr || '')) return { source: 'worker', text: '(아직 남은 로그가 없습니다 - 이 인스턴스는 앱 프로세스가 띄운 워커라 전체 출력은 앱 로그에 [bugfix-kit] 접두어로 함께 남습니다)' };
-    const s = await run('systemctl', ['--user', 'status', 'bugfix-server', '-n', String(n), '--no-pager'], { timeout: 20000 });
+    if (/ENOENT/.test(j.stderr || '')) return { source: 'worker', text: '(아직 남은 로그가 없습니다 - 이 인스턴스는 앱 프로세스가 띄운 워커라 전체 출력은 앱 로그에 [devloop] 접두어로 함께 남습니다)' };
+    const s = await run('systemctl', ['--user', 'status', 'devloop-server', '-n', String(n), '--no-pager'], { timeout: 20000 });
     return { source: 'systemctl', text: s.stdout || s.stderr || '(로그를 읽을 수 없습니다 - journald 사용자 로그가 꺼져 있을 수 있습니다)' };
   }));
 
-  function readToken() { try { return fs.readFileSync(TOKEN_FILE, 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return process.env.BUGFIX_GITHUB_TOKEN || null; } }
+  function readToken() { try { return fs.readFileSync(TOKEN_FILE, 'utf8').trim().split(/\r?\n/)[0].trim() || null; } catch { return process.env.DEVLOOP_GITHUB_TOKEN || null; } }
   // du 는 디렉터리 크기에 비례해 오래 걸리므로 1분 캐시
   const duCache = new Map();
   async function du(d) {

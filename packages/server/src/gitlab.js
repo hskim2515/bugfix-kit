@@ -30,7 +30,7 @@ export class GitLab {
     if (!this.isConfigured()) throw new Error('GitLab 연동이 설정되지 않았습니다(GITLAB_TOKEN / projects.*.repo).');
     const res = await fetch(`${this.baseUrl}/api/v4/projects/${encodeURIComponent(this.project)}${path}`, {
       method,
-      headers: { 'PRIVATE-TOKEN': this.token(), Accept: 'application/json', 'User-Agent': 'bugfix-kit', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { 'PRIVATE-TOKEN': this.token(), Accept: 'application/json', 'User-Agent': 'devloop', ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();
@@ -48,7 +48,7 @@ export class GitLab {
   async createPullRequest(title, body, head, base) {
     const r = await this.call('POST', '/merge_requests', { title, description: body, source_branch: head, target_branch: base, remove_source_branch: false });
     if (!r?.web_url) throw new Error('GitLab MR 생성 응답이 비었습니다.');
-    this.log.info(`[bugfix] MR 생성 ${r.web_url}`);
+    this.log.info(`[devloop] MR 생성 ${r.web_url}`);
     return { number: r.iid, url: r.web_url };
   }
 
@@ -85,7 +85,7 @@ export class GitLab {
   async mergePullRequest(number, commitTitle) {
     const r = await this.call('PUT', `/merge_requests/${number}/merge`, { merge_commit_message: commitTitle, should_remove_source_branch: false, squash: false });
     if (r?.state !== 'merged') throw new Error(`GitLab 이 병합을 거부했습니다: ${r?.merge_error || r?.detailed_merge_status || ''}`);
-    this.log.info(`[bugfix] MR !${number} 병합 ${r.merge_commit_sha || r.sha}`);
+    this.log.info(`[devloop] MR !${number} 병합 ${r.merge_commit_sha || r.sha}`);
     return String(r.merge_commit_sha || r.sha);
   }
 
@@ -100,7 +100,7 @@ export class GitLab {
 
   async deleteBranch(branch) {
     try { await this.call('DELETE', `/repository/branches/${encodeURIComponent(branch)}`); }
-    catch (e) { this.log.warn(`[bugfix] 브랜치 삭제 실패 ${branch}: ${e.message}`); }
+    catch (e) { this.log.warn(`[devloop] 브랜치 삭제 실패 ${branch}: ${e.message}`); }
   }
 }
 

@@ -8,10 +8,10 @@ const noop = () => [];
 /**
  * SDK 진입점.
  *
- *   const kit = createBugfix({
- *     endpoint: 'https://lhdt.gaia3d.dev/bugfix',   // bugfix-server (…/api 까지. 비우면 서버 저장 없이 복사·다운로드만)
+ *   const kit = createDevloop({
+ *     endpoint: 'https://lhdt.gaia3d.dev/devloop',   // devloop-server (…/api 까지. 비우면 서버 저장 없이 복사·다운로드만)
  *     project: 'lhdt',
- *     apiKey: '…',                                   // X-Bugfix-Key (공개 키 - 남용 방지 수준)
+ *     apiKey: '…',                                   // X-Devloop-Key (공개 키 - 남용 방지 수준)
  *     user: () => loginId,                           // 보고자 표시명
  *     context: () => ({ camera, menus, activeData }),// 앱 전용 컨텍스트
  *     capture: { canvases: () => [viewer.canvas], beforeCapture: () => viewer.render(), ignore: ['.fab'] },
@@ -20,10 +20,10 @@ const noop = () => [];
  *     hotkeys: { report: 'Shift+F9', viewer: 'Shift+F10' },
  *     notify: ({ title, message, type }) => …,       // 알림 훅(없으면 UI 안에 표시)
  *   });
- *   kit.mount();            // <bugfix-report-modal>, <bugfix-viewer> 를 body 에 붙인다 (Web Component 빌드)
+ *   kit.mount();            // <devloop-report-modal>, <devloop-viewer> 를 body 에 붙인다 (Web Component 빌드)
  *   kit.openReport(); kit.openViewer();
  */
-export function createBugfix(options = {}) {
+export function createDevloop(options = {}) {
   const opt = { project: 'default', hotkeys: { report: 'Shift+F9', viewer: 'Shift+F10' }, interceptors: { console: true }, ...options };
   const ic = opt.interceptors || {};
   const getLogs = ic.console === false ? noop : installConsole(ic.console === true ? {} : ic.console);
@@ -67,8 +67,8 @@ export function createBugfix(options = {}) {
     /** Web Component 빌드에서: 두 엘리먼트를 body 에 붙이고 kit 을 넘긴다 */
     mount() {
       if (kit._els.modal) return kit;
-      const modal = document.createElement('bugfix-report-modal');
-      const viewer = document.createElement('bugfix-viewer');
+      const modal = document.createElement('devloop-report-modal');
+      const viewer = document.createElement('devloop-viewer');
       modal.kit = kit; viewer.kit = kit;
       document.body.append(modal, viewer);
       kit._els = { modal, viewer };

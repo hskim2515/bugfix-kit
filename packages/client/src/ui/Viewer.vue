@@ -1,5 +1,5 @@
 <template>
-  <div class="bugfix-root">
+  <div class="devloop-root">
     <!-- 바깥(오버레이)에서 누르고 뗀 경우에만 닫는다: 창 안에서 드래그하다 밖에서 떼면 click 이 오버레이로 가서 닫히던 문제 -->
     <div v-if="isOpen" class="brv-overlay"
       @mousedown="backdropPressed = $event.target === $event.currentTarget"
@@ -408,7 +408,7 @@ import * as fmt from '../core/fmt.js';
 import * as i18n from '../core/i18n.js';
 
 export default {
-  name: 'BugfixViewer',
+  name: 'DevloopViewer',
   props: { kit: { type: Object, default: null } },
   expose: ['open', 'close'],
   data() {

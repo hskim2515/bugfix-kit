@@ -1,5 +1,5 @@
 {
-  "name": "bugfix-kit",
+  "name": "devloop",
   "private": true,
   "description": "앱 안 버그 리포트 → Claude Code 자동 수정 → 검증 → PR → 병합 → 헤드리스 화면 확인. 여러 프로젝트에 붙이는 도구 모음",
   "workspaces": [
@@ -9,18 +9,18 @@
     "node": ">=18.17"
   },
   "scripts": {
-    "server": "node packages/server/bin/bugfix-server.mjs",
+    "server": "node packages/server/bin/devloop-server.mjs",
     "test": "npm test --workspaces --if-present"
   },
   "exports": {
     "./client": {
       "types": "./packages/client/types/index.d.ts",
-      "import": "./packages/client/dist/bugfix-client.js",
-      "default": "./packages/client/dist/bugfix-client.iife.js"
+      "import": "./packages/client/dist/devloop-client.js",
+      "default": "./packages/client/dist/devloop-client.iife.js"
     },
     "./client/vue": {
       "types": "./packages/client/types/index.d.ts",
-      "default": "./packages/client/dist/bugfix-client.vue.js"
+      "default": "./packages/client/dist/devloop-client.vue.js"
     },
     "./client/style.css": "./packages/client/dist/style.css",
     "./client/dist/*": "./packages/client/dist/*",
@@ -29,17 +29,17 @@
     "./adapters/express": "./packages/adapters/express.js",
     "./client/auto": {
       "types": "./packages/client/types/index.d.ts",
-      "default": "./packages/client/dist/bugfix-client.auto.js"
+      "default": "./packages/client/dist/devloop-client.auto.js"
     },
     "./vite": "./packages/vite/index.js",
     "./webpack": "./packages/webpack/index.js",
     "./webpack/bootstrap.js": "./packages/webpack/bootstrap.js",
     "./embed": "./packages/server/src/embed.js"
   },
-  "version": "0.1.98",
+  "version": "0.2.0",
   "bin": {
     "front-check": "packages/front-check/bin/front-check.mjs",
-    "bugfix-adapter": "./packages/adapters/bin/bugfix-adapter.mjs"
+    "devloop-adapter": "./packages/adapters/bin/devloop-adapter.mjs"
   },
   "dependencies": {
     "pixelmatch": "^6.0.0",

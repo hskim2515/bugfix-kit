@@ -26,7 +26,7 @@ export class Notifier {
   }
   /** 콘솔·미리보기 등 앱 주소 기준 절대 URL: project.publicUrl → cors[0] */
   appUrl(project) { return String(project.publicUrl || (project.cors || [])[0] || '').replace(/\/+$/, ''); }
-  consoleUrl(project) { const base = project.preview?.base || project.consolePath || '/bugfix'; const app = this.appUrl(project); return app ? `${app}${base}/ui/` : ''; }
+  consoleUrl(project) { const base = project.preview?.base || project.consolePath || '/devloop'; const app = this.appUrl(project); return app ? `${app}${base}/ui/` : ''; }
   abs(project, rel) { if (!rel) return ''; if (/^https?:/.test(rel)) return rel; const app = this.appUrl(project); return app ? `${app}${rel}` : rel; }
 
   /** payload: { title, lines[], url, level: 'info'|'ok'|'warn'|'bad' } */

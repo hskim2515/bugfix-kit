@@ -134,7 +134,7 @@ export class FileStore {
           fixUpdatedAt: nowIso(),
         }));
         if (!hasPr) redo.push(followup ? { project: p, id, kind: 'followup', message: followup.text, mode: /^추천 개선 실행:|수정|고쳐/.test(followup.text) ? 'change' : 'ask', prevStatus: null } : { project: p, id, kind: 'fix' });
-        log.warn(`[bugfix] ${p}#${id} 재시작으로 끊김 → ${hasPr ? 'PR_OPENED' : '다시 큐에'}`);
+        log.warn(`[devloop] ${p}#${id} 재시작으로 끊김 → ${hasPr ? 'PR_OPENED' : '다시 큐에'}`);
       }
     }
     return redo;

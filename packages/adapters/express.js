@@ -1,13 +1,13 @@
 /**
- * bugfix-kit 백엔드 로그 어댑터(Node/Express) - console 출력을 링 버퍼에 모으고 `/debug/recent-logs` 로 돌려준다.
+ * devloop 백엔드 로그 어댑터(Node/Express) - console 출력을 링 버퍼에 모으고 `/debug/recent-logs` 로 돌려준다.
  *
- *   import { bugfixLogs } from 'bugfix-kit/adapters/express';
- *   const logs = bugfixLogs({ max: 500 });      // console.* 을 가로채 모은다(원래 출력은 그대로)
+ *   import { devloopLogs } from 'devloop/adapters/express';
+ *   const logs = devloopLogs({ max: 500 });      // console.* 을 가로채 모은다(원래 출력은 그대로)
  *   app.get('/debug/recent-logs', logs.handler); // ?level=WARN&limit=200
  *
  * 앱의 신고 설정: backendLogs: () => fetch('/api/debug/recent-logs?level=WARN&limit=200').then(r => r.json())
  */
-export function bugfixLogs({ max = 500, capture = true } = {}) {
+export function devloopLogs({ max = 500, capture = true } = {}) {
   const buffer = [];
   const push = (level, args) => {
     const message = args.map((a) => (typeof a === 'string' ? a : (a instanceof Error ? `${a.name}: ${a.message}` : safeJson(a)))).join(' ');
@@ -37,11 +37,11 @@ export function bugfixLogs({ max = 500, capture = true } = {}) {
 function safeJson(v) { try { return JSON.stringify(v); } catch { return String(v); } }
 
 /**
- * 앱 서버가 `/bugfix/*` 를 bugfix-kit 인스턴스로 넘긴다 - nginx 없이 '앱 주소/bugfix' 로 신고 서버·콘솔에 닿는다.
- *   app.use('/bugfix', bugfixProxy('http://127.0.0.1:8790'));
+ * 앱 서버가 `/devloop/*` 를 devloop 인스턴스로 넘긴다 - nginx 없이 '앱 주소/devloop' 로 신고 서버·콘솔에 닿는다.
+ *   app.use('/devloop', devloopProxy('http://127.0.0.1:8790'));
  * 본문(스크린샷 포함, 수 MB)을 그대로 흘려보내므로 body-parser 보다 앞에 두는 것이 좋다.
  */
-export function bugfixProxy(server) {
+export function devloopProxy(server) {
   const base = String(server).replace(/\/+$/, '') + '/api';
   return async (req, res) => {
     const http = await import(base.startsWith('https') ? 'node:https' : 'node:http');
@@ -52,7 +52,7 @@ export function bugfixProxy(server) {
       res.writeHead(ur.statusCode || 502, ur.headers);
       ur.pipe(res);
     });
-    up.on('error', (e) => { if (!res.headersSent) res.writeHead(502); res.end(`bugfix proxy error: ${e.message}`); });
+    up.on('error', (e) => { if (!res.headersSent) res.writeHead(502); res.end(`devloop proxy error: ${e.message}`); });
     if (req.readableEnded || req.complete) { if (req.body != null) up.end(typeof req.body === 'string' || Buffer.isBuffer(req.body) ? req.body : JSON.stringify(req.body)); else up.end(); }
     else req.pipe(up);
   };

@@ -1,2 +1,2 @@
-dev.bugfixkit.spring.BugfixAutoConfiguration
-dev.bugfixkit.spring.BugfixSecurityAutoConfiguration
+dev.devloop.spring.DevloopAutoConfiguration
+dev.devloop.spring.DevloopSecurityAutoConfiguration

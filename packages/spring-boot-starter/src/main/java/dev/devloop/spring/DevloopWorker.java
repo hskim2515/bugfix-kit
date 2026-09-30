@@ -1,4 +1,4 @@
-package dev.bugfixkit.spring;
+package dev.devloop.spring;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,18 +28,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 /**
- * 앱과 같이 뜨는 bugfix-kit 워커. 기동 때:
- *   1. node 를 찾는다(bugfix.worker.node → PATH → ~/.nvm)
- *   2. <dataDir>/kit 에 bugfix-kit 이 (같은 버전으로) 없으면 npm 으로 설치한다 - 한 번만
- *   3. <dataDir>/bugfix-kit.yml 이 없으면 만든다(저장소·브랜치·검증 명령은 속성 → git.properties → 작업 디렉터리의 git)
- *   4. `node bin/bugfix-server.mjs --config … --port …` 를 자식 프로세스로 띄우고, 죽으면 다시 띄운다
+ * 앱과 같이 뜨는 devloop 워커. 기동 때:
+ *   1. node 를 찾는다(devloop.worker.node → PATH → ~/.nvm)
+ *   2. <dataDir>/kit 에 devloop 이 (같은 버전으로) 없으면 npm 으로 설치한다 - 한 번만
+ *   3. <dataDir>/devloop.yml 이 없으면 만든다(저장소·브랜치·검증 명령은 속성 → git.properties → 작업 디렉터리의 git)
+ *   4. `node bin/devloop-server.mjs --config … --port …` 를 자식 프로세스로 띄우고, 죽으면 다시 띄운다
  * 앱이 내려가면 같이 내려간다. 프록시 컨트롤러는 이 워커의 주소로 넘긴다.
- * Node 나 git 이 없으면 경고만 남기고 앱은 그대로 뜬다(신고 저장·수정은 bugfix.server 를 주면 된다).
+ * Node 나 git 이 없으면 경고만 남기고 앱은 그대로 뜬다(신고 저장·수정은 devloop.server 를 주면 된다).
  */
-public class BugfixWorker implements SmartLifecycle {
+public class DevloopWorker implements SmartLifecycle {
 
-    private static final Logger log = LoggerFactory.getLogger("bugfix-kit");
-    private final BugfixProperties props;
+    private static final Logger log = LoggerFactory.getLogger("devloop");
+    private final DevloopProperties props;
     private final String appName;
     private final String starterVersion;
     private volatile Process process;
@@ -47,7 +47,7 @@ public class BugfixWorker implements SmartLifecycle {
     private volatile boolean running;
     private Thread supervisor;
 
-    public BugfixWorker(BugfixProperties props, String appName, String starterVersion) {
+    public DevloopWorker(DevloopProperties props, String appName, String starterVersion) {
         this.props = props;
         this.appName = appName;
         this.starterVersion = starterVersion;
@@ -59,18 +59,18 @@ public class BugfixWorker implements SmartLifecycle {
     @Override
     public void start() {
         if (running) return;
-        // 외부 인스턴스(bugfix.server)를 쓰거나 워커를 껐으면 아무것도 안 띄운다
-        if (props.getServer() != null && !props.getServer().isBlank()) { log.info("[bugfix-kit] 외부 인스턴스 {} 로 프록시합니다 (워커 없음)", props.getServer()); return; }
+        // 외부 인스턴스(devloop.server)를 쓰거나 워커를 껐으면 아무것도 안 띄운다
+        if (props.getServer() != null && !props.getServer().isBlank()) { log.info("[devloop] 외부 인스턴스 {} 로 프록시합니다 (워커 없음)", props.getServer()); return; }
         if (!props.getWorker().isEnabled()) return;
         // Windows 에서는 워커(bash·sh·심볼릭 링크·claude CLI)가 돌지 않는다 - 개발서버 워커를 가리키거나 WSL2 에서 실행
         if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
-            log.warn("[bugfix-kit] Windows 에서는 bugfix-kit 워커를 띄우지 않습니다. 앱은 정상 동작하며 /bugfix 만 503 입니다.\n"
-                + "  → 로컬 프로파일(application-local.properties 등)에 개발서버 워커를 적으세요:  bugfix.server=http://<개발서버>:<워커 포트>\n"
+            log.warn("[devloop] Windows 에서는 devloop 워커를 띄우지 않습니다. 앱은 정상 동작하며 /devloop 만 503 입니다.\n"
+                + "  → 로컬 프로파일(application-local.properties 등)에 개발서버 워커를 적으세요:  devloop.server=http://<개발서버>:<워커 포트>\n"
                 + "  → 또는 WSL2 에서 앱을 실행하세요(리눅스 환경이라 워커가 그대로 돕니다).");
             return;
         }
         running = true;
-        supervisor = new Thread(this::supervise, "bugfix-kit-worker");
+        supervisor = new Thread(this::supervise, "devloop-worker");
         supervisor.setDaemon(true);
         supervisor.start();
     }
@@ -89,7 +89,7 @@ public class BugfixWorker implements SmartLifecycle {
     private void supervise() {
         try {
             String node = findNode();
-            if (node == null) { log.warn("[bugfix-kit] node 를 찾지 못해 워커를 띄우지 않습니다. 앱은 정상 동작하며 /bugfix 만 503 입니다.\n  → bugfix.worker.node=/경로/node 로 지정하거나, bugfix.server=http://<개발서버>:<워커 포트> 로 개발서버 워커를 쓰세요"); return; }
+            if (node == null) { log.warn("[devloop] node 를 찾지 못해 워커를 띄우지 않습니다. 앱은 정상 동작하며 /devloop 만 503 입니다.\n  → devloop.worker.node=/경로/node 로 지정하거나, devloop.server=http://<개발서버>:<워커 포트> 로 개발서버 워커를 쓰세요"); return; }
             Path dataDir = dataDir();
             Files.createDirectories(dataDir);
             Path kitBin = ensureKit(node, dataDir);
@@ -102,21 +102,21 @@ public class BugfixWorker implements SmartLifecycle {
                 pb.directory(kitBin.getParent().getParent().toFile());
                 pb.redirectErrorStream(true);
                 Map<String, String> env = pb.environment();
-                env.put("BUGFIX_ADMIN_KEY", adminKey);
-                env.putIfAbsent("BUGFIX_CONFIG", yml.toString());
+                env.put("DEVLOOP_ADMIN_KEY", adminKey);
+                env.putIfAbsent("DEVLOOP_CONFIG", yml.toString());
                 Process p = pb.start();
                 process = p;
-                log.info("[bugfix-kit] 워커 시작 pid={} port={} config={}", p.pid(), port, yml);
+                log.info("[devloop] 워커 시작 pid={} port={} config={}", p.pid(), port, yml);
                 pipe(p);
                 // 포트가 열려 응답할 때까지는 url 을 비워 둔다 - 프록시가 '시작 중' 503 을 주고 콘솔이 잠시 뒤 다시 시도한다
                 String candidate = "http://127.0.0.1:" + port;
                 long t0 = System.currentTimeMillis();
                 while (running && p.isAlive() && !healthy(candidate)) { Thread.sleep(500); if (System.currentTimeMillis() - t0 > 120_000) break; }
-                if (p.isAlive()) { url = candidate; log.info("[bugfix-kit] 워커 준비됨 ({}초)", (System.currentTimeMillis() - t0) / 1000); }
+                if (p.isAlive()) { url = candidate; log.info("[devloop] 워커 준비됨 ({}초)", (System.currentTimeMillis() - t0) / 1000); }
                 int code = p.waitFor();
                 process = null;
                 if (!running) break;
-                log.warn("[bugfix-kit] 워커가 종료됨(exit {}) - {}초 뒤 다시 띄웁니다", code, backoff);
+                log.warn("[devloop] 워커가 종료됨(exit {}) - {}초 뒤 다시 띄웁니다", code, backoff);
                 url = "";
                 Thread.sleep(backoff * 1000L);
                 backoff = Math.min(backoff * 2, 60);
@@ -124,7 +124,7 @@ public class BugfixWorker implements SmartLifecycle {
         } catch (InterruptedException ignored) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
-            log.warn("[bugfix-kit] 워커를 띄우지 못했습니다: {}", e.toString());
+            log.warn("[devloop] 워커를 띄우지 못했습니다: {}", e.toString());
         }
     }
 
@@ -132,9 +132,9 @@ public class BugfixWorker implements SmartLifecycle {
         Thread t = new Thread(() -> {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
-                while ((line = r.readLine()) != null) log.info("[bugfix-kit] {}", line);
+                while ((line = r.readLine()) != null) log.info("[devloop] {}", line);
             } catch (IOException ignored) { /* 종료 */ }
-        }, "bugfix-kit-worker-log");
+        }, "devloop-worker-log");
         t.setDaemon(true);
         t.start();
     }
@@ -158,7 +158,7 @@ public class BugfixWorker implements SmartLifecycle {
     private Path dataDir() {
         String d = props.getDataDir();
         if (d != null && !d.isBlank()) return Path.of(expandHome(d)).toAbsolutePath();
-        return Path.of(System.getProperty("user.home"), ".bugfix-data", projectName()).toAbsolutePath();
+        return Path.of(System.getProperty("user.home"), ".devloop-data", projectName()).toAbsolutePath();
     }
 
     private String projectName() {
@@ -169,37 +169,37 @@ public class BugfixWorker implements SmartLifecycle {
         return "app";
     }
 
-    /** bugfix-kit 설치(같은 버전이 있으면 건너뜀) → bin/bugfix-server.mjs 경로 */
+    /** devloop 설치(같은 버전이 있으면 건너뜀) → bin/devloop-server.mjs 경로 */
     private Path ensureKit(String node, Path dataDir) throws IOException, InterruptedException {
         String version = props.getWorker().getKitVersion().isBlank() ? (starterVersion.startsWith("v") ? starterVersion : "v" + starterVersion) : props.getWorker().getKitVersion();
         Path kitDir = dataDir.resolve("kit");
-        Path pkgJson = kitDir.resolve("node_modules/bugfix-kit/package.json");
-        Path bin = kitDir.resolve("node_modules/bugfix-kit/packages/server/bin/bugfix-server.mjs");
+        Path pkgJson = kitDir.resolve("node_modules/devloop/package.json");
+        Path bin = kitDir.resolve("node_modules/devloop/packages/server/bin/devloop-server.mjs");
         if (Files.exists(pkgJson) && Files.exists(bin) && Files.readString(pkgJson).contains("\"version\": \"" + version.replaceFirst("^v", "") + "\"")) return bin;
         Files.createDirectories(kitDir);
-        if (!Files.exists(kitDir.resolve("package.json"))) Files.writeString(kitDir.resolve("package.json"), "{ \"name\": \"bugfix-kit-worker\", \"private\": true }\n");
+        if (!Files.exists(kitDir.resolve("package.json"))) Files.writeString(kitDir.resolve("package.json"), "{ \"name\": \"devloop-worker\", \"private\": true }\n");
         String npm = Path.of(node).getParent() != null ? Path.of(node).getParent().resolve("npm").toString() : "npm";
         if (!Files.exists(Path.of(npm))) npm = "npm";
-        log.info("[bugfix-kit] bugfix-kit {} 설치 중… ({})", version, kitDir);
+        log.info("[devloop] devloop {} 설치 중… ({})", version, kitDir);
         Process p = new ProcessBuilder(npm, "install", "--no-audit", "--no-fund", "--no-save", props.getWorker().getKitSource() + "#" + version)
                 .directory(kitDir.toFile()).redirectErrorStream(true).start();
         String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        if (p.waitFor() != 0 || !Files.exists(bin)) throw new IOException("bugfix-kit 설치 실패: " + out.lines().reduce((a, b) -> b).orElse(""));
+        if (p.waitFor() != 0 || !Files.exists(bin)) throw new IOException("devloop 설치 실패: " + out.lines().reduce((a, b) -> b).orElse(""));
         return bin;
     }
 
     /** 첫 설정 파일 - 있으면 그대로(콘솔에서 고친 내용 유지) */
     private Path ensureConfig(Path dataDir) throws IOException {
-        Path yml = dataDir.resolve("bugfix-kit.yml");
+        Path yml = dataDir.resolve("devloop.yml");
         if (Files.exists(yml)) return yml;
         String repo = repoUrl();
-        if (repo.isBlank()) throw new IOException("저장소 주소를 모릅니다 - application.properties 에 bugfix.repo 를 적거나 git.properties(gradle-git-properties)를 넣으세요");
+        if (repo.isBlank()) throw new IOException("저장소 주소를 모릅니다 - application.properties 에 devloop.repo 를 적거나 git.properties(gradle-git-properties)를 넣으세요");
         String branch = branch();
         String name = projectName();
         List<String> verify = new ArrayList<>(props.getVerify());
         if (verify.isEmpty()) verify.add("./gradlew compileJava -x test --no-daemon -q");
         StringBuilder sb = new StringBuilder();
-        sb.append("# bugfix-kit 설정 - Spring 스타터가 첫 기동 때 만들었다. 콘솔(<REST 경로>").append(props.getPath()).append("/ui/ → 프로젝트 탭)에서 고치면 여기에 저장된다\n");
+        sb.append("# devloop 설정 - Spring 스타터가 첫 기동 때 만들었다. 콘솔(<REST 경로>").append(props.getPath()).append("/ui/ → 프로젝트 탭)에서 고치면 여기에 저장된다\n");
         sb.append("server:\n  port: 0\n  dataDir: ").append(dataDir.resolve("data")).append("\n  workDir: ").append(dataDir.resolve("work")).append("\n");
         sb.append("projects:\n  ").append(name).append(":\n    repo: ").append(repo).append("\n    baseBranch: ").append(branch).append("\n");
         if (repo.contains("github.com/")) sb.append("    githubRepo: ").append(repo.replaceAll("^https?://github\\.com/", "").replaceAll("\\.git$", "")).append("\n");
@@ -211,15 +211,15 @@ public class BugfixWorker implements SmartLifecycle {
         for (String v : verify) sb.append("          - ").append(quote(v)).append("\n");
         Files.writeString(yml, sb.toString());
         try { Files.setPosixFilePermissions(yml, PosixFilePermissions.fromString("rw-------")); } catch (Exception ignored) { /* 윈도우 */ }
-        log.info("[bugfix-kit] 설정을 만들었습니다: {} (프로젝트 {}, {} @ {})", yml, name, repo, branch);
+        log.info("[devloop] 설정을 만들었습니다: {} (프로젝트 {}, {} @ {})", yml, name, repo, branch);
         return yml;
     }
 
     private String ensureAdminKey(Path dataDir) throws IOException {
         if (!props.getAdminKey().isBlank()) return props.getAdminKey();
-        String env = System.getenv("BUGFIX_ADMIN_KEY");
+        String env = System.getenv("DEVLOOP_ADMIN_KEY");
         if (env != null && !env.isBlank()) return env;
-        Path home = Path.of(System.getProperty("user.home"), ".config", "bugfix-kit", "default.env");
+        Path home = Path.of(System.getProperty("user.home"), ".config", "devloop", "default.env");
         if (Files.exists(home)) {
             Properties p = new Properties();
             try (var in = Files.newBufferedReader(home)) { p.load(in); }
@@ -233,7 +233,7 @@ public class BugfixWorker implements SmartLifecycle {
         String key = HexFormat.of().formatHex(b);
         Files.writeString(f, key + "\n");
         try { Files.setPosixFilePermissions(f, PosixFilePermissions.fromString("rw-------")); } catch (Exception ignored) { /* 윈도우 */ }
-        log.info("[bugfix-kit] 운영자 키를 만들었습니다: {} (콘솔 로그인에 씁니다: {})", f, key);
+        log.info("[devloop] 운영자 키를 만들었습니다: {} (콘솔 로그인에 씁니다: {})", f, key);
         return key;
     }
 

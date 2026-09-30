@@ -1,5 +1,5 @@
 // front-check 설정 - 프로젝트마다 다른 것(주소·로그인·화면으로 가는 절차)만 여기에 적는다.
-// 실행: npx front-check check --scenario main   /  npx front-check check --context .bugfix/context.json --out .bugfix/after
+// 실행: npx front-check check --scenario main   /  npx front-check check --context .devloop/context.json --out .devloop/after
 export default {
   // 대상. serve 를 주면 빌드 결과(dist)를 임시 포트로 서빙하고 그 주소를 쓴다(--url 로 덮어쓸 수 있음)
   baseUrl: process.env.FC_BASE_URL || '',
@@ -16,7 +16,7 @@ export default {
     done: '#app .main',                    // 로그인된 화면에만 있는 요소
     form: {                                // 있으면 login 명령·만료 갱신에 쓴다 (없으면 창을 띄워 사람이 로그인)
       url: '/login', user: '#username', pass: '#password', submit: 'button[type=submit]',
-      // 계정은 여기(저장소)에 두지 않는다. 서버(bugfix-server)는 ~/.config/bugfix-kit/projects/<이름>.env 의 FC_USER/FC_PASS 로 넘겨 주고,
+      // 계정은 여기(저장소)에 두지 않는다. 서버(devloop-server)는 ~/.config/devloop/projects/<이름>.env 의 FC_USER/FC_PASS 로 넘겨 주고,
       // 개발 PC 에서는 FC_USER/FC_PASS 환경변수 또는 gitignore 된 ./front-check.account (init 이 만들어 줌) 를 쓴다
       account: './front-check.account',
     },

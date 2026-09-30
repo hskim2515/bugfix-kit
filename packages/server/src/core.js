@@ -29,10 +29,10 @@ export function bufferedLog(base = defaultLog) {
 }
 
 /**
- * bugfix-kit 한 벌(설정·저장소·큐·제안·지식 그래프·라우터)을 만든다. 독립 서버(bin)와 앱 내장(embed)이 같이 쓴다.
- *   const kit = await createBugfixKit({ configFile }); app.use('/api', kit.router); await kit.start();
+ * devloop 한 벌(설정·저장소·큐·제안·지식 그래프·라우터)을 만든다. 독립 서버(bin)와 앱 내장(embed)이 같이 쓴다.
+ *   const kit = await createDevLoop({ configFile }); app.use('/api', kit.router); await kit.start();
  */
-export async function createBugfixKit({ configFile, log: baseLog = defaultLog } = {}) {
+export async function createDevLoop({ configFile, log: baseLog = defaultLog } = {}) {
   const log = typeof baseLog.recent === 'function' ? baseLog : bufferedLog(baseLog);
   const cfg = loadConfig(configFile);
   const store = new FileStore(cfg.server.dataDir);
@@ -57,8 +57,8 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
       if (r.kind === 'followup') await runner.enqueueFollowUp(project, r.id, r.message, r.mode);
       else await runner.enqueue(project, r.id);
     }
-    if (redo.length) log.info(`[bugfix] 재시작으로 끊긴 작업 ${redo.length}건을 다시 큐에 넣었습니다`);
-    runner.resumeDeployWatch().catch((e) => log.warn('[bugfix] 배포 추적 재개 실패:', e.message));
+    if (redo.length) log.info(`[devloop] 재시작으로 끊긴 작업 ${redo.length}건을 다시 큐에 넣었습니다`);
+    runner.resumeDeployWatch().catch((e) => log.warn('[devloop] 배포 추적 재개 실패:', e.message));
     await insights.resetInterrupted();
     await knowledge.resetInterrupted();
     await versions.resetInterrupted().catch((e) => log.warn('[preview] 상태 정리 실패:', e.message));
@@ -67,7 +67,7 @@ export async function createBugfixKit({ configFile, log: baseLog = defaultLog } 
     knowledge.startSchedules();
     versions.startSweeper();
     loops.startSchedules();
-    if (!cfg.githubToken(Object.values(cfg.projects)[0])) log.warn('[bugfix] 저장소 토큰이 없습니다 - 리포트 저장은 되지만 자동 수정은 거부됩니다');
+    if (!cfg.githubToken(Object.values(cfg.projects)[0])) log.warn('[devloop] 저장소 토큰이 없습니다 - 리포트 저장은 되지만 자동 수정은 거부됩니다');
   }
   function stop() { insights.stopSchedules(); knowledge.stopSchedules(); versions.stopSweeper(); loops.stopSchedules(); }
   return { cfg, store, runner, insights, knowledge, versions, loops, notifier, router, log, start, stop };

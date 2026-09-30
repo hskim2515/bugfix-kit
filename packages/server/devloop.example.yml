@@ -1,11 +1,11 @@
-# bugfix-server 설정 예시. 복사해서 bugfix-kit.yml 로 쓰고, 비밀값은 환경변수로:
-#   BUGFIX_GITHUB_TOKEN   GitHub PAT (classic, repo 권한) - 또는 github.tokenFile
-#   BUGFIX_KEY_LHDT       프로젝트 lhdt 의 API 키 (X-Bugfix-Key) - 또는 projects.lhdt.apiKey
+# devloop-server 설정 예시. 복사해서 devloop.yml 로 쓰고, 비밀값은 환경변수로:
+#   DEVLOOP_GITHUB_TOKEN   GitHub PAT (classic, repo 권한) - 또는 github.tokenFile
+#   DEVLOOP_KEY_LHDT       프로젝트 lhdt 의 API 키 (X-Devloop-Key) - 또는 projects.lhdt.apiKey
 
 server:
   port: 8790
   dataDir: ./data            # 리포트 JSON 저장 (프로젝트별 하위 디렉터리)
-  workDir: /data/bugfix-kit  # 저장소 사본·작업 worktree·node_modules 캐시
+  workDir: /data/devloop  # 저장소 사본·작업 worktree·node_modules 캐시
   claudeBin: claude          # PATH 에 없으면 절대 경로
   pathExtra: /home/gaia3d/.local/bin:/opt/java/jdk-21.0.2/bin
   javaHome: /opt/java/jdk-21.0.2
@@ -16,14 +16,14 @@ server:
   runAsUser: ""              # 다른 계정으로 돌릴 때(sudo -n 필요). 보통 비움
 
 github:
-  tokenFile: ~/.config/bugfix-kit/github-token   # 한 줄, chmod 600
+  tokenFile: ~/.config/devloop/github-token   # 한 줄, chmod 600
 
-# 프로젝트별 비밀값은 서버의 ~/.config/bugfix-kit/projects/<이름>.env (KEY=VALUE, chmod 600) 에 둔다 - 저장소에는 안 들어간다.
-#   BUGFIX_API_KEY=…      (apiKey 대신)   GITHUB_TOKEN=…  (이 프로젝트만 다른 토큰을 쓸 때)
+# 프로젝트별 비밀값은 서버의 ~/.config/devloop/projects/<이름>.env (KEY=VALUE, chmod 600) 에 둔다 - 저장소에는 안 들어간다.
+#   DEVLOOP_API_KEY=…      (apiKey 대신)   GITHUB_TOKEN=…  (이 프로젝트만 다른 토큰을 쓸 때)
 #   FC_USER=… FC_PASS=…   (front-check 로그인 테스트 계정 - 저장소의 front-check.account 보다 우선)
 projects:
   lhdt:
-    # envFile: ~/.config/bugfix-kit/projects/lhdt.env   (기본값이라 생략 가능)
+    # envFile: ~/.config/devloop/projects/lhdt.env   (기본값이라 생략 가능)
     repo: https://github.com/Gaia3D/lhdt.git
     githubRepo: Gaia3D/lhdt
     baseBranch: develop-new
@@ -57,12 +57,12 @@ projects:
     # 검증 뒤 실제 화면 확인 (front-check). when 의 모듈이 바뀌었을 때만. 결과는 진행 로그·PR 본문에
     # AI 가 건드리면 되돌리는 경로 - 버그 신고 연결 파일·CI 설정 등
     protectedPaths:
-      - lhdt-user-front/src/utils/bugfixKit.js
+      - lhdt-user-front/src/utils/devloopKit.js
       - lhdt-user-front/front-check.config.mjs
       - .github/workflows/
     frontCheck:
       cwd: lhdt-user-front
-      command: npx front-check check --context ../.bugfix/context.json --out ../.bugfix/after --json
+      command: npx front-check check --context ../.devloop/context.json --out ../.devloop/after --json
       when: [front]
       timeoutMinutes: 10
     allowedTools:
@@ -75,14 +75,14 @@ projects:
       - "Bash(node_modules/.bin/sass:*)"
       - "Bash(../../node_modules/.bin/sass:*)"
 
-  # 라이브러리(bugfix-kit) 자체의 버그는 앱 저장소에서 못 고친다 - 라이브러리도 프로젝트로 등록해 두면 같은 파이프라인으로 고친다
-  bugfix-kit:
-    repo: https://github.com/hskim2515/bugfix-kit.git
-    githubRepo: hskim2515/bugfix-kit
+  # 라이브러리(devloop) 자체의 버그는 앱 저장소에서 못 고친다 - 라이브러리도 프로젝트로 등록해 두면 같은 파이프라인으로 고친다
+  devloop:
+    repo: https://github.com/hskim2515/devloop.git
+    githubRepo: hskim2515/devloop
     baseBranch: main
     autoMerge: false          # 라이브러리는 PR 만 올리고 사람이 병합
     fixFrom: admin            # 앱 사용자는 신고만, 수정 요청·PR 은 관리 콘솔에서만
-    description: "bugfix-kit 모노레포(Node 18 ESM): packages/server(리포트 API·자동 수정 파이프라인) · packages/client(브라우저 SDK, Vue 3 → Web Component) · packages/front-check(Playwright CLI)"
+    description: "devloop 모노레포(Node 18 ESM): packages/server(리포트 API·자동 수정 파이프라인) · packages/client(브라우저 SDK, Vue 3 → Web Component) · packages/front-check(Playwright CLI)"
     modules:
       - { name: server, match: packages/server/, dir: packages/server, verify: [npm test] }
       - { name: client, match: packages/client/, dir: packages/client, nodeModulesCache: false, verify: [npm run build] }

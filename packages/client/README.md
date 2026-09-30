@@ -1,22 +1,22 @@
-# @bugfix-kit/client
+# @devloop/client
 
 브라우저 SDK. 콘솔·네트워크·상태 변화·경로·이벤트를 링 버퍼에 모아 두고, 신고 때 화면(WebGL 캔버스 + DOM)을 합성해
-`bugfix-server` 로 보낸다. 저장된 리포트와 Claude 자동 수정 진행(실시간 로그·PR·후속 대화)을 보는 뷰어도 들어 있다.
+`devloop-server` 로 보낸다. 저장된 리포트와 Claude 자동 수정 진행(실시간 로그·PR·후속 대화)을 보는 뷰어도 들어 있다.
 
 두 가지 빌드:
 
 | 빌드 | 쓰는 곳 | 크기(gzip) |
 |---|---|---|
-| `dist/bugfix-client.iife.js` / `bugfix-client.js` | 아무 앱(React·순수 HTML·다른 Vue 버전). Web Component `<bugfix-report-modal>`, `<bugfix-viewer>` + Vue 런타임 포함 | ~100 KB |
-| `dist/bugfix-client.vue.js` + `dist/style.css` | Vue 3 앱. 일반 컴포넌트, vue 는 앱 것을 쓴다 | ~75 KB |
+| `dist/devloop-client.iife.js` / `devloop-client.js` | 아무 앱(React·순수 HTML·다른 Vue 버전). Web Component `<devloop-report-modal>`, `<devloop-viewer>` + Vue 런타임 포함 | ~100 KB |
+| `dist/devloop-client.vue.js` + `dist/style.css` | Vue 3 앱. 일반 컴포넌트, vue 는 앱 것을 쓴다 | ~75 KB |
 
 ## Web Component 로 쓰기 (어떤 앱이든)
 
 ```html
-<script src="…/bugfix-client.iife.js"></script>
+<script src="…/devloop-client.iife.js"></script>
 <script>
-  const kit = BugfixKit.createBugfix({
-    endpoint: 'https://dev.example.com/bugfix',   // bugfix-server 의 /api 까지 (nginx 로 프록시)
+  const kit = DevLoop.createDevloop({
+    endpoint: 'https://dev.example.com/devloop',   // devloop-server 의 /api 까지 (nginx 로 프록시)
     project: 'myapp',
     apiKey: 'xxxx',                                // 서버 설정의 projects.myapp.apiKey (공개 키, 남용 방지 수준)
     user: () => currentUser.id,
@@ -33,18 +33,18 @@
 Web Component 빌드를 그대로 쓴다(React 버전·상태 라이브러리 무관). `main.tsx` 에서 한 번 만들고 `mount()`.
 
 ```tsx
-import { createBugfix, reduxMiddleware } from 'bugfix-kit/client';   // ESM (Vue 런타임 포함, ~115KB gzip)
+import { createDevloop, reduxMiddleware } from 'devloop/client';   // ESM (Vue 런타임 포함, ~115KB gzip)
 
 const mw = reduxMiddleware();                                       // Redux 면 (Zustand 는 zustandSource(useStore))
 export const store = configureStore({ reducer, middleware: (g) => g().concat(mw) });
 
-export const kit = createBugfix({
-  endpoint: import.meta.env.VITE_BUGFIX_ENDPOINT, project: 'myapp', apiKey: import.meta.env.VITE_BUGFIX_KEY,
+export const kit = createDevloop({
+  endpoint: import.meta.env.VITE_DEVLOOP_ENDPOINT, project: 'myapp', apiKey: import.meta.env.VITE_DEVLOOP_KEY,
   user: () => auth.user?.id,
   context: () => ({ route: window.location.pathname, selection: store.getState().selection }),
   capture: { canvases: () => [document.querySelector('canvas')!] },            // WebGL 캔버스가 있으면 (preserveDrawingBuffer)
   interceptors: { console: true, network: { fetch: true, xhr: true }, router: true, mutation: mw.source },   // router: true = history API 패치(react-router 포함)
-}).mount();                                                          // <bugfix-report-modal>·<bugfix-viewer> 를 body 에 붙임
+}).mount();                                                          // <devloop-report-modal>·<devloop-viewer> 를 body 에 붙임
 ```
 어디서든 `kit.openReport()` / `kit.openViewer()` (또는 Shift+F9 / Shift+F10). 타입은 `types/index.d.ts` 로 제공.
 
@@ -52,10 +52,10 @@ export const kit = createBugfix({
 
 ```js
 // main.js
-import { createBugfix } from 'bugfix-kit/client/vue';
-import 'bugfix-kit/client/style.css';
-export const kit = createBugfix({
-  endpoint: process.env.VUE_APP_BUGFIX_ENDPOINT, project: 'myapp', apiKey: process.env.VUE_APP_BUGFIX_KEY,
+import { createDevloop } from 'devloop/client/vue';
+import 'devloop/client/style.css';
+export const kit = createDevloop({
+  endpoint: process.env.VUE_APP_DEVLOOP_ENDPOINT, project: 'myapp', apiKey: process.env.VUE_APP_DEVLOOP_KEY,
   interceptors: { console: true, network: { axios: [{ instance: rest, label: 'rest' }] }, mutation: store, router, events: { emitter, skip: ['loader:show'] } },
   context: () => ({ … }),
   notify: ({ title, message, type }) => emitter.emit('alert', { title, message, type }),
@@ -65,7 +65,7 @@ export const kit = createBugfix({
 <!-- App.vue -->
 <ReportModal :kit="kit" @open-viewer="$refs.viewer.open()" />
 <Viewer ref="viewer" :kit="kit" />
-<script> import { ReportModal, Viewer } from 'bugfix-kit/client/vue'; …
+<script> import { ReportModal, Viewer } from 'devloop/client/vue'; …
   mounted() { this.kit.register('report', () => this.$refs.modal.open()); this.kit.register('viewer', () => this.$refs.viewer.open()); } </script>
 ```
 
@@ -73,7 +73,7 @@ export const kit = createBugfix({
 
 | 키 | 설명 |
 |---|---|
-| `endpoint` | bugfix-server 주소(`…/api`). 비우면 서버 저장·목록 없이 복사·다운로드만 |
+| `endpoint` | devloop-server 주소(`…/api`). 비우면 서버 저장·목록 없이 복사·다운로드만 |
 | `project`, `apiKey`, `user` | 서버 설정의 프로젝트 이름·키, 보고자 표시명(문자열 또는 함수) |
 | `projects` | 프론트/백엔드 저장소가 다른 앱처럼 신고 대상이 여럿일 때: `[{ key: 'web', label: '프론트', apiKey }, { key: 'api', label: '백엔드' }]` - 모달에 '신고 대상' 선택, 뷰어에 프로젝트 전환이 생긴다. 신고 도구 자체의 문제는 별도 프로젝트가 아니라 모달의 '버그 신고 도구 문제' 체크(같은 프로젝트에 `tool` 표시, AI 수정 대상 아님) |
 | `context()` | 앱 전용 컨텍스트. 공통 항목(브라우저·화면·메모리·연결·localStorage·최근 이벤트·상태 변화·경로)에 합쳐진다 |
@@ -94,5 +94,5 @@ export const kit = createBugfix({
 
 ```bash
 npm run build                      # dist/ 세 번들
-python3 -m http.server 8792        # test/index.html?auto=1 - 헤드리스 점검 (bugfix-server :8791 필요)
+python3 -m http.server 8792        # test/index.html?auto=1 - 헤드리스 점검 (devloop-server :8791 필요)
 ```

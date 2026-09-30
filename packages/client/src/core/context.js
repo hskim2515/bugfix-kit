@@ -3,7 +3,7 @@ import { localTime } from './interceptors.js';
 /**
  * 신고 시점의 컨텍스트 스냅샷. 공통 항목(브라우저·화면·메모리·연결·localStorage·최근 이벤트·상태 변화·경로)에
  * 앱이 준 `context()` 결과(카메라·메뉴·켜진 데이터 등 앱 전용)를 합친다.
- * @param {object} kit  createBugfix() 결과
+ * @param {object} kit  createDevloop() 결과
  */
 export function captureContext(kit) {
   let memory = null;

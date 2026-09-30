@@ -3,7 +3,7 @@ import path from 'node:path';
 import { runClaudeStream, claudeSummary, sessionIdOf } from './claude.js';
 import { firstLine, hhmmss, nowIso } from './util.js';
 
-const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)', 'Bash(wc:*)', 'Bash(find:*)', 'Write(.bugfix/knowledge.json)'];
+const READ_TOOLS = ['Read', 'Glob', 'Grep', 'Bash(git log:*)', 'Bash(git diff:*)', 'Bash(git show:*)', 'Bash(cat:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(grep:*)', 'Bash(rg:*)', 'Bash(ls:*)', 'Bash(wc:*)', 'Bash(find:*)', 'Write(.devloop/knowledge.json)'];
 const TYPES = ['menu', 'screen', 'feature', 'component', 'store', 'util', 'api', 'service', 'table', 'module'];
 const RELS = ['contains', 'uses', 'calls', 'reads', 'writes', 'navigates'];
 
@@ -11,7 +11,7 @@ const RELS = ['contains', 'uses', 'calls', 'reads', 'writes', 'navigates'];
  * 프로젝트 지식 그래프(온톨로지) - 메뉴/화면 → 기능 → 구현 파일(컴포넌트·스토어·유틸) → API → 백엔드 서비스·테이블.
  * Claude 가 저장소를 읽어 만들고(읽기 전용), 병합될 때마다 바뀐 파일 기준으로 갱신한다.
  * 결과는 {dataDir}/{project}/knowledge.json = { status, log, nodes[], edges[], head, builtAt, updatedAt }.
- * 쓰임: 수정·질문 프롬프트에 그 신고와 관련된 부분 그래프(.bugfix/knowledge.md), 제안 분석에는 전체 요약.
+ * 쓰임: 수정·질문 프롬프트에 그 신고와 관련된 부분 그래프(.devloop/knowledge.md), 제안 분석에는 전체 요약.
  */
 export class Knowledge {
   constructor(cfg, store, runner, log = console) {
@@ -111,7 +111,7 @@ export class Knowledge {
     await L(`작업 사본: ${project.baseBranch} @ ${head.slice(0, 8)}`);
 
     try {
-      const dir = path.join(wt, '.bugfix');
+      const dir = path.join(wt, '.devloop');
       await fs.mkdir(dir, { recursive: true });
       let changed = '';
       if (!full) {
@@ -144,7 +144,7 @@ export class Knowledge {
         await L('결과 파일이 없어 같은 세션에서 정리만 이어서 요청…');
         const p2 = [];
         try {
-          const out2 = await runClaudeStream(ex, wt, 10, [this.cfg.server.claudeBin || 'claude', '-p', '--resume', sid, '탐색은 여기서 멈추세요. 더 읽지 말고 지금까지 파악한 것만으로 `.bugfix/knowledge.json` 을 정해진 형식으로 지금 바로 쓰세요.', '--max-turns', '6', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])], (line) => { p2.push(this.logLine(name, `  ${line}`).catch(() => {})); });
+          const out2 = await runClaudeStream(ex, wt, 10, [this.cfg.server.claudeBin || 'claude', '-p', '--resume', sid, '탐색은 여기서 멈추세요. 더 읽지 말고 지금까지 파악한 것만으로 `.devloop/knowledge.json` 을 정해진 형식으로 지금 바로 쓰세요.', '--max-turns', '6', '--permission-mode', 'acceptEdits', '--allowedTools', READ_TOOLS.join(','), ...(this.cfg.server.model ? ['--model', this.cfg.server.model] : [])], (line) => { p2.push(this.logLine(name, `  ${line}`).catch(() => {})); });
           await Promise.all(p2);
           await L(`정리 종료 (${claudeSummary(out2)})`);
         } catch (e) { await Promise.all(p2); await L(`정리 요청 실패: ${firstLine(e.message, 120)}`); }
@@ -164,7 +164,7 @@ export class Knowledge {
   prompt(project, full, changed, packages = []) {
     const verified = new Set(project.modules.map((m) => m.dir.replace(/\/$/, '')));
     const mods = (packages.length ? packages : project.modules.map((m) => m.dir)).map((d) => `  - \`${d}\`${verified.has(d.replace(/\/$/, '')) ? ' (검증 규칙 있음)' : ''}`).join('\n') || '  - (저장소 구조를 보고 판단)';
-    const schema = `\`.bugfix/knowledge.json\` 형식:
+    const schema = `\`.devloop/knowledge.json\` 형식:
 {
   "nodes": [ { "id": "menu:지구선택", "type": "menu|screen|feature|component|store|util|api|service|table|module", "label": "사람이 읽는 이름", "path": "저장소 상대 경로(파일이면)", "route": "/경로(화면이면)", "desc": "한 줄 설명" } ],
   "edges": [ { "from": "menu:지구선택", "to": "feature:지구목록검색", "rel": "contains|uses|calls|reads|writes|navigates" } ]
@@ -185,9 +185,9 @@ API 는 백엔드 컨트롤러 → 서비스 → 테이블(엔티티/매퍼)까�
 ${schema}`;
     }
     return `${project.description || `\`${project.githubRepo}\``} 저장소입니다. 이 프로젝트의 지식 그래프를 **최근 변경에 맞춰 갱신** 해 주세요. 코드는 고치지 마세요.
-  - \`.bugfix/knowledge-prev.json\`: 지금까지의 그래프(nodes·edges)
-  - \`.bugfix/changed-files.txt\`: 그 뒤 바뀐 파일 목록 (${changed.split(/\r?\n/).length}개)
-바뀐 파일과 관련된 노드·엣지만 다시 확인해 고치고(새 메뉴·기능·API 추가, 없어진 것 제거, 설명 갱신), 나머지는 그대로 두어 **전체 그래프를** \`.bugfix/knowledge.json\` 에 다시 쓰세요. 기존 id 는 바꾸지 마세요.
+  - \`.devloop/knowledge-prev.json\`: 지금까지의 그래프(nodes·edges)
+  - \`.devloop/changed-files.txt\`: 그 뒤 바뀐 파일 목록 (${changed.split(/\r?\n/).length}개)
+바뀐 파일과 관련된 노드·엣지만 다시 확인해 고치고(새 메뉴·기능·API 추가, 없어진 것 제거, 설명 갱신), 나머지는 그대로 두어 **전체 그래프를** \`.devloop/knowledge.json\` 에 다시 쓰세요. 기존 id 는 바꾸지 마세요.
 바뀐 파일이 그래프와 무관한 것(문서·설정·테스트)뿐이면 이전 그래프를 그대로 써도 됩니다. 탐색은 15턴 안쪽에서 끊고 반드시 결과 파일을 쓰세요.
 ${schema}`;
   }
@@ -198,7 +198,7 @@ ${schema}`;
     return s.nodes?.length ? { nodes: s.nodes, edges: s.edges || [] } : null;
   }
 
-  /** 수정·질문 작업 사본에 .bugfix/knowledge.md 를 쓴다 - 신고 내용과 관련된 부분 그래프. 그래프가 없으면 아무것도 안 쓴다 */
+  /** 수정·질문 작업 사본에 .devloop/knowledge.md 를 쓴다 - 신고 내용과 관련된 부분 그래프. 그래프가 없으면 아무것도 안 쓴다 */
   async writeFor(project, dir, r) {
     const g = await this.graph(project.name);
     if (!g) return false;

@@ -182,7 +182,7 @@ export function installEvents(emitter, { max = 80, skip = [] } = {}) {
  * Redux 미들웨어 - 디스패치된 액션을 mutation 로그로 모은다.
  *   const mw = reduxMiddleware();
  *   const store = configureStore({ reducer, middleware: (g) => g().concat(mw) });
- *   createBugfix({ interceptors: { mutation: mw.source } });
+ *   createDevloop({ interceptors: { mutation: mw.source } });
  */
 export function reduxMiddleware() {
   const listeners = new Set();
@@ -197,7 +197,7 @@ export function reduxMiddleware() {
 
 /**
  * Zustand 스토어 - 상태 변화를 mutation 로그로 (바뀐 최상위 키만 기록).
- *   createBugfix({ interceptors: { mutation: zustandSource(useStore) } });
+ *   createDevloop({ interceptors: { mutation: zustandSource(useStore) } });
  */
 export function zustandSource(useStore) {
   return {

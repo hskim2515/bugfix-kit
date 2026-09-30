@@ -1,4 +1,4 @@
-package dev.bugfixkit.spring;
+package dev.devloop.spring;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
@@ -15,9 +15,9 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /** 최근 로그 링 버퍼 - 스타터가 기동 때 루트 로거에 붙인다(logback 설정 파일을 안 건드린다) */
-public class BugfixLogAppender extends AppenderBase<ILoggingEvent> {
+public class DevloopLogAppender extends AppenderBase<ILoggingEvent> {
 
-    public static final String NAME = "BUGFIX";
+    public static final String NAME = "DEVLOOP";
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
     private static final Deque<Entry> BUFFER = new ConcurrentLinkedDeque<>();
     private static volatile int max = 500;
@@ -31,7 +31,7 @@ public class BugfixLogAppender extends AppenderBase<ILoggingEvent> {
             if (!(LoggerFactory.getILoggerFactory() instanceof LoggerContext ctx)) return;
             Logger root = ctx.getLogger(Logger.ROOT_LOGGER_NAME);
             if (root.getAppender(NAME) != null) return;
-            BugfixLogAppender a = new BugfixLogAppender();
+            DevloopLogAppender a = new DevloopLogAppender();
             a.setName(NAME);
             a.setContext(ctx);
             a.start();

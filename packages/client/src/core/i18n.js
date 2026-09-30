@@ -1,14 +1,14 @@
 /**
  * 화면 글자 번역(한국어 → 영어). 원본 UI 는 한국어로 쓰고, 영어는 DOM 을 훑어 정확히 일치하는 구절만 바꾼다.
  * 데이터(리포트 본문·로그·지식 그래프·AI 답변)는 건드리지 않는다: .bf-md .bf-log .bf-diff pre code .prob .ktree .brv-text 등은 제외.
- *   lang: localStorage['bugfix-lang'] → navigator.language(ko 면 ko, 아니면 en)
+ *   lang: localStorage['devloop-lang'] → navigator.language(ko 면 ko, 아니면 en)
  *   translateTree(root, lang): root 아래를 번역하고 MutationObserver 로 새로 생기는 글자도 계속 번역
  */
 export const KO_EN = {
   // ── 콘솔 공통 ──
   '리포트': 'Reports', '제안': 'Insights', '버전': 'Versions', '루프': 'Loops', '지식': 'Knowledge', '프로젝트': 'Project', '키·계정': 'Keys', '서버': 'Server', '점검': 'Checks', '로그': 'Logs',
-  '관리': 'Console', 'bugfix-kit 관리': 'bugfix-kit console', '키 지우기': 'Clear key', '저장된 운영자 키 지우기': 'Forget the saved admin key', '운영자 키': 'Admin key', '들어가기': 'Enter',
-  '⏳ 잠시만요': '⏳ One moment', '입력한 키는 그대로 둡니다. 계속 이 화면이면 앱 로그의 [bugfix-kit] 줄이나 콘솔 \'점검\' 탭을 보세요.': 'Your key is kept. If this stays, check the app log lines tagged [bugfix-kit] or the Checks tab.',
+  '관리': 'Console', 'devloop 관리': 'devloop console', '키 지우기': 'Clear key', '저장된 운영자 키 지우기': 'Forget the saved admin key', '운영자 키': 'Admin key', '들어가기': 'Enter',
+  '⏳ 잠시만요': '⏳ One moment', '입력한 키는 그대로 둡니다. 계속 이 화면이면 앱 로그의 [devloop] 줄이나 콘솔 \'점검\' 탭을 보세요.': 'Your key is kept. If this stays, check the app log lines tagged [devloop] or the Checks tab.',
   '워커가 시작 중입니다 (앱 재배포 직후 10초~1분)': 'The worker is starting (10 s to 1 min after a redeploy)', '앱이 재시작 중입니다': 'The app is restarting', '운영자 키가 맞지 않습니다': 'Wrong admin key',
   '전체': 'All', '진행 중': 'In progress', '실패': 'Failed', '수정본 준비': 'Fix ready', 'PR 열림': 'PR open', '병합됨': 'Merged', '되돌림': 'Reverted', '요청 전': 'Not requested', '문제·보고자 검색': 'Search problem · reporter',
   '#': '#', '심각도': 'Severity', '문제': 'Problem', '수정': 'Fix', '보고자': 'Reporter', '갱신': 'Update', '리포트가 없습니다': 'No reports', '대기': 'Queued', '수정 중': 'Fixing', '병합': 'Merged', '도구': 'tool',
@@ -21,7 +21,7 @@ export const KO_EN = {
   '분석 실행을 누르면 AI 가 최근 리포트·커밋·코드를 읽고 고칠 점을 찾습니다 (5분 안팎, Claude 비용 발생)': 'Run analysis: the AI reads recent reports, commits and code to find things to fix (about 5 min, Claude cost)',
   '마지막 분석': 'last analysis', '분석 전': 'not analysed yet', '대기 중…': 'queued…', '분석 중…': 'analysing…',
   // 버전
-  'AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가': 'Every AI fix is kept by the kit as a', '으로 갖고 있습니다(키트 저장소 태그 bugfix/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워': 'even before it goes to the remote (kit repo tag bugfix/v{n}). Each version can be spun up as front+backend+DB copy and', '해 보고, 마음에 들면': ', and when it looks right you', '원격으로 보냅니다': 'send it to the remote', '(브랜치만 / PR·MR / 자동 병합).': '(branch only / PR·MR / auto-merge).', '접속': 'opened',
+  'AI 가 고친 소스 상태는 원격에 올리지 않아도 키트가': 'Every AI fix is kept by the kit as a', '으로 갖고 있습니다(키트 저장소 태그 devloop/v{n}). 버전마다 프론트+백엔드+DB 사본을 띄워': 'even before it goes to the remote (kit repo tag devloop/v{n}). Each version can be spun up as front+backend+DB copy and', '해 보고, 마음에 들면': ', and when it looks right you', '원격으로 보냅니다': 'send it to the remote', '(브랜치만 / PR·MR / 자동 병합).': '(branch only / PR·MR / auto-merge).', '접속': 'opened',
   '미리보기 레시피': 'Preview recipe', '· 있음': '· set', '· 없음 (초안을 만들거나 적어 주세요)': '· none (draft one or write it)',
   '프론트 빌드·백엔드 실행·DB 복제 방법. 자리표시자 {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}. db.mode: template(기본, 템플릿 DB 에서 초 단위 복제) · clone(매번 라이브에서, 느림) · shared(사본 없이 개발 DB 공유). maxUp(동시 개수, 기본 2) · ttlHours(미사용 자동 중지, 기본 12)': 'How to build the front, run the backend and copy the DB. Placeholders {base} {project} {n} {db} {port} {host} {previewUrl} {backUrl}. db.mode: template (default, seconds from a template DB) · clone (from live each time, slow) · shared (use the dev DB, no copy). maxUp (concurrent previews, default 2) · ttlHours (auto-stop when idle, default 12)',
   'AI 초안 만들기': 'Draft with AI', 'AI 에게 줄 메모 (선택: 배포 서버 IP, DB 컨테이너 이름 …)': 'Notes for the AI (optional: deploy host IP, DB container name …)', '레시피 저장': 'Save recipe',
@@ -136,11 +136,11 @@ const AGO = [[/(\d+)초 전/g, '$1 s ago'], [/(\d+)분 전/g, '$1 min ago'], [/(
 const SKIP = '.bf-md,.bf-log,.bf-diff,pre,code,textarea,.prob,.ktree,.kg-info,.kg-tip,.brv-text,.brv-chat__text,.brv-logbox,.brv-ai__summary,.brv-suggest__text,.brv-problem,.brv-log-msg,.brv-log-payload,.brv-shots__bigcap,[data-i18n-skip],#kLegend,.shots figcaption,.log';
 
 export function detectLang() {
-  try { const s = localStorage.getItem('bugfix-lang'); if (s === 'ko' || s === 'en') return s; } catch { /* */ }
+  try { const s = localStorage.getItem('devloop-lang'); if (s === 'ko' || s === 'en') return s; } catch { /* */ }
   const nav = (typeof navigator !== 'undefined' && (navigator.language || '')) || 'ko';
   return nav.toLowerCase().startsWith('ko') ? 'ko' : 'en';
 }
-export function setLang(lang) { try { localStorage.setItem('bugfix-lang', lang); } catch { /* */ } }
+export function setLang(lang) { try { localStorage.setItem('devloop-lang', lang); } catch { /* */ } }
 
 export function tr(text) {
   const raw = String(text ?? '');

@@ -1,9 +1,9 @@
 {
-  "name": "@bugfix-kit/vite",
-  "version": "0.1.98",
+  "name": "@devloop/vite",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "bugfix-kit Vite 플러그인 - 플러그인 한 줄로 SDK 자동 마운트·개발 프록시·/bugfix 안내 페이지",
+  "description": "devloop Vite 플러그인 - 플러그인 한 줄로 SDK 자동 마운트·개발 프록시·/devloop 안내 페이지",
   "main": "index.js",
   "peerDependencies": { "vite": ">=4" }
 }

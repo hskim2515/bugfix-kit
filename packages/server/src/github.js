@@ -29,7 +29,7 @@ export class GitHub {
         Authorization: `Bearer ${this.token()}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'bugfix-kit',
+        'User-Agent': 'devloop',
         ...(body ? { 'Content-Type': 'application/json' } : {}),
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -48,7 +48,7 @@ export class GitHub {
   async createPullRequest(title, body, head, base) {
     const r = await this.call('POST', '/pulls', { title, body, head, base, draft: false });
     if (!r?.html_url) throw new Error('GitHub PR 생성 응답이 비었습니다.');
-    this.log.info(`[bugfix] PR 생성 ${r.html_url}`);
+    this.log.info(`[devloop] PR 생성 ${r.html_url}`);
     return { number: r.number, url: r.html_url };
   }
 
@@ -79,7 +79,7 @@ export class GitHub {
   async mergePullRequest(number, commitTitle) {
     const r = await this.call('PUT', `/pulls/${number}/merge`, { commit_title: commitTitle, merge_method: 'merge' });
     if (!r?.merged) throw new Error(`GitHub 가 병합을 거부했습니다: ${r?.message || ''}`);
-    this.log.info(`[bugfix] PR #${number} 병합 ${r.sha}`);
+    this.log.info(`[devloop] PR #${number} 병합 ${r.sha}`);
     return String(r.sha);
   }
 
@@ -92,6 +92,6 @@ export class GitHub {
   /** 병합 뒤 작업 브랜치 정리 - 실패해도 치명적이지 않다 */
   async deleteBranch(branch) {
     try { await this.call('DELETE', `/git/refs/heads/${branch}`); }
-    catch (e) { this.log.warn(`[bugfix] 브랜치 삭제 실패 ${branch}: ${e.message}`); }
+    catch (e) { this.log.warn(`[devloop] 브랜치 삭제 실패 ${branch}: ${e.message}`); }
   }
 }
