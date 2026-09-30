@@ -57,7 +57,7 @@ export const planMixin = {
   },
 
   async runPlan(project, id, note) {
-    const r = await this.store.get(project.name, id);
+    const r = await this.withFeature(project, await this.store.get(project.name, id));
     if (!r) throw new Error(`리포트 없음: ${id}`);
     await this.updateFix(project, id, { fixStatus: 'PLANNING' });
     const L = (s) => this.logLine(project, id, s);
@@ -108,7 +108,7 @@ export const planMixin = {
       ? project.modules.map((m) => `  - \`${m.dir}\` (${m.name}): ${m.verify.length ? m.verify.map((v) => `\`${v}\``).join(' → ') : '검증 명령 없음'}`).join('\n')
       : '  - (모듈 규칙 없음 - 저장소 구조를 보고 판단하세요)';
     return `${project.description || `\`${project.githubRepo}\``} 저장소입니다.
-아래 ${this.kindLabel(r)} 요청 #${r.bugReportId} 의 **구현 계획**을 세워 주세요. 이 단계에서는 코드를 바꾸지 않습니다(바꿔도 버립니다). 저장소와 \`.devloop/\` 자료(summary.md, knowledge.md 가 있으면 관련 메뉴·기능·파일·API)를 읽고 판단하세요.
+아래 ${this.kindLabel(r)} 요청 #${r.bugReportId}${r.featureInfo ? ` (기능 "${r.featureInfo.name}" 의 일부 - summary.md 의 기능 범위·관련 파일부터 보세요)` : ''} 의 **구현 계획**을 세워 주세요. 이 단계에서는 코드를 바꾸지 않습니다(바꿔도 버립니다). 저장소와 \`.devloop/\` 자료(summary.md, knowledge.md 가 있으면 관련 메뉴·기능·파일·API)를 읽고 판단하세요.
 
 ## 요청
 ${this.taskTitle(r)}
@@ -151,7 +151,7 @@ ${mods}
   },
 
   async runImplement(project, id) {
-    const r = await this.store.get(project.name, id);
+    const r = await this.withFeature(project, await this.store.get(project.name, id));
     if (!r) throw new Error(`리포트 없음: ${id}`);
     let plan = null; try { plan = normalizePlan(JSON.parse(r.plan || 'null')); } catch { /* */ }
     if (!plan) throw new Error('승인된 계획이 없습니다');

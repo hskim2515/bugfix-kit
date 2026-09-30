@@ -40,6 +40,8 @@ function yt({ endpoint: e, project: A, apiKey: t, user: s, adminKey: r }) {
     planApprove: (c, B) => i("POST", `/reports/${c}/plan/approve`, B || {}),
     planNext: (c) => i("POST", `/reports/${c}/plan/next`),
     planReplan: (c, B) => i("POST", `/reports/${c}/plan/replan`, { note: B }),
+    impact: (c) => i("GET", `/reports/${c}/impact`),
+    setFeature: (c, B) => i("PUT", `/reports/${c}/feature`, { featureId: B }),
     fixChat: (c, B, g) => i("POST", `/reports/${c}/fix-chat`, { message: B, mode: g }),
     fixSync: (c) => i("POST", `/reports/${c}/fix-sync`),
     previewStart: (c) => i("POST", `/reports/${c}/preview`),
@@ -5365,7 +5367,7 @@ function Mg(e, { max: A = 80, skip: t = [] } = {}) {
   const s = ee(A), r = new Set(t), n = e.emit.bind(e);
   return e.emit = (o, i) => (r.has(o) || s.push({ time: gA(), type: o }), n(o, i)), s.get;
 }
-function lp() {
+function cp() {
   const e = /* @__PURE__ */ new Set(), A = () => (t) => (s) => {
     const r = typeof s == "function" ? "(thunk)" : String((s == null ? void 0 : s.type) ?? "(unknown)");
     for (const n of e)
@@ -5377,7 +5379,7 @@ function lp() {
   };
   return A.source = { subscribe: (t) => (e.add(t), () => e.delete(t)) }, A;
 }
-function ap(e) {
+function Bp(e) {
   return {
     subscribe: (A) => e.subscribe((t, s) => {
       const r = Object.keys(t).filter((n) => t[n] !== (s == null ? void 0 : s[n]));
@@ -5433,7 +5435,7 @@ function Ng(e) {
   };
 }
 const le = () => [];
-function cp(e = {}) {
+function gp(e = {}) {
   var g;
   const A = { project: "default", hotkeys: { report: "Shift+F9", viewer: "Shift+F10" }, interceptors: { console: !0 }, ...e }, t = A.interceptors || {}, s = t.console === !1 ? le : Kg(t.console === !0 ? {} : t.console), r = t.network ? Dg(t.network) : le, n = t.mutation ? Rg(t.mutation) : le, o = t.router ? Og(t.router === !0 ? null : t.router) : le, i = t.events ? Mg(t.events.emitter || t.events, t.events.emitter ? t.events : {}) : le, c = ((g = A.projects) != null && g.length ? A.projects : [{ key: A.project, label: A.project }]).map((l) => typeof l == "string" ? { key: l, label: l } : l), B = {
     options: A,
@@ -6119,6 +6121,28 @@ const qg = /* @__PURE__ */ xs(Gg, [["render", zg], ["__scopeId", "data-v-9785ec7
   검증: "Verification",
   "확인이 필요한 점": "Things to check",
   "추천 개선 ": "Suggested follow-ups",
+  기능: "Features",
+  "+ 새 기능": "+ New feature",
+  "새 기능": "New feature",
+  이름: "Name",
+  "마일스톤 (선택, 예: 10월 배포)": "Milestone (optional)",
+  "코드 범위": "Code scope",
+  "지식 그래프": "knowledge graph",
+  "범위 추천": "Suggest scope",
+  "파일 직접 지정": "Extra files",
+  범위: "Scope",
+  작업: "Tasks",
+  "작업 보기": "Tasks",
+  수정: "Edit",
+  삭제: "Delete",
+  "범위 없음": "no scope",
+  "기능이 없습니다 - 위에서 만드세요": "No features yet - create one above",
+  계획: "Planned",
+  진행: "Active",
+  검토: "Review",
+  완료: "Done",
+  보류: "On hold",
+  "(기능에 묶지 않음)": "(not linked to a feature)",
   "+ 새 작업": "+ New task",
   "새 작업": "New task",
   "계획 대기": "Plan pending",
@@ -7320,7 +7344,7 @@ function Td(e, A, t, s, r, n) {
     ], 32)) : C("", !0)
   ]);
 }
-const Bp = /* @__PURE__ */ xs(eu, [["render", Td], ["__scopeId", "data-v-80543552"]]), Ae = (e) => String(e ?? "").replace(/[&<>"']/g, (A) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[A]);
+const up = /* @__PURE__ */ xs(eu, [["render", Td], ["__scopeId", "data-v-80543552"]]), Ae = (e) => String(e ?? "").replace(/[&<>"']/g, (A) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[A]);
 function _A(e) {
   let A = Ae(e);
   return A = A.replace(/`([^`]+)`/g, (t, s) => `<code>${s}</code>`), A = A.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>"), A = A.replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>'), A = A.replace(/(^|[\s(])((?:[\w.-]+\/)+[\w.-]+\.(?:java|js|ts|tsx|jsx|vue|py|xml|yml|yaml|json|properties|gradle|sql|md|scss|css|html)(?::\d+)?)(?=$|[\s,)])/g, (t, s, r) => t.includes("<code>") ? t : `${s}<code class="p">${r}</code>`), A;
@@ -7501,6 +7525,7 @@ const Md = `
       chatInput: "",
       approveMode: "plan",
       replanNote: "",
+      impactFeatures: [],
       now: Date.now(),
       notice: null,
       canFix: !0,
@@ -7815,7 +7840,7 @@ const Md = `
     async openDetail(e) {
       this.selected = e, this.detail = null, this.detailLoading = !0, this.logTab = "front", this.expanded = /* @__PURE__ */ new Set();
       try {
-        if (this.detail = await this.kit.api.get(e) ?? null, this.loadKnowledge(e), this.detail) {
+        if (this.detail = await this.kit.api.get(e) ?? null, this.loadImpact(), this.loadKnowledge(e), this.detail) {
           const A = (() => {
             try {
               return JSON.parse(this.detail.frontendLogs || "[]");
@@ -7859,6 +7884,20 @@ const Md = `
     },
     fixShort(e) {
       return Pd[e] || e;
+    },
+    async loadImpact() {
+      var A, t;
+      const e = (A = this.detail) == null ? void 0 : A.bugReportId;
+      if (!e || !((t = this.detail) != null && t.fixFiles)) {
+        this.impactFeatures = [];
+        return;
+      }
+      try {
+        const s = await this.kit.api.impact(e);
+        this.impactFeatures = (s == null ? void 0 : s.features) || [];
+      } catch {
+        this.impactFeatures = [];
+      }
     },
     // ── 작업 계획 ──
     async approvePlan() {
@@ -8095,141 +8134,149 @@ ${e}`) && this.sendChat("change", `추천 개선 실행: ${e}`);
   class: "brv-kind"
 }, Hw = {
   key: 1,
-  class: "brv-spin brv-spin--sm"
+  class: "brv-kind brv-kind--feat",
+  title: "이 작업이 속한 기능"
 }, Iw = {
   key: 2,
-  class: "brv-fix-elapsed"
+  class: "brv-ai__hint",
+  title: "바뀐 파일이 이 기능들의 범위와 겹칩니다"
 }, xw = {
   key: 3,
-  class: "brv-fix-elapsed"
+  class: "brv-spin brv-spin--sm"
 }, vw = {
   key: 4,
+  class: "brv-fix-elapsed"
+}, Lw = {
+  key: 5,
+  class: "brv-fix-elapsed"
+}, Sw = {
+  key: 6,
   class: "brv-ai__tools"
-}, Lw = ["disabled"], Sw = ["disabled"], Kw = ["disabled"], kw = {
+}, Kw = ["disabled"], kw = ["disabled"], Tw = ["disabled"], Dw = {
   key: 0,
   class: "brv-ai__hint"
-}, Tw = {
+}, _w = {
   key: 1,
   class: "brv-ai__hint"
-}, Dw = {
+}, Rw = {
   key: 2,
   class: "brv-ai__start"
-}, _w = ["disabled"], Rw = {
+}, Ow = ["disabled"], Mw = {
   key: 0,
   class: "brv-plan"
-}, Ow = { class: "brv-plan__head" }, Mw = { class: "brv-ai__hint" }, Nw = { class: "brv-plan__summary brv-selectable" }, Pw = { class: "brv-plan__steps" }, Gw = {
+}, Nw = { class: "brv-plan__head" }, Pw = { class: "brv-ai__hint" }, Gw = { class: "brv-plan__summary brv-selectable" }, Vw = { class: "brv-plan__steps" }, Xw = {
   key: 0,
   class: "brv-plan__done"
-}, Vw = { class: "brv-plan__detail brv-selectable" }, Xw = {
+}, Jw = { class: "brv-plan__detail brv-selectable" }, Ww = {
   key: 0,
   class: "brv-plan__more"
-}, Jw = {
+}, Yw = {
   key: 0,
   class: "brv-plan__q"
-}, Ww = ["innerHTML"], Yw = { key: 2 }, Zw = { key: 3 }, jw = { class: "brv-plan__files" }, zw = { key: 4 }, qw = {
+}, Zw = ["innerHTML"], jw = { key: 2 }, zw = { key: 3 }, qw = { class: "brv-plan__files" }, $w = { key: 4 }, Af = {
   key: 1,
   class: "brv-plan__actions"
-}, $w = ["disabled"], Af = { class: "brv-ai__hint" }, ef = ["disabled"], tf = {
+}, ef = ["disabled"], tf = { class: "brv-ai__hint" }, sf = ["disabled"], rf = {
   key: 2,
   class: "brv-plan__actions"
-}, sf = { class: "brv-ai__hint" }, rf = ["disabled"], nf = {
+}, nf = { class: "brv-ai__hint" }, of = ["disabled"], lf = {
   key: 1,
   class: "brv-ai__meta"
-}, of = ["href"], lf = ["href"], af = ["title"], cf = {
+}, af = ["href"], cf = ["href"], Bf = ["title"], gf = {
   key: 3,
   class: "brv-ai__hint"
-}, Bf = { class: "brv-ai__branch" }, gf = ["href"], uf = {
+}, uf = { class: "brv-ai__branch" }, hf = ["href"], df = {
   key: 1,
   class: "brv-ai__hint"
-}, hf = ["disabled"], df = ["title"], wf = ["innerHTML"], ff = {
+}, wf = ["disabled"], ff = ["title"], Qf = ["innerHTML"], pf = {
   key: 3,
   class: "brv-result",
   open: ""
-}, Qf = { key: 0 }, pf = { key: 1 }, Cf = ["innerHTML"], Uf = {
+}, Cf = { key: 0 }, Uf = { key: 1 }, Ff = ["innerHTML"], bf = {
   key: 2,
   class: "brv-result__files"
-}, Ff = { class: "brv-field-label" }, bf = {
+}, mf = { class: "brv-field-label" }, Ef = {
   key: 4,
   class: "brv-kg",
   open: ""
-}, mf = { class: "brv-kg__wrap" }, Ef = ["viewBox"], yf = ["x"], Hf = ["d"], If = ["transform", "onMouseenter"], xf = ["width", "height", "fill"], vf = {
+}, yf = { class: "brv-kg__wrap" }, Hf = ["viewBox"], If = ["x"], xf = ["d"], vf = ["transform", "onMouseenter"], Lf = ["width", "height", "fill"], Sf = {
   x: "6",
   y: "14",
   class: "brv-kg__label"
-}, Lf = {
+}, Kf = {
   key: 5,
   class: "brv-shots"
-}, Sf = { class: "brv-shots__title" }, Kf = { class: "brv-suggest__hint" }, kf = { class: "brv-shots__strip" }, Tf = ["onClick"], Df = ["src", "alt"], _f = {
+}, kf = { class: "brv-shots__title" }, Tf = { class: "brv-suggest__hint" }, Df = { class: "brv-shots__strip" }, _f = ["onClick"], Rf = ["src", "alt"], Of = {
   key: 1,
   class: "brv-shots__ph"
-}, Rf = ["open"], Of = { class: "brv-ai__count" }, Mf = ["innerHTML"], Nf = {
+}, Mf = ["open"], Nf = { class: "brv-ai__count" }, Pf = ["innerHTML"], Gf = {
   key: 7,
   class: "brv-suggest"
-}, Pf = ["innerHTML"], Gf = ["disabled", "onClick"], Vf = { class: "brv-chat" }, Xf = { class: "brv-chat__who" }, Jf = ["innerHTML"], Wf = {
+}, Vf = ["innerHTML"], Xf = ["disabled", "onClick"], Jf = { class: "brv-chat" }, Wf = { class: "brv-chat__who" }, Yf = ["innerHTML"], Zf = {
   key: 0,
   class: "brv-chat__msg brv-chat__msg--assistant"
-}, Yf = {
+}, jf = {
   key: 1,
   class: "brv-chat__compose"
-}, Zf = ["disabled"], jf = { class: "brv-chat__btns" }, zf = ["disabled"], qf = ["disabled"], $f = {
+}, zf = ["disabled"], qf = { class: "brv-chat__btns" }, $f = ["disabled"], AQ = ["disabled"], eQ = {
   key: 2,
   class: "brv-ai__hint"
-}, AQ = {
+}, tQ = {
   key: 2,
   class: "brv-section"
-}, eQ = {
+}, sQ = {
   key: 0,
-  class: "brv-field"
-}, tQ = ["innerHTML"], sQ = {
-  key: 1,
   class: "brv-field"
 }, rQ = ["innerHTML"], nQ = {
-  key: 2,
+  key: 1,
   class: "brv-field"
 }, oQ = ["innerHTML"], iQ = {
+  key: 2,
+  class: "brv-field"
+}, lQ = ["innerHTML"], aQ = {
   key: 3,
   class: "brv-section"
-}, lQ = {
+}, cQ = {
   key: 0,
-  class: "brv-row"
-}, aQ = { class: "brv-selectable" }, cQ = {
-  key: 1,
   class: "brv-row"
 }, BQ = { class: "brv-selectable" }, gQ = {
-  key: 2,
+  key: 1,
   class: "brv-row"
 }, uQ = { class: "brv-selectable" }, hQ = {
-  key: 3,
+  key: 2,
   class: "brv-row"
 }, dQ = { class: "brv-selectable" }, wQ = {
+  key: 3,
+  class: "brv-row"
+}, fQ = { class: "brv-selectable" }, QQ = {
   key: 4,
   class: "brv-row"
-}, fQ = { class: "brv-selectable" }, QQ = { class: "brv-section" }, pQ = { class: "brv-label-row" }, CQ = { class: "brv-log-tabs" }, UQ = ["onClick"], FQ = { class: "brv-log-filters" }, bQ = { class: "brv-filter-chip brv-filter-error" }, mQ = { class: "brv-filter-chip brv-filter-warn" }, EQ = { class: "brv-filter-chip brv-filter-log" }, yQ = { class: "brv-log-list" }, HQ = ["onClick"], IQ = { class: "brv-log-time brv-selectable" }, xQ = { class: "brv-log-lv" }, vQ = {
+}, pQ = { class: "brv-selectable" }, CQ = { class: "brv-section" }, UQ = { class: "brv-label-row" }, FQ = { class: "brv-log-tabs" }, bQ = ["onClick"], mQ = { class: "brv-log-filters" }, EQ = { class: "brv-filter-chip brv-filter-error" }, yQ = { class: "brv-filter-chip brv-filter-warn" }, HQ = { class: "brv-filter-chip brv-filter-log" }, IQ = { class: "brv-log-list" }, xQ = ["onClick"], vQ = { class: "brv-log-time brv-selectable" }, LQ = { class: "brv-log-lv" }, SQ = {
   key: 0,
   class: "brv-log-empty"
-}, LQ = { class: "brv-log-filters" }, SQ = { class: "brv-filter-chip brv-filter-error" }, KQ = { class: "brv-filter-chip brv-filter-warn" }, kQ = { class: "brv-filter-chip brv-filter-log" }, TQ = { class: "brv-log-list" }, DQ = ["onClick"], _Q = { class: "brv-log-time brv-selectable" }, RQ = { class: "brv-log-lv" }, OQ = { class: "brv-log-logger brv-selectable" }, MQ = {
+}, KQ = { class: "brv-log-filters" }, kQ = { class: "brv-filter-chip brv-filter-error" }, TQ = { class: "brv-filter-chip brv-filter-warn" }, DQ = { class: "brv-filter-chip brv-filter-log" }, _Q = { class: "brv-log-list" }, RQ = ["onClick"], OQ = { class: "brv-log-time brv-selectable" }, MQ = { class: "brv-log-lv" }, NQ = { class: "brv-log-logger brv-selectable" }, PQ = {
   key: 0,
   class: "brv-log-empty"
-}, NQ = { class: "brv-log-filters" }, PQ = { class: "brv-filter-chip brv-filter-error" }, GQ = { class: "brv-filter-chip brv-filter-log" }, VQ = { class: "brv-log-list" }, XQ = ["onClick"], JQ = { class: "brv-net-method brv-selectable" }, WQ = { class: "brv-net-dur brv-selectable" }, YQ = { class: "brv-log-time brv-selectable" }, ZQ = {
+}, GQ = { class: "brv-log-filters" }, VQ = { class: "brv-filter-chip brv-filter-error" }, XQ = { class: "brv-filter-chip brv-filter-log" }, JQ = { class: "brv-log-list" }, WQ = ["onClick"], YQ = { class: "brv-net-method brv-selectable" }, ZQ = { class: "brv-net-dur brv-selectable" }, jQ = { class: "brv-log-time brv-selectable" }, zQ = {
   key: 0,
   class: "brv-net-detail brv-selectable"
-}, jQ = { key: 0 }, zQ = { key: 1 }, qQ = { key: 2 }, $Q = {
+}, qQ = { key: 0 }, $Q = { key: 1 }, Ap = { key: 2 }, ep = {
   key: 3,
   class: "brv-log--error"
-}, Ap = {
+}, tp = {
   key: 0,
   class: "brv-log-empty"
-}, ep = {
+}, sp = {
   key: 3,
   class: "brv-log-list"
-}, tp = ["onClick"], sp = { class: "brv-log-time brv-selectable" }, rp = {
+}, rp = ["onClick"], np = { class: "brv-log-time brv-selectable" }, op = {
   key: 0,
   class: "brv-log-payload brv-selectable"
-}, np = {
+}, ip = {
   key: 0,
   class: "brv-log-empty"
 };
-function op(e, A, t, s, r, n) {
+function lp(e, A, t, s, r, n) {
   var o, i, c, B, g;
   return h(), d("div", Vd, [
     r.isOpen ? (h(), d("div", {
@@ -8336,57 +8383,59 @@ function op(e, A, t, s, r, n) {
                 a("div", mw, [
                   a("span", Ew, f(r.detail.kind && r.detail.kind !== "bug" ? `AI ${n.kindLabel} 작업` : "AI 자동 수정"), 1),
                   r.detail.kind && r.detail.kind !== "bug" ? (h(), d("span", yw, f(n.kindLabel) + " · " + f(n.modeLabel), 1)) : C("", !0),
+                  r.detail.featureId ? (h(), d("span", Hw, "기능 #" + f(r.detail.featureId), 1)) : C("", !0),
+                  r.impactFeatures.length ? (h(), d("span", Iw, "영향: " + f(r.impactFeatures.map((l) => l.name).join(", ")), 1)) : C("", !0),
                   a("span", {
                     class: T(["brv-fix", `brv-fix--${(r.detail.fixStatus || "none").toLowerCase()}`])
                   }, f(n.fixLabel(r.detail.fixStatus)), 3),
-                  r.fixBusy || n.fixInProgress ? (h(), d("span", Hw)) : C("", !0),
-                  n.fixInProgress && n.fixElapsed ? (h(), d("span", Iw, f(n.fixElapsed), 1)) : n.deployPending ? (h(), d("span", xw, [...A[40] || (A[40] = [
+                  r.fixBusy || n.fixInProgress ? (h(), d("span", xw)) : C("", !0),
+                  n.fixInProgress && n.fixElapsed ? (h(), d("span", vw, f(n.fixElapsed), 1)) : n.deployPending ? (h(), d("span", Lw, [...A[40] || (A[40] = [
                     a("span", { class: "brv-spin brv-spin--sm" }, null, -1),
                     v(" 배포 중", -1)
                   ])])) : C("", !0),
-                  r.detail.fixStatus && n.fixable ? (h(), d("span", vw, [
+                  r.detail.fixStatus && n.fixable ? (h(), d("span", Sw, [
                     a("button", {
                       class: "brv-ai__tool",
                       disabled: r.fixBusy,
                       onClick: A[4] || (A[4] = (...l) => n.refreshDetail && n.refreshDetail(...l)),
                       title: "상태·로그 다시 읽기 (PR 이 열려 있으면 GitHub 와 맞춤)"
-                    }, "새로고침", 8, Lw),
+                    }, "새로고침", 8, Kw),
                     a("button", {
                       class: "brv-ai__tool",
                       disabled: r.fixBusy || n.fixInProgress,
                       onClick: A[5] || (A[5] = (...l) => n.requestFix && n.requestFix(...l)),
                       title: "앞선 대화·수정을 잇지 않고 원인 조사부터 새로 고칩니다"
-                    }, "처음부터 다시", 8, Sw),
+                    }, "처음부터 다시", 8, kw),
                     r.detail.fixStatus === "MERGED" && r.detail.fixMergeSha ? (h(), d("button", {
                       key: 0,
                       class: "brv-ai__tool brv-ai__tool--danger",
                       disabled: r.fixBusy || n.fixInProgress,
                       onClick: A[6] || (A[6] = (...l) => n.revertFix && n.revertFix(...l)),
                       title: "병합된 이 수정을 되돌리는 브랜치·PR 을 만듭니다 (자동 병합 프로젝트면 병합까지)"
-                    }, "되돌리기", 8, Kw)) : C("", !0)
+                    }, "되돌리기", 8, Tw)) : C("", !0)
                   ])) : C("", !0)
                 ]),
-                !r.detail.fixStatus && r.detail.tool ? (h(), d("div", kw, "버그 신고 도구 자체의 문제로 접수됐습니다. 앱 코드 수정 대상이 아니라 운영자가 도구 저장소에서 처리합니다.")) : !r.detail.fixStatus && !n.fixable ? (h(), d("div", Tw, "이 프로젝트의 수정은 운영자가 관리 콘솔에서 진행합니다. 신고는 접수됐습니다.")) : r.detail.fixStatus ? (h(), d(x, { key: 3 }, [
-                  n.planObj ? (h(), d("div", Rw, [
-                    a("div", Ow, [
+                !r.detail.fixStatus && r.detail.tool ? (h(), d("div", Dw, "버그 신고 도구 자체의 문제로 접수됐습니다. 앱 코드 수정 대상이 아니라 운영자가 도구 저장소에서 처리합니다.")) : !r.detail.fixStatus && !n.fixable ? (h(), d("div", _w, "이 프로젝트의 수정은 운영자가 관리 콘솔에서 진행합니다. 신고는 접수됐습니다.")) : r.detail.fixStatus ? (h(), d(x, { key: 3 }, [
+                  n.planObj ? (h(), d("div", Mw, [
+                    a("div", Nw, [
                       A[42] || (A[42] = a("b", null, "계획", -1)),
                       A[43] || (A[43] = v()),
-                      a("span", Mw, f(n.planObj.steps.length) + "단계 · 파일 " + f(n.planObj.files.length) + "개" + f(n.planObj.estimate ? " · " + n.planObj.estimate : ""), 1)
+                      a("span", Pw, f(n.planObj.steps.length) + "단계 · 파일 " + f(n.planObj.files.length) + "개" + f(n.planObj.estimate ? " · " + n.planObj.estimate : ""), 1)
                     ]),
-                    a("div", Nw, f(n.planObj.summary), 1),
-                    a("ol", Pw, [
+                    a("div", Gw, f(n.planObj.summary), 1),
+                    a("ol", Vw, [
                       (h(!0), d(x, null, L(n.planObj.steps, (l, u) => (h(), d("li", {
                         key: u,
                         class: T({ "brv-plan__step--done": u < n.planStep, "brv-plan__step--next": u === n.planStep && r.detail.fixStatus === "STEP_WAIT" })
                       }, [
                         a("b", null, f(l.title), 1),
-                        u < n.planStep ? (h(), d("span", Gw, "✓")) : C("", !0),
-                        a("div", Vw, f(l.detail), 1)
+                        u < n.planStep ? (h(), d("span", Xw, "✓")) : C("", !0),
+                        a("div", Jw, f(l.detail), 1)
                       ], 2))), 128))
                     ]),
-                    n.planObj.approach || n.planObj.risks.length || n.planObj.questions.length || n.planObj.files.length ? (h(), d("details", Xw, [
+                    n.planObj.approach || n.planObj.risks.length || n.planObj.questions.length || n.planObj.files.length ? (h(), d("details", Ww, [
                       a("summary", null, "접근 · 파일 · 위험" + f(n.planObj.questions.length ? " · 확인 질문 " + n.planObj.questions.length : ""), 1),
-                      n.planObj.questions.length ? (h(), d("div", Jw, [
+                      n.planObj.questions.length ? (h(), d("div", Yw, [
                         A[44] || (A[44] = a("b", null, "확인 질문", -1)),
                         a("ul", null, [
                           (h(!0), d(x, null, L(n.planObj.questions, (l, u) => (h(), d("li", {
@@ -8398,8 +8447,8 @@ function op(e, A, t, s, r, n) {
                         key: 1,
                         class: "brv-selectable",
                         innerHTML: n.md(n.planObj.approach)
-                      }, null, 8, Ww)) : C("", !0),
-                      n.planObj.risks.length ? (h(), d("div", Yw, [
+                      }, null, 8, Zw)) : C("", !0),
+                      n.planObj.risks.length ? (h(), d("div", jw, [
                         A[45] || (A[45] = a("b", null, "위험", -1)),
                         a("ul", null, [
                           (h(!0), d(x, null, L(n.planObj.risks, (l, u) => (h(), d("li", {
@@ -8407,9 +8456,9 @@ function op(e, A, t, s, r, n) {
                           }, f(l), 1))), 128))
                         ])
                       ])) : C("", !0),
-                      n.planObj.files.length ? (h(), d("div", Zw, [
+                      n.planObj.files.length ? (h(), d("div", zw, [
                         A[46] || (A[46] = a("b", null, "파일", -1)),
-                        a("ul", jw, [
+                        a("ul", qw, [
                           (h(!0), d(x, null, L(n.planObj.files, (l, u) => (h(), d("li", {
                             key: "f" + u
                           }, [
@@ -8417,7 +8466,7 @@ function op(e, A, t, s, r, n) {
                           ]))), 128))
                         ])
                       ])) : C("", !0),
-                      n.planObj.acceptance && n.planObj.acceptance.manual && n.planObj.acceptance.manual.length ? (h(), d("div", zw, [
+                      n.planObj.acceptance && n.planObj.acceptance.manual && n.planObj.acceptance.manual.length ? (h(), d("div", $w, [
                         A[47] || (A[47] = a("b", null, "사람이 확인할 것", -1)),
                         a("ul", null, [
                           (h(!0), d(x, null, L(n.planObj.acceptance.manual, (l, u) => (h(), d("li", {
@@ -8426,13 +8475,13 @@ function op(e, A, t, s, r, n) {
                         ])
                       ])) : C("", !0)
                     ])) : C("", !0),
-                    r.detail.fixStatus === "PLANNED" && n.fixable ? (h(), d("div", qw, [
+                    r.detail.fixStatus === "PLANNED" && n.fixable ? (h(), d("div", Af, [
                       a("button", {
                         class: "brv-fix-btn",
                         disabled: r.fixBusy,
                         onClick: A[8] || (A[8] = (...l) => n.approvePlan && n.approvePlan(...l))
-                      }, "계획 승인 → 구현 시작", 8, $w),
-                      a("label", Af, [
+                      }, "계획 승인 → 구현 시작", 8, ef),
+                      a("label", tf, [
                         A[49] || (A[49] = v("개입 ", -1)),
                         X(a("select", {
                           "onUpdate:modelValue": A[9] || (A[9] = (l) => r.approveMode = l),
@@ -8456,39 +8505,39 @@ function op(e, A, t, s, r, n) {
                         class: "brv-ai__tool",
                         disabled: r.fixBusy,
                         onClick: A[11] || (A[11] = (...l) => n.replan && n.replan(...l))
-                      }, "다시 계획", 8, ef)
-                    ])) : r.detail.fixStatus === "STEP_WAIT" && n.fixable ? (h(), d("div", tf, [
-                      a("span", sf, f(n.planStep) + "/" + f(n.planObj.steps.length) + " 단계 완료 · 미리보기로 확인한 뒤", 1),
+                      }, "다시 계획", 8, sf)
+                    ])) : r.detail.fixStatus === "STEP_WAIT" && n.fixable ? (h(), d("div", rf, [
+                      a("span", nf, f(n.planStep) + "/" + f(n.planObj.steps.length) + " 단계 완료 · 미리보기로 확인한 뒤", 1),
                       a("button", {
                         class: "brv-fix-btn",
                         disabled: r.fixBusy,
                         onClick: A[12] || (A[12] = (...l) => n.nextStep && n.nextStep(...l))
-                      }, "다음 단계 → " + f(n.planObj.steps[n.planStep] ? n.planObj.steps[n.planStep].title : ""), 9, rf)
+                      }, "다음 단계 → " + f(n.planObj.steps[n.planStep] ? n.planObj.steps[n.planStep].title : ""), 9, of)
                     ])) : C("", !0)
                   ])) : C("", !0),
-                  r.detail.fixPrUrl || r.detail.fixBranch ? (h(), d("div", nf, [
+                  r.detail.fixPrUrl || r.detail.fixBranch ? (h(), d("div", lf, [
                     r.detail.fixPrUrl ? (h(), d("a", {
                       key: 0,
                       class: "brv-link brv-ai__pr",
                       href: r.detail.fixPrUrl,
                       target: "_blank",
                       rel: "noopener"
-                    }, "PR #" + f(n.prNumber), 9, of)) : C("", !0),
+                    }, "PR #" + f(n.prNumber), 9, af)) : C("", !0),
                     r.detail.fixRevertPrUrl ? (h(), d("a", {
                       key: 1,
                       class: "brv-link",
                       href: r.detail.fixRevertPrUrl,
                       target: "_blank",
                       rel: "noopener"
-                    }, "되돌리기 PR", 8, lf)) : C("", !0),
+                    }, "되돌리기 PR", 8, cf)) : C("", !0),
                     r.detail.fixBranch ? (h(), d("span", {
                       key: 2,
                       class: "brv-ai__branch brv-selectable",
                       title: r.detail.fixStatus === "READY" ? r.detail.fixPushed ? "AI 수정본이 담긴 작업 브랜치 - 원격 저장소에 같은 이름으로 올라가 있습니다 (PR 은 아직 없음)" : "AI 수정본이 담긴 작업 브랜치 - 아직 키트 서버 안에만 있고 원격에는 없습니다 (콘솔에서 내보내기)" : "AI 수정본이 담긴 작업 브랜치 (기준 브랜치는 건드리지 않음)"
-                    }, f(r.detail.fixBranch), 9, af)) : C("", !0),
-                    r.detail.fixStatus === "READY" ? (h(), d("span", cf, f(r.detail.fixPushed ? "원격에 브랜치만 있음 · PR 없음" : "키트 서버 안에만 있음 · 원격에 없음"), 1)) : C("", !0),
+                    }, f(r.detail.fixBranch), 9, Bf)) : C("", !0),
+                    r.detail.fixStatus === "READY" ? (h(), d("span", gf, f(r.detail.fixPushed ? "원격에 브랜치만 있음 · PR 없음" : "키트 서버 안에만 있음 · 원격에 없음"), 1)) : C("", !0),
                     r.detail.fixVersion != null ? (h(), d(x, { key: 4 }, [
-                      a("span", Bf, "v" + f(r.detail.fixVersion), 1),
+                      a("span", uf, "v" + f(r.detail.fixVersion), 1),
                       r.detail.preview ? (h(), d(x, { key: 0 }, [
                         r.detail.preview.status === "UP" && r.detail.preview.url ? (h(), d("a", {
                           key: 0,
@@ -8497,7 +8546,7 @@ function op(e, A, t, s, r, n) {
                           target: "_blank",
                           rel: "noopener",
                           title: "이 수정본으로 띄운 앱(프론트+백엔드+DB 사본)"
-                        }, "미리보기 열기 ↗", 8, gf)) : n.previewPending ? (h(), d("span", uf, [
+                        }, "미리보기 열기 ↗", 8, hf)) : n.previewPending ? (h(), d("span", df, [
                           A[50] || (A[50] = a("span", { class: "brv-spin brv-spin--sm" }, null, -1)),
                           v(" 미리보기 준비 중(" + f(n.previewLabel) + ")", 1)
                         ])) : r.detail.preview.canPreview && n.fixable ? (h(), d("button", {
@@ -8506,12 +8555,12 @@ function op(e, A, t, s, r, n) {
                           disabled: r.fixBusy,
                           onClick: A[13] || (A[13] = (...l) => n.startPreview && n.startPreview(...l)),
                           title: "이 수정본으로 프론트·백엔드·DB 사본을 띄워 직접 써 봅니다 (몇 분)"
-                        }, "미리보기 띄우기", 8, hf)) : C("", !0),
+                        }, "미리보기 띄우기", 8, wf)) : C("", !0),
                         r.detail.preview.status === "FAILED" ? (h(), d("span", {
                           key: 3,
                           class: "brv-ai__hint",
                           title: r.detail.preview.error || ""
-                        }, "미리보기 실패", 8, df)) : C("", !0)
+                        }, "미리보기 실패", 8, ff)) : C("", !0)
                       ], 64)) : C("", !0)
                     ], 64)) : C("", !0)
                   ])) : C("", !0),
@@ -8519,8 +8568,8 @@ function op(e, A, t, s, r, n) {
                     key: 2,
                     class: "brv-ai__summary brv-selectable",
                     innerHTML: n.md(r.detail.fixSummary)
-                  }, null, 8, wf)) : C("", !0),
-                  r.detail.fixReport || n.fixFiles.length ? (h(), d("details", ff, [
+                  }, null, 8, Qf)) : C("", !0),
+                  r.detail.fixReport || n.fixFiles.length ? (h(), d("details", pf, [
                     A[52] || (A[52] = a("summary", null, [
                       v("수정 결과 "),
                       a("span", { class: "brv-suggest__hint" }, "원인 · 고친 내용 · 검증 · 확인이 필요한 점")
@@ -8531,8 +8580,8 @@ function op(e, A, t, s, r, n) {
                     }, [
                       A[51] || (A[51] = a("b", null, "재현 검증", -1)),
                       v(" " + f(n.fixRepro.passed ? "✓ 통과" : "✗ 실패") + " · " + f(n.fixRepro.rounds) + "회", 1),
-                      n.fixRepro.note ? (h(), d("span", Qf, " · " + f(n.fixRepro.note), 1)) : C("", !0),
-                      (i = n.fixRepro.evidence) != null && i.length ? (h(), d("ul", pf, [
+                      n.fixRepro.note ? (h(), d("span", Cf, " · " + f(n.fixRepro.note), 1)) : C("", !0),
+                      (i = n.fixRepro.evidence) != null && i.length ? (h(), d("ul", Uf, [
                         (h(!0), d(x, null, L(n.fixRepro.evidence.slice(0, 6), (l, u) => (h(), d("li", { key: u }, [
                           a("code", null, f(l), 1)
                         ]))), 128))
@@ -8542,9 +8591,9 @@ function op(e, A, t, s, r, n) {
                       key: 1,
                       class: "brv-result__body brv-selectable",
                       innerHTML: n.md(r.detail.fixReport)
-                    }, null, 8, Cf)) : C("", !0),
-                    n.fixFiles.length ? (h(), d("div", Uf, [
-                      a("span", Ff, "바뀐 파일 (" + f(n.fixFiles.length) + ")", 1),
+                    }, null, 8, Ff)) : C("", !0),
+                    n.fixFiles.length ? (h(), d("div", bf, [
+                      a("span", mf, "바뀐 파일 (" + f(n.fixFiles.length) + ")", 1),
                       a("ul", null, [
                         (h(!0), d(x, null, L(n.fixFiles, (l) => (h(), d("li", { key: l }, [
                           a("code", null, f(l), 1)
@@ -8552,12 +8601,12 @@ function op(e, A, t, s, r, n) {
                       ])
                     ])) : C("", !0)
                   ])) : C("", !0),
-                  n.kgLayout ? (h(), d("details", bf, [
+                  n.kgLayout ? (h(), d("details", Ef, [
                     A[53] || (A[53] = a("summary", null, [
                       v("관련 기능·파일 "),
                       a("span", { class: "brv-suggest__hint" }, "지식 그래프에서 이 신고와 이어진 부분 · 노란 테두리 = 신고 내용과 직접 맞는 것")
                     ], -1)),
-                    a("div", mf, [
+                    a("div", yf, [
                       (h(), d("svg", {
                         viewBox: `0 0 ${n.kgLayout.w} ${n.kgLayout.h}`,
                         style: Mr({ width: n.kgLayout.w + "px", height: n.kgLayout.h + "px" }),
@@ -8568,12 +8617,12 @@ function op(e, A, t, s, r, n) {
                           x: l.x,
                           y: "12",
                           class: "brv-kg__col"
-                        }, f(l.title), 9, yf))), 128)),
+                        }, f(l.title), 9, If))), 128)),
                         (h(!0), d(x, null, L(n.kgLayout.edges, (l, u) => (h(), d("path", {
                           key: "e" + u,
                           d: l.d,
                           class: T(["brv-kg__edge", "brv-kg__edge--" + l.rel, { "brv-kg__edge--dim": r.kgHover && l.from !== r.kgHover && l.to !== r.kgHover }])
-                        }, null, 10, Hf))), 128)),
+                        }, null, 10, xf))), 128)),
                         (h(!0), d(x, null, L(n.kgLayout.nodes, (l) => (h(), d("g", {
                           key: l.id,
                           transform: `translate(${l.x},${l.y})`,
@@ -8590,18 +8639,18 @@ function op(e, A, t, s, r, n) {
                             height: l.h,
                             rx: "4",
                             fill: n.kgColor(l.type)
-                          }, null, 8, xf),
-                          a("text", vf, f(l.short), 1)
-                        ], 42, If))), 128))
-                      ], 12, Ef))
+                          }, null, 8, Lf),
+                          a("text", Sf, f(l.short), 1)
+                        ], 42, vf))), 128))
+                      ], 12, Hf))
                     ])
                   ])) : C("", !0),
-                  n.fixShots.length ? (h(), d("div", Lf, [
-                    a("div", Sf, [
-                      A[54] || (A[54] = v("화면 확인 ", -1)),
-                      a("span", Kf, f(n.fixShots[n.fixShots.length - 1].label), 1)
-                    ]),
+                  n.fixShots.length ? (h(), d("div", Kf, [
                     a("div", kf, [
+                      A[54] || (A[54] = v("화면 확인 ", -1)),
+                      a("span", Tf, f(n.fixShots[n.fixShots.length - 1].label), 1)
+                    ]),
+                    a("div", Df, [
                       (h(!0), d(x, null, L(n.fixShots, (l) => (h(), d("figure", {
                         key: l.file,
                         class: "brv-shots__item",
@@ -8611,9 +8660,9 @@ function op(e, A, t, s, r, n) {
                           key: 0,
                           src: r.shotUrls[l.file],
                           alt: l.name
-                        }, null, 8, Df)) : (h(), d("div", _f, "…")),
+                        }, null, 8, Rf)) : (h(), d("div", Of, "…")),
                         a("figcaption", null, f(l.name.replace(/\.png$/i, "")), 1)
-                      ], 8, Tf))), 128))
+                      ], 8, _f))), 128))
                     ])
                   ])) : C("", !0),
                   r.detail.fixLog ? (h(), d("details", {
@@ -8623,15 +8672,15 @@ function op(e, A, t, s, r, n) {
                   }, [
                     a("summary", null, [
                       A[55] || (A[55] = v("진행 로그 ", -1)),
-                      a("span", Of, f(n.logLineCount) + "줄", 1)
+                      a("span", Nf, f(n.logLineCount) + "줄", 1)
                     ]),
                     a("div", {
                       ref: "fixLogPre",
                       class: "brv-selectable brv-logbox",
                       innerHTML: n.logH(r.detail.fixLog)
-                    }, null, 8, Mf)
-                  ], 8, Rf)) : C("", !0),
-                  n.fixSuggestions.length ? (h(), d("div", Nf, [
+                    }, null, 8, Pf)
+                  ], 8, Mf)) : C("", !0),
+                  n.fixSuggestions.length ? (h(), d("div", Gf, [
                     A[56] || (A[56] = a("div", { class: "brv-suggest__title" }, [
                       v("추천 개선 "),
                       a("span", { class: "brv-suggest__hint" }, "실행을 누르면 그 내용으로 이어서 고칩니다")
@@ -8643,34 +8692,34 @@ function op(e, A, t, s, r, n) {
                       a("span", {
                         class: "brv-suggest__text brv-selectable",
                         innerHTML: n.md(l)
-                      }, null, 8, Pf),
+                      }, null, 8, Vf),
                       n.fixable ? (h(), d("button", {
                         key: 0,
                         class: "brv-fix-btn brv-fix-btn--ghost brv-suggest__run",
                         disabled: r.fixBusy || n.fixInProgress,
                         onClick: (Q) => n.runSuggestion(l)
-                      }, "실행", 8, Gf)) : C("", !0)
+                      }, "실행", 8, Xf)) : C("", !0)
                     ]))), 128))
                   ])) : C("", !0),
-                  a("div", Vf, [
+                  a("div", Jf, [
                     (h(!0), d(x, null, L(n.fixChat, (l, u) => (h(), d("div", {
                       key: u,
                       class: T(["brv-chat__msg", `brv-chat__msg--${l.role}`])
                     }, [
-                      a("span", Xf, f(l.role === "user" ? "나" : "AI"), 1),
+                      a("span", Wf, f(l.role === "user" ? "나" : "AI"), 1),
                       a("div", {
                         class: "brv-chat__text brv-selectable",
                         innerHTML: n.md(l.text)
-                      }, null, 8, Jf)
+                      }, null, 8, Yf)
                     ], 2))), 128)),
-                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (h(), d("div", Wf, [...A[57] || (A[57] = [
+                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (h(), d("div", Zf, [...A[57] || (A[57] = [
                       a("span", { class: "brv-chat__who" }, "AI", -1),
                       a("div", { class: "brv-chat__text" }, [
                         a("span", { class: "brv-spin brv-spin--sm" }),
                         v(" 생각 중…")
                       ], -1)
                     ])])) : C("", !0),
-                    n.fixable ? (h(), d("div", Yf, [
+                    n.fixable ? (h(), d("div", jf, [
                       X(a("textarea", {
                         "onUpdate:modelValue": A[15] || (A[15] = (l) => r.chatInput = l),
                         class: "brv-chat__input",
@@ -8681,89 +8730,89 @@ function op(e, A, t, s, r, n) {
                           A[16] || (A[16] = Ls(ae((l) => n.sendChat("ask"), ["ctrl", "prevent"]), ["enter"])),
                           A[17] || (A[17] = Ls(ae((l) => n.sendChat("ask"), ["meta", "prevent"]), ["enter"]))
                         ]
-                      }, null, 40, Zf), [
+                      }, null, 40, zf), [
                         [Qe, r.chatInput]
                       ]),
-                      a("div", jf, [
+                      a("div", qf, [
                         a("button", {
                           class: "brv-fix-btn brv-fix-btn--ghost",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
                           onClick: A[18] || (A[18] = (l) => n.sendChat("ask")),
                           title: "코드는 바꾸지 않고 답만 합니다 (Ctrl+Enter)"
-                        }, "질문", 8, zf),
+                        }, "질문", 8, $f),
                         a("button", {
                           class: "brv-fix-btn",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
                           onClick: A[19] || (A[19] = (l) => n.sendChat("change")),
                           title: "앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지"
-                        }, "수정 요청", 8, qf)
+                        }, "수정 요청", 8, AQ)
                       ])
                     ])) : C("", !0),
-                    n.fixable ? (h(), d("div", $f, "질문은 코드를 바꾸지 않고 답만, 수정 요청은 이어서 고쳐 검증·PR·병합까지 진행합니다.")) : C("", !0)
+                    n.fixable ? (h(), d("div", eQ, "질문은 코드를 바꾸지 않고 답만, 수정 요청은 이어서 고쳐 검증·PR·병합까지 진행합니다.")) : C("", !0)
                   ])
-                ], 64)) : (h(), d("div", Dw, [
+                ], 64)) : (h(), d("div", Rw, [
                   a("button", {
                     class: "brv-fix-btn brv-fix-btn--lg",
                     disabled: r.fixBusy,
                     onClick: A[7] || (A[7] = (...l) => n.requestFix && n.requestFix(...l))
-                  }, "AI 에게 수정 요청", 8, _w),
+                  }, "AI 에게 수정 요청", 8, Ow),
                   A[41] || (A[41] = a("span", { class: "brv-ai__hint" }, "서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.", -1))
                 ]))
               ]),
-              r.detail.problem || r.detail.reproSteps || r.detail.expectedResult ? (h(), d("div", AQ, [
+              r.detail.problem || r.detail.reproSteps || r.detail.expectedResult ? (h(), d("div", tQ, [
                 A[61] || (A[61] = a("div", { class: "brv-label" }, "내용", -1)),
-                r.detail.problem ? (h(), d("div", eQ, [
+                r.detail.problem ? (h(), d("div", sQ, [
                   A[58] || (A[58] = a("div", { class: "brv-field-label" }, "문제 상황", -1)),
                   a("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.problem)
-                  }, null, 8, tQ)
+                  }, null, 8, rQ)
                 ])) : C("", !0),
-                r.detail.reproSteps ? (h(), d("div", sQ, [
+                r.detail.reproSteps ? (h(), d("div", nQ, [
                   A[59] || (A[59] = a("div", { class: "brv-field-label" }, "재현 단계", -1)),
                   a("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.reproSteps)
-                  }, null, 8, rQ)
+                  }, null, 8, oQ)
                 ])) : C("", !0),
-                r.detail.expectedResult ? (h(), d("div", nQ, [
+                r.detail.expectedResult ? (h(), d("div", iQ, [
                   A[60] || (A[60] = a("div", { class: "brv-field-label" }, "기대 결과", -1)),
                   a("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.expectedResult)
-                  }, null, 8, oQ)
+                  }, null, 8, lQ)
                 ])) : C("", !0)
               ])) : C("", !0),
-              n.parsedContext ? (h(), d("div", iQ, [
+              n.parsedContext ? (h(), d("div", aQ, [
                 A[67] || (A[67] = a("div", { class: "brv-label" }, "컨텍스트", -1)),
-                n.parsedContext.camera ? (h(), d("div", lQ, [
+                n.parsedContext.camera ? (h(), d("div", cQ, [
                   A[62] || (A[62] = a("span", null, "카메라", -1)),
-                  a("span", aQ, f(n.parsedContext.camera.longitude) + "°, " + f(n.parsedContext.camera.latitude) + "° · 고도 " + f(n.parsedContext.camera.height) + "m · H" + f(n.parsedContext.camera.heading) + "° P" + f(n.parsedContext.camera.pitch) + "° ", 1)
+                  a("span", BQ, f(n.parsedContext.camera.longitude) + "°, " + f(n.parsedContext.camera.latitude) + "° · 고도 " + f(n.parsedContext.camera.height) + "m · H" + f(n.parsedContext.camera.heading) + "° P" + f(n.parsedContext.camera.pitch) + "° ", 1)
                 ])) : C("", !0),
-                (c = n.parsedContext.menus) != null && c.header ? (h(), d("div", cQ, [
+                (c = n.parsedContext.menus) != null && c.header ? (h(), d("div", gQ, [
                   A[63] || (A[63] = a("span", null, "상단 탭", -1)),
-                  a("span", BQ, f(n.parsedContext.menus.header), 1)
+                  a("span", uQ, f(n.parsedContext.menus.header), 1)
                 ])) : C("", !0),
-                n.parsedContext.activeData ? (h(), d("div", gQ, [
+                n.parsedContext.activeData ? (h(), d("div", hQ, [
                   A[64] || (A[64] = a("span", null, "데이터셋", -1)),
-                  a("span", uQ, f(((B = n.parsedContext.activeData.datasets) == null ? void 0 : B.map((l) => l._displayName).join(", ")) || "없음"), 1)
+                  a("span", dQ, f(((B = n.parsedContext.activeData.datasets) == null ? void 0 : B.map((l) => l._displayName).join(", ")) || "없음"), 1)
                 ])) : C("", !0),
-                (g = n.parsedContext.activeData) != null && g.terrain ? (h(), d("div", hQ, [
+                (g = n.parsedContext.activeData) != null && g.terrain ? (h(), d("div", wQ, [
                   A[65] || (A[65] = a("span", null, "지형", -1)),
-                  a("span", dQ, f(n.parsedContext.activeData.terrain), 1)
+                  a("span", fQ, f(n.parsedContext.activeData.terrain), 1)
                 ])) : C("", !0),
-                n.parsedContext.datetime ? (h(), d("div", wQ, [
+                n.parsedContext.datetime ? (h(), d("div", QQ, [
                   A[66] || (A[66] = a("span", null, "발생 시각", -1)),
-                  a("span", fQ, f(n.parsedContext.datetime), 1)
+                  a("span", pQ, f(n.parsedContext.datetime), 1)
                 ])) : C("", !0)
               ])) : C("", !0),
-              a("div", QQ, [
-                a("div", pQ, [
+              a("div", CQ, [
+                a("div", UQ, [
                   A[68] || (A[68] = a("div", {
                     class: "brv-label",
                     style: { "margin-bottom": "0" }
                   }, "로그", -1)),
-                  a("div", CQ, [
+                  a("div", FQ, [
                     (h(!0), d(x, null, L(n.logTabs, (l) => (h(), d("button", {
                       key: l.id,
                       class: T(["brv-log-tab", { active: r.logTab === l.id }]),
@@ -8774,12 +8823,12 @@ function op(e, A, t, s, r, n) {
                         key: 0,
                         class: T(["brv-log-tab-count", l.countClass])
                       }, f(l.count), 3)) : C("", !0)
-                    ], 10, UQ))), 128))
+                    ], 10, bQ))), 128))
                   ])
                 ]),
                 r.logTab === "front" ? (h(), d(x, { key: 0 }, [
-                  a("div", FQ, [
-                    a("label", bQ, [
+                  a("div", mQ, [
+                    a("label", EQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[20] || (A[20] = (l) => r.showFE.error = l)
@@ -8788,7 +8837,7 @@ function op(e, A, t, s, r, n) {
                       ]),
                       v(" 오류 (" + f(n.countFE("error")) + ") ", 1)
                     ]),
-                    a("label", mQ, [
+                    a("label", yQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[21] || (A[21] = (l) => r.showFE.warn = l)
@@ -8797,7 +8846,7 @@ function op(e, A, t, s, r, n) {
                       ]),
                       v(" 경고 (" + f(n.countFE("warn")) + ") ", 1)
                     ]),
-                    a("label", EQ, [
+                    a("label", HQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[22] || (A[22] = (l) => r.showFE.log = l)
@@ -8807,7 +8856,7 @@ function op(e, A, t, s, r, n) {
                       v(" 로그 (" + f(n.countFE("log")) + ") ", 1)
                     ])
                   ]),
-                  a("div", yQ, [
+                  a("div", IQ, [
                     (h(!0), d(x, null, L(n.filteredFrontLogs, (l, u) => {
                       var Q;
                       return h(), d("div", {
@@ -8815,19 +8864,19 @@ function op(e, A, t, s, r, n) {
                         class: T(["brv-log-item", `brv-log--${l.level}`]),
                         onClick: (p) => n.toggleExpand("f" + u)
                       }, [
-                        a("span", IQ, f((Q = l.time) == null ? void 0 : Q.slice(11, 23)), 1),
-                        a("span", xQ, f(l.level), 1),
+                        a("span", vQ, f((Q = l.time) == null ? void 0 : Q.slice(11, 23)), 1),
+                        a("span", LQ, f(l.level), 1),
                         a("span", {
                           class: T(["brv-log-msg brv-selectable", { expanded: r.expanded.has("f" + u) }])
                         }, f(l.message), 3)
-                      ], 10, HQ);
+                      ], 10, xQ);
                     }), 128)),
-                    n.filteredFrontLogs.length === 0 ? (h(), d("div", vQ, "표시할 로그 없음")) : C("", !0)
+                    n.filteredFrontLogs.length === 0 ? (h(), d("div", SQ, "표시할 로그 없음")) : C("", !0)
                   ])
                 ], 64)) : C("", !0),
                 r.logTab === "back" ? (h(), d(x, { key: 1 }, [
-                  a("div", LQ, [
-                    a("label", SQ, [
+                  a("div", KQ, [
+                    a("label", kQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[23] || (A[23] = (l) => r.showBE.error = l)
@@ -8836,7 +8885,7 @@ function op(e, A, t, s, r, n) {
                       ]),
                       v(" ERROR (" + f(n.countBE("ERROR")) + ") ", 1)
                     ]),
-                    a("label", KQ, [
+                    a("label", TQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[24] || (A[24] = (l) => r.showBE.warn = l)
@@ -8845,7 +8894,7 @@ function op(e, A, t, s, r, n) {
                       ]),
                       v(" WARN (" + f(n.countBE("WARN")) + ") ", 1)
                     ]),
-                    a("label", kQ, [
+                    a("label", DQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[25] || (A[25] = (l) => r.showBE.info = l)
@@ -8855,7 +8904,7 @@ function op(e, A, t, s, r, n) {
                       v(" INFO (" + f(n.countBE("INFO")) + ") ", 1)
                     ])
                   ]),
-                  a("div", TQ, [
+                  a("div", _Q, [
                     (h(!0), d(x, null, L(n.filteredBackLogs, (l, u) => {
                       var Q, p;
                       return h(), d("div", {
@@ -8863,20 +8912,20 @@ function op(e, A, t, s, r, n) {
                         class: T(["brv-log-item", `brv-log--${(Q = l.level) == null ? void 0 : Q.toLowerCase()}`]),
                         onClick: (U) => n.toggleExpand("b" + u)
                       }, [
-                        a("span", _Q, f((p = l.time) == null ? void 0 : p.slice(11, 23)), 1),
-                        a("span", RQ, f(l.level), 1),
-                        a("span", OQ, f(n.shortLogger(l.logger)), 1),
+                        a("span", OQ, f((p = l.time) == null ? void 0 : p.slice(11, 23)), 1),
+                        a("span", MQ, f(l.level), 1),
+                        a("span", NQ, f(n.shortLogger(l.logger)), 1),
                         a("span", {
                           class: T(["brv-log-msg brv-selectable", { expanded: r.expanded.has("b" + u) }])
                         }, f(l.message), 3)
-                      ], 10, DQ);
+                      ], 10, RQ);
                     }), 128)),
-                    n.filteredBackLogs.length === 0 ? (h(), d("div", MQ, "표시할 로그 없음")) : C("", !0)
+                    n.filteredBackLogs.length === 0 ? (h(), d("div", PQ, "표시할 로그 없음")) : C("", !0)
                   ])
                 ], 64)) : C("", !0),
                 r.logTab === "net" ? (h(), d(x, { key: 2 }, [
-                  a("div", NQ, [
-                    a("label", PQ, [
+                  a("div", GQ, [
+                    a("label", VQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[26] || (A[26] = (l) => r.showNet.error = l)
@@ -8885,7 +8934,7 @@ function op(e, A, t, s, r, n) {
                       ]),
                       v(" 에러 (" + f(n.networkLogs.filter((l) => l.error || l.status >= 400).length) + ") ", 1)
                     ]),
-                    a("label", GQ, [
+                    a("label", XQ, [
                       X(a("input", {
                         type: "checkbox",
                         "onUpdate:modelValue": A[27] || (A[27] = (l) => r.showNet.ok = l)
@@ -8895,7 +8944,7 @@ function op(e, A, t, s, r, n) {
                       v(" 성공 (" + f(n.networkLogs.filter((l) => !l.error && l.status < 400).length) + ") ", 1)
                     ])
                   ]),
-                  a("div", VQ, [
+                  a("div", JQ, [
                     (h(!0), d(x, null, L(n.filteredNetLogs, (l, u) => {
                       var Q;
                       return h(), d("div", {
@@ -8906,52 +8955,52 @@ function op(e, A, t, s, r, n) {
                         a("span", {
                           class: T(["brv-net-status", n.statusClass(l.status)])
                         }, f(l.status || "ERR"), 3),
-                        a("span", JQ, f(l.method), 1),
+                        a("span", YQ, f(l.method), 1),
                         a("span", {
                           class: T(["brv-log-msg brv-selectable", { expanded: r.expanded.has("n" + u) }])
                         }, f(l.url), 3),
-                        a("span", WQ, f(l.duration) + "ms", 1),
-                        a("span", YQ, f((Q = l.time) == null ? void 0 : Q.slice(11, 19)), 1)
-                      ], 10, XQ);
+                        a("span", ZQ, f(l.duration) + "ms", 1),
+                        a("span", jQ, f((Q = l.time) == null ? void 0 : Q.slice(11, 19)), 1)
+                      ], 10, WQ);
                     }), 128)),
                     (h(!0), d(x, null, L(n.filteredNetLogs, (l, u) => (h(), d(x, {
                       key: "d" + u
                     }, [
-                      r.expanded.has("n" + u) ? (h(), d("div", ZQ, [
-                        l.params ? (h(), d("div", jQ, [
+                      r.expanded.has("n" + u) ? (h(), d("div", zQ, [
+                        l.params ? (h(), d("div", qQ, [
                           A[69] || (A[69] = a("b", null, "Params:", -1)),
                           v(" " + f(l.params), 1)
                         ])) : C("", !0),
-                        l.requestBody ? (h(), d("div", zQ, [
+                        l.requestBody ? (h(), d("div", $Q, [
                           A[70] || (A[70] = a("b", null, "Request:", -1)),
                           v(" " + f(l.requestBody), 1)
                         ])) : C("", !0),
-                        l.responseBody ? (h(), d("div", qQ, [
+                        l.responseBody ? (h(), d("div", Ap, [
                           A[71] || (A[71] = a("b", null, "Response:", -1)),
                           v(" " + f(l.responseBody), 1)
                         ])) : C("", !0),
-                        l.error ? (h(), d("div", $Q, [
+                        l.error ? (h(), d("div", ep, [
                           A[72] || (A[72] = a("b", null, "Error:", -1)),
                           v(" " + f(l.error), 1)
                         ])) : C("", !0)
                       ])) : C("", !0)
                     ], 64))), 128)),
-                    n.filteredNetLogs.length === 0 ? (h(), d("div", Ap, "표시할 요청 없음")) : C("", !0)
+                    n.filteredNetLogs.length === 0 ? (h(), d("div", tp, "표시할 요청 없음")) : C("", !0)
                   ])
                 ], 64)) : C("", !0),
-                r.logTab === "mutation" ? (h(), d("div", ep, [
+                r.logTab === "mutation" ? (h(), d("div", sp, [
                   (h(!0), d(x, null, L(n.parsedMutationLog, (l, u) => (h(), d("div", {
                     key: u,
                     class: "brv-log-item",
                     onClick: (Q) => n.toggleExpand("m" + u)
                   }, [
-                    a("span", sp, f(l.time), 1),
+                    a("span", np, f(l.time), 1),
                     a("span", {
                       class: T(["brv-log-msg brv-mutation brv-selectable", { expanded: r.expanded.has("m" + u) }])
                     }, f(l.type), 3),
-                    l.payload !== null ? (h(), d("span", rp, f(n.formatPayload(l.payload)), 1)) : C("", !0)
-                  ], 8, tp))), 128)),
-                  n.parsedMutationLog.length === 0 ? (h(), d("div", np, "기록된 mutation 없음")) : C("", !0)
+                    l.payload !== null ? (h(), d("span", op, f(n.formatPayload(l.payload)), 1)) : C("", !0)
+                  ], 8, rp))), 128)),
+                  n.parsedMutationLog.length === 0 ? (h(), d("div", ip, "기록된 mutation 없음")) : C("", !0)
                 ])) : C("", !0)
               ])
             ], 64)) : C("", !0)
@@ -8995,12 +9044,12 @@ function op(e, A, t, s, r, n) {
     ], 32)) : C("", !0)
   ]);
 }
-const gp = /* @__PURE__ */ xs(Gd, [["render", op], ["__scopeId", "data-v-4915b2a5"]]);
+const hp = /* @__PURE__ */ xs(Gd, [["render", lp], ["__scopeId", "data-v-b418d2b9"]]);
 export {
-  Bp as ReportModal,
-  gp as Viewer,
+  up as ReportModal,
+  hp as Viewer,
   vg as captureScreen,
-  cp as createDevloop,
-  lp as reduxMiddleware,
-  ap as zustandSource
+  gp as createDevloop,
+  cp as reduxMiddleware,
+  Bp as zustandSource
 };

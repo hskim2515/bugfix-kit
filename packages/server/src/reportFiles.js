@@ -12,10 +12,11 @@ export async function writeReportFiles(dir, r) {
   const w = async (name, content) => { if (content) await fs.writeFile(path.join(dir, name), content, 'utf8'); };
 
   const kind = r.kind && r.kind !== 'bug' ? ({ feature: '기능 요청', improve: '개선 요청' }[r.kind] || '작업') : null;
+  const featureMd = r.featureMd ? `\n${r.featureMd}\n` : '';
   await w('summary.md', kind
-    ? `# ${kind} #${r.bugReportId}${r.title ? `: ${r.title}` : ''}\n\n- 일시: ${r.insertDate || '-'}\n- 개입 방식: ${r.mode || 'plan'}\n\n## 요청\n${orDash(r.problem)}\n${r.reproSteps ? `\n## 참고\n${r.reproSteps}\n` : ''}${r.expectedResult ? `\n## 기대 결과\n${r.expectedResult}\n` : ''}`
+    ? `# ${kind} #${r.bugReportId}${r.title ? `: ${r.title}` : ''}\n\n- 일시: ${r.insertDate || '-'}\n- 개입 방식: ${r.mode || 'plan'}\n\n## 요청\n${orDash(r.problem)}\n${r.reproSteps ? `\n## 참고\n${r.reproSteps}\n` : ''}${r.expectedResult ? `\n## 기대 결과\n${r.expectedResult}\n` : ''}${featureMd}`
     : `# 버그 리포트 #${r.bugReportId}\n\n- 심각도: ${orDash(r.severity)}\n- 일시: ${r.insertDate || '-'}\n\n`
-    + `## 문제\n${orDash(r.problem)}\n\n## 재현 절차\n${orDash(r.reproSteps)}\n\n## 기대 결과\n${orDash(r.expectedResult)}\n`);
+    + `## 문제\n${orDash(r.problem)}\n\n## 재현 절차\n${orDash(r.reproSteps)}\n\n## 기대 결과\n${orDash(r.expectedResult)}\n${featureMd}`);
 
   if (r.screenshot) {
     const comma = r.screenshot.indexOf(',');

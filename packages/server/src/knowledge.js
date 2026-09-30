@@ -332,7 +332,9 @@ export function hintsFromReport(r) {
     for (const k of Object.keys(m)) { const v = m[k]; const label = typeof v === 'string' ? v : v?.label; if (label) { hints.add(String(label)); add(label); } }
     if (ctx.route) { hints.add(String(ctx.route)); add(ctx.route); }
   }
-  add(r.problem); add(r.reproSteps); add(r.expectedResult);
+  add(r.problem); add(r.reproSteps); add(r.expectedResult); add(r.title); add(r.scope);
+  // 기능에 묶인 작업이면 기능의 범위(노드 라벨·파일)를 힌트로 - 그 코드부터 보게
+  if (r.featureInfo) { for (const l of r.featureInfo.scope?.nodes || []) hints.add(String(l)); for (const f of [...(r.featureInfo.scope?.files || []), ...(r.featureInfo.extraFiles || [])]) hints.add(String(f)); add(r.featureInfo.name); }
   // 두 단어 묶음("지구 선택")은 한 단어보다 뜻이 분명하다 - 라벨에 그대로 들어 있는 경우가 많다
   const pt = tokens(r.problem).slice(0, 40);
   for (let i = 0; i + 1 < pt.length; i++) if (/^[가-힣]+$/.test(pt[i]) && /^[가-힣]+$/.test(pt[i + 1])) hints.add(`${pt[i]} ${pt[i + 1]}`);

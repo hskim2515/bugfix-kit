@@ -29,7 +29,7 @@ const REPORT_FIELDS = ['severity', 'problem', 'reproSteps', 'expectedResult', 's
  * 라우터를 돌려준다(경로는 마운트 지점 기준). 독립 서버는 `app.use('/api', router)`, 앱 내장(devloop/embed)은 `app.use('/devloop', router)`.
  * 콘솔(/ui/)은 자기 주소의 한 단계 위를 API 기준으로 쓰므로 어디에 마운트해도 맞는다.
  */
-export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null, versions = null, loops = null, notifier = null) {
+export function createApi(cfg, store, runner, log = console, insights = null, knowledge = null, versions = null, loops = null, notifier = null, features = null) {
   const app = express.Router();
   // 버전 미리보기({마운트}/v/:project/:n/…)는 본문을 그대로 넘겨야 하므로 JSON 파서보다 앞에
   if (versions) app.use(versions.router());
@@ -108,6 +108,14 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
   app.post('/admin/loops/:project/:name/run', admin, wrap(async (req) => loops.runNow(proj(req), req.params.name)));
   app.post('/admin/loops/:project/stop', admin, wrap(async (req) => loops.stop(proj(req))));
   // ── 버전(AI 수정본) · 미리보기 ──
+  // ── 기능(feature) ──
+  app.get('/admin/features/:project', admin, wrap(async (req) => ({ features: features ? await features.list(proj(req).name) : [], statuses: (await import('./features.js')).FEATURE_STATUS })));
+  app.post('/admin/features/:project', admin, wrap(async (req) => features.create(proj(req).name, req.body || {})));
+  app.put('/admin/features/:project/:id', admin, wrap(async (req) => { const f = await features.update(proj(req).name, req.params.id, req.body || {}); if (!f) throw new HttpError(404, '없는 기능'); return f; }));
+  app.delete('/admin/features/:project/:id', admin, wrap(async (req) => features.remove(proj(req).name, req.params.id)));
+  app.get('/admin/features/:project/:id/tasks', admin, wrap(async (req) => ({ tasks: (await features.tasksOf(proj(req).name, req.params.id)).map((r) => FileStore.light(r)) })));
+  app.post('/admin/features/:project/suggest', admin, wrap(async (req) => features.suggest(proj(req).name, String(req.body?.text || ''))));
+  app.post('/admin/features/:project/impact', admin, wrap(async (req) => ({ features: await features.impact(proj(req).name, Array.isArray(req.body?.files) ? req.body.files : []) })));
   app.get('/admin/versions/:project', admin, wrap(async (req) => ({ versions: versions ? await versions.list(proj(req).name) : [], recipe: versions ? versions.recipe(proj(req)) : null, dbTemplate: versions ? (await versions.state(proj(req).name)).dbTemplate || null : null, sandbox: versions ? await versions.sandboxInfo(proj(req)) : {}, lane: runner.laneState().preview || null })));
   app.post('/admin/versions/:project/sandbox/reset', admin, wrap(async (req) => versions.resetSandbox(proj(req))));
   app.get('/admin/versions/:project/:n/diff', admin, wrap(async (req) => { const d = versions ? await versions.diff(proj(req), req.params.n) : null; if (!d) throw new HttpError(404, '없는 버전'); return d; }));
@@ -193,13 +201,28 @@ export function createApi(cfg, store, runner, log = console, insights = null, kn
     if (!title && !description) throw new HttpError(400, '제목이나 설명을 적어 주세요');
     if (!notBlank(cfg.githubToken(p))) throw new HttpError(409, '저장소 토큰이 없습니다(키·계정 탭)');
     const mode = ['auto', 'plan', 'step'].includes(b.mode) ? b.mode : (p.taskMode || 'plan');
-    const report = { severity: ['HIGH', 'MEDIUM', 'LOW'].includes(b.severity) ? b.severity : 'MEDIUM', problem: description || title, reproSteps: b.notes || null, expectedResult: b.expected || null, kind, mode, title: title || null, scope: b.scope ? String(b.scope).slice(0, 200) : null };
+    const featureId = b.featureId != null && b.featureId !== '' ? Number(b.featureId) : null;
+    if (featureId != null && features && !await features.get(p.name, featureId)) throw new HttpError(400, '없는 기능입니다');
+    const report = { severity: ['HIGH', 'MEDIUM', 'LOW'].includes(b.severity) ? b.severity : 'MEDIUM', problem: description || title, reproSteps: b.notes || null, expectedResult: b.expected || null, kind, mode, title: title || null, scope: b.scope ? String(b.scope).slice(0, 200) : null, featureId };
     report.reporter = req.get('X-Devloop-User') || b.reporter || (req.isAdmin ? 'admin' : 'anonymous');
     const saved = await store.save(p.name, report);
     log.info(`[devloop ${p.name}] 작업 #${saved.bugReportId} (${kind}/${mode}) ${title}`);
     await store.update(p.name, saved.bugReportId, (c) => ({ ...c, fixStatus: 'QUEUED', fixRequestedAt: new Date().toISOString(), fixUpdatedAt: new Date().toISOString(), status: 'IN_PROGRESS' }));
     if (kind === 'bug') await runner.enqueue(p, saved.bugReportId); else await runner.enqueuePlan(p, saved.bugReportId);
     return FileStore.fixState(await store.get(p.name, saved.bugReportId));
+  }));
+  /** 리포트를 기능에 묶기/풀기 */
+  pr.put('/reports/:id/feature', wrap(async (req) => {
+    const p = req.project; const r = await load(req);
+    const featureId = req.body?.featureId != null && req.body.featureId !== '' ? Number(req.body.featureId) : null;
+    if (featureId != null && features && !await features.get(p.name, featureId)) throw new HttpError(400, '없는 기능입니다');
+    await store.update(p.name, r.bugReportId, (c) => ({ ...c, featureId }));
+    return { ok: true, featureId };
+  }));
+  /** 이 리포트의 변경이 영향 주는 기능 */
+  pr.get('/reports/:id/impact', wrap(async (req) => {
+    const r = await load(req); let files = []; try { files = JSON.parse(r.fixFiles || '[]'); } catch { /* */ }
+    return { features: features ? await features.impact(req.project.name, files) : [] };
   }));
   /** 계획 승인(수정된 계획을 같이 보낼 수 있음) → 구현 시작 */
   pr.post('/reports/:id/plan/approve', fixGuard, wrap(async (req) => {

@@ -76,7 +76,7 @@
   #rows td:last-child, #rows td:nth-child(7) { white-space: nowrap; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; background: #2b3242; color: #c7d0dd; white-space: nowrap; }
   .p-PLANNING { background: #2e2650; color: #c4b5fd; } .p-PLANNED { background: #3b2f1f; color: #fcd34d; } .p-STEP_WAIT { background: #1f3350; color: #7dd3fc; }
-  .p-feature { background: #2e2650; color: #c4b5fd; } .p-improve { background: #1f3a3a; color: #8ee0d0; }
+  .p-feature { background: #2e2650; color: #c4b5fd; } .p-feat { background: #1f2e3a; color: #93c5fd; } .p-improve { background: #1f3a3a; color: #8ee0d0; }
   .p-QUEUED { background: #3b3a1f; color: var(--warn); } .p-RUNNING { background: #1f3350; color: #8ec1ff; } .p-PR_OPENED { background: #3b2a1f; color: #ffb27a; }
   .p-READY { background: #1f3a3a; color: #8ee0d0; } .p-REVERTED { background: #3b2a3a; color: #e0a0d0; } .p-MERGED { background: #1e3a2a; color: var(--ok); } .p-FAILED { background: #43232a; color: var(--bad); } .p-NONE { background: #2b3242; color: #9aa6b8; }
   .sev-CRITICAL { color: #ff6b7a; } .sev-HIGH { color: #ffb27a; } .sev-MEDIUM { color: var(--warn); } .sev-LOW { color: var(--ok); }
@@ -205,6 +205,7 @@
     <button data-t="reports" class="on">리포트</button>
     <button data-t="insights">제안</button>
     <button data-t="versions">버전</button>
+    <button data-t="features">기능</button>
     <button data-t="loops">루프</button>
     <button data-t="knowledge">지식</button>
     <button data-t="projects">프로젝트</button>
@@ -255,6 +256,7 @@
             <select id="t_mode" title="사람 개입 방식"><option value="plan">계획 승인 뒤 끝까지 자동</option><option value="step">단계마다 확인(미리보기 보고 다음 단계)</option><option value="auto">끝까지 자동</option></select></div>
           <label>제목</label><input id="t_title" placeholder="예: 시나리오 목록에 즐겨찾기 추가">
           <label>설명 <small>무엇을, 왜, 어디에</small></label><textarea id="t_desc" style="min-height:120px" placeholder="원하는 동작, 화면 위치, 참고할 기존 기능, 제약 … 자세할수록 계획이 정확해집니다"></textarea>
+          <label>기능 <small>선택</small></label><select id="t_feature"><option value="">(기능에 묶지 않음)</option></select>
           <label>관련 범위 <small>선택</small></label><input id="t_scope" placeholder="메뉴·기능·파일 이름 (지식 그래프가 관련 코드를 찾는 힌트)">
           <div class="actions"><button class="btn primary" id="t_submit">작업 만들기</button><button class="btn" id="t_cancel">닫기</button><span class="dim" id="t_msg"></span></div>
         </div>
@@ -294,6 +296,24 @@
     </div>
 
     <!-- 루프 -->
+    <!-- 기능 · 로드맵 단위 -->
+    <div data-tab="features" hidden>
+      <div class="intro"><b>기능</b>은 로드맵과 작업의 관리 단위입니다. 기능마다 코드 범위(지식 그래프의 화면·메뉴·기능 노드 + 이어진 파일, 직접 적은 파일)를 두면 그 기능의 작업이 그 코드부터 보고, 어떤 수정이 어느 기능에 영향 주는지 보입니다. 작업의 인수 조건이 통과하면 기능에 쌓여 회귀 검증 재료가 됩니다.</div>
+      <div class="toolbar"><button class="btn primary" id="fNew">+ 새 기능</button><span class="dim" id="fMsg"></span></div>
+      <div class="card" id="fForm" hidden style="margin-bottom:12px">
+        <div class="form">
+          <label>이름</label><input id="f_name" placeholder="예: 시나리오 버전 관리">
+          <label>설명</label><textarea id="f_desc" style="min-height:80px" placeholder="이 기능이 무엇을 하는지, 목표"></textarea>
+          <label>상태</label><div class="inline"><select id="f_status"><option value="planned">계획</option><option value="active">진행</option><option value="review">검토</option><option value="done">완료</option><option value="hold">보류</option></select><input id="f_milestone" placeholder="마일스톤 (선택, 예: 10월 배포)" style="width:200px"></div>
+          <label>코드 범위 <small>지식 그래프</small></label><div class="inline" style="flex-direction:column;align-items:stretch;gap:4px"><div class="inline"><input id="f_scope" placeholder="화면·메뉴·기능 이름 (지식 그래프 노드)" style="flex:1"><button class="btn" id="f_suggest" title="이름·설명으로 지식 그래프에서 후보를 찾습니다">범위 추천</button></div><div class="dim" id="f_cands"></div></div>
+          <label>파일 직접 지정 <small>선택</small></label><textarea id="f_files" style="min-height:60px" placeholder="한 줄에 하나 - 지식 그래프에 없는 파일이나 꼭 포함할 파일"></textarea>
+          <div class="actions"><button class="btn primary" id="f_save">저장</button><button class="btn" id="f_cancel">닫기</button></div>
+        </div>
+      </div>
+      <table id="fTable"><thead><tr><th style="width:200px">기능</th><th>범위</th><th style="width:120px">상태</th><th style="width:200px">작업</th><th style="width:230px"></th></tr></thead><tbody id="fRows"></tbody></table>
+      <div class="empty" id="fEmpty" hidden>기능이 없습니다 - 위에서 만드세요</div>
+      <div class="card" id="fDetail" hidden style="margin-top:12px"><div class="toolbar"><b id="fDetailHead"></b><button class="btn" id="fDetailClose">닫기</button></div><div id="fDetailBody"></div></div>
+    </div>
     <div data-tab="loops" hidden>
       <div class="intro">정해 둔 순서를 되풀이 돕니다: <b>지식 갱신 → 제안 분석 → 심각도 이상 자동 수정 → 미리보기 → 내보내기</b> 중 원하는 단계만. 시점은 수동 · 원격에 새 커밋이 보일 때 · N시간마다 · 매일 HH:MM. <b>대상 기능</b>을 정하면(지식 그래프의 화면·메뉴·기능) 그 기능에 이어진 파일들로 분석·수정을 한정합니다. 수정은 프로젝트의 내보내기 설정(보관만/브랜치/PR/병합)을 따르고, 한 번에 최대 건수를 둡니다(Claude 비용).</div>
       <table id="lTable"><thead><tr><th style="width:150px">루프</th><th>단계</th><th style="width:150px">시점</th><th style="width:170px">마지막 · 다음</th><th style="width:250px"></th></tr></thead><tbody id="lRows"></tbody></table>
@@ -503,6 +523,7 @@
       data = await api('GET', '/admin/overview');
       if (!scopeReady) await resolveScope(data.projects);
       if (scope) data.projects = data.projects.filter((p) => p.name === scope);
+      await Promise.all(data.projects.map((p) => fetchFeatures(p.name)));
       ensureKit(); renderReports();
       $('#login').hidden = true; $('#app').hidden = false; hideWaiting();
       if (!quick) loadChecklist();
@@ -598,7 +619,7 @@
     }).sort((a, b) => new Date(b.fixUpdatedAt || b.insertDate) - new Date(a.fixUpdatedAt || a.insertDate));
     $('#rows').innerHTML = rows.map((r) => { const st = r.fixStatus || 'NONE';
       const pr = r.fixPrUrl ? `<a href="${esc(r.fixPrUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${esc(r.fixPrUrl.split('/').pop())}</a>` : '';
-      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" data-kind="${esc(r.kind || 'bug')}" title="${esc(r.problem)}">${r.kind && r.kind !== 'bug' ? `<span class="pill p-${r.kind}">${kindLabel[r.kind]}</span> ` : ''}${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px" title="AI 수정본이 담긴 작업 브랜치. '푸시됨' 이면 원격 저장소에 같은 이름으로 있고, '키트 안' 이면 아직 이 서버에만 있습니다">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 원격에 푸시됨(PR 없음)' : ' · 키트 저장소 안(원격에 없음)'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : st === 'MERGED' && r.fixMergeSha ? `<div style="margin-top:4px"><button class="btn danger" data-revert="${r.bugReportId}" title="병합된 수정을 revert 하는 브랜치·PR 을 만듭니다(자동 병합 프로젝트면 병합까지)">되돌리기</button></div>` : st === 'REVERTED' && r.fixRevertPrUrl ? `<div class="dim" style="margin-top:4px"><a href="${esc(r.fixRevertPrUrl)}" target="_blank">되돌리기 PR</a></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
+      return `<tr class="r" data-id="${r.bugReportId}" data-p="${esc(r.project)}"><td>${r.bugReportId}</td><td class="pcol dim"${multi ? '' : ' hidden'}>${esc(r.project)}</td><td class="sev-${esc(r.severity)}">${esc(r.severity || '')}</td><td class="prob" data-kind="${esc(r.kind || 'bug')}" title="${esc(r.problem)}">${r.kind && r.kind !== 'bug' ? `<span class="pill p-${r.kind}">${kindLabel[r.kind]}</span> ` : ''}${r.featureId && featureName(r.project, r.featureId) ? `<span class="pill p-feat" title="기능">${esc(featureName(r.project, r.featureId))}</span> ` : ''}${r.tool ? '<span class="pill p-NONE" title="버그 신고 도구 자체의 문제 - AI 수정 대상 아님">도구</span> ' : ''}${esc(r.problem)}${r.fixSummary ? `<div class="dim">${esc(r.fixSummary)}</div>` : ''}</td><td><span class="pill p-${st}">${fixLabel[st] || st}</span>${st === 'READY' ? `<div class="dim" style="margin-top:4px" title="AI 수정본이 담긴 작업 브랜치. '푸시됨' 이면 원격 저장소에 같은 이름으로 있고, '키트 안' 이면 아직 이 서버에만 있습니다">${esc(r.fixBranch || '')}${r.fixPushed ? ' · 원격에 푸시됨(PR 없음)' : ' · 키트 저장소 안(원격에 없음)'}</div><div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="pr">PR 만들기</button> <button class="btn primary" data-export="${r.bugReportId}" data-mode="merge">병합까지</button></div>` : st === 'PR_OPENED' ? `<div style="margin-top:4px"><button class="btn" data-export="${r.bugReportId}" data-mode="merge">병합</button></div>` : st === 'MERGED' && r.fixMergeSha ? `<div style="margin-top:4px"><button class="btn danger" data-revert="${r.bugReportId}" title="병합된 수정을 revert 하는 브랜치·PR 을 만듭니다(자동 병합 프로젝트면 병합까지)">되돌리기</button></div>` : st === 'REVERTED' && r.fixRevertPrUrl ? `<div class="dim" style="margin-top:4px"><a href="${esc(r.fixRevertPrUrl)}" target="_blank">되돌리기 PR</a></div>` : ''}</td><td>${pr}</td><td class="dim">${esc(r.reporter)}</td><td class="dim" title="${esc(r.fixUpdatedAt || r.insertDate)}">${ago(r.fixUpdatedAt || r.insertDate)}</td></tr>`; }).join('');
     $('#empty').hidden = rows.length > 0;
   }
 
@@ -668,11 +689,12 @@
     const sel = $('#t_project'); const names = (data?.projects || []).map((p) => p.name);
     sel.innerHTML = names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join(''); if (scopeProject()) sel.value = scopeProject();
     const p = (settings?.projects || []).find((x) => x.name === sel.value); $('#t_mode').value = p?.taskMode || 'plan';
+    fillTaskFeatures(sel.value, $('#t_feature').dataset.pre || ''); sel.onchange = () => fillTaskFeatures(sel.value, '');
     $('#t_msg').textContent = ''; $('#t_title').focus();
   }
   function scopeProject() { try { return new URLSearchParams(location.search).get('project') || ''; } catch { return ''; } }
   async function submitTask() {
-    const project = $('#t_project').value; const body = { kind: $('#t_kind').value, mode: $('#t_mode').value, title: $('#t_title').value.trim(), description: $('#t_desc').value.trim(), scope: $('#t_scope').value.trim() };
+    const project = $('#t_project').value; const body = { kind: $('#t_kind').value, mode: $('#t_mode').value, title: $('#t_title').value.trim(), description: $('#t_desc').value.trim(), scope: $('#t_scope').value.trim(), featureId: $('#t_feature').value || null };
     if (!body.title && !body.description) { $('#t_msg').textContent = '제목이나 설명을 적어 주세요'; return; }
     $('#t_submit').disabled = true; $('#t_msg').textContent = '만드는 중…';
     try { const r = await api('POST', `/p/${project}/tasks`, body); $('#t_msg').textContent = `작업 #${r.bugReportId} 등록 - ${body.kind === 'bug' ? '수정' : '계획'} 시작`; $('#t_title').value = ''; $('#t_desc').value = ''; $('#t_scope').value = ''; await load(); }
@@ -683,6 +705,65 @@
     if (e.target.closest('#newTask')) { openTaskForm(); return; }
     if (e.target.closest('#t_cancel')) { $('#taskForm').hidden = true; return; }
     if (e.target.closest('#t_submit')) { submitTask(); return; }
+  });
+
+  // ── 기능 ──
+  let fProject = null, fEditing = null, featureCache = {};
+  const fStatusLabel = { planned: '계획', active: '진행', review: '검토', done: '완료', hold: '보류' };
+  const fStatusPill = { planned: 'p-NONE', active: 'p-RUNNING', review: 'p-PR_OPENED', done: 'p-MERGED', hold: 'p-QUEUED' };
+  function featureName(project, id) { return (featureCache[project] || []).find((f) => f.id === Number(id))?.name || ''; }
+  async function fetchFeatures(project) { try { const r = await api('GET', `/admin/features/${project}`); featureCache[project] = r.features || []; } catch { featureCache[project] = featureCache[project] || []; } return featureCache[project]; }
+  async function fillTaskFeatures(project, pre) { const fs = await fetchFeatures(project); const sel = $('#t_feature'); sel.innerHTML = '<option value="">(기능에 묶지 않음)</option>' + fs.filter((f) => f.status !== 'done').map((f) => `<option value="${f.id}">${esc(f.name)} · ${fStatusLabel[f.status] || f.status}</option>`).join(''); if (pre) sel.value = String(pre); }
+  async function loadFeatures() {
+    fProject = versionProject(); if (!fProject) return;
+    const fs = await fetchFeatures(fProject);
+    $('#fEmpty').hidden = fs.length > 0;
+    $('#fRows').innerHTML = fs.map((f) => { const c = f.counts || {}; const active = (c.QUEUED || 0) + (c.RUNNING || 0) + (c.PLANNING || 0); const wait = (c.PLANNED || 0) + (c.STEP_WAIT || 0);
+      return `<tr data-f="${f.id}"><td><b>${esc(f.name)}</b>${f.milestone ? `<div class="dim">${esc(f.milestone)}</div>` : ''}</td>
+      <td class="dim">${f.scope?.label ? `${esc(f.scope.label)} → 파일 ${(f.scope.files || []).length}개${f.scope.missing ? ' <span class="pill p-FAILED">그래프에 없음</span>' : ''}` : '<span class="dim">범위 없음</span>'}${(f.extraFiles || []).length ? ` · 직접 ${f.extraFiles.length}개` : ''}${(f.acceptance || []).length ? ` · 인수 조건 ${f.acceptance.length}건` : ''}</td>
+      <td><span class="pill ${fStatusPill[f.status] || ''}">${fStatusLabel[f.status] || f.status}</span></td>
+      <td>${f.tasks ? `${f.tasks}건${active ? ` · <span class="pill p-RUNNING">진행 ${active}</span>` : ''}${wait ? ` · <span class="pill p-PLANNED">대기 ${wait}</span>` : ''}${c.MERGED ? ` · 병합 ${c.MERGED}` : ''}` : '<span class="dim">없음</span>'}</td>
+      <td><button class="btn" data-fopen="${f.id}">작업 보기</button> <button class="btn" data-ftask="${f.id}">새 작업</button> <button class="btn" data-fedit="${f.id}">수정</button> <button class="btn danger" data-fdel="${f.id}">삭제</button></td></tr>`; }).join('');
+  }
+  function openFeatureForm(f) {
+    fEditing = f ? f.id : null; $('#fForm').hidden = false;
+    $('#f_name').value = f?.name || ''; $('#f_desc').value = f?.description || ''; $('#f_status').value = f?.status || 'planned'; $('#f_milestone').value = f?.milestone || '';
+    $('#f_scope').value = f?.scope?.label || ''; $('#f_scope').dataset.nodeId = f?.scope?.nodeId || ''; $('#f_files').value = (f?.extraFiles || []).join('\n'); $('#f_cands').innerHTML = '';
+    $('#f_name').focus();
+  }
+  async function saveFeature() {
+    const body = { name: $('#f_name').value.trim(), description: $('#f_desc').value.trim(), status: $('#f_status').value, milestone: $('#f_milestone').value.trim(), extraFiles: $('#f_files').value, scope: $('#f_scope').value.trim() ? { nodeId: $('#f_scope').dataset.nodeId || null, label: $('#f_scope').value.trim() } : null };
+    if (!body.name) { $('#fMsg').textContent = '이름을 적어 주세요'; return; }
+    try { if (fEditing) await api('PUT', `/admin/features/${fProject}/${fEditing}`, body); else await api('POST', `/admin/features/${fProject}`, body); $('#fForm').hidden = true; $('#fMsg').textContent = '저장됨'; await loadFeatures(); }
+    catch (e) { $('#fMsg').textContent = e.message; }
+  }
+  async function suggestScope() {
+    $('#f_cands').textContent = '찾는 중…';
+    try { const r = await api('POST', `/admin/features/${fProject}/suggest`, { text: `${$('#f_scope').value} ${$('#f_name').value} ${$('#f_desc').value}` });
+      $('#f_cands').innerHTML = r.missing ? '지식 그래프가 없습니다 - 지식 탭에서 먼저 만드세요' : (r.candidates.length ? r.candidates.map((c) => `<a href="#" data-fcand="${esc(c.nodeId)}" data-flabel="${esc(c.label)}">${esc(c.label)}</a> <span class="dim">(${esc(c.type)}${c.path ? ' · ' + esc(c.path) : ''})</span>`).join(' · ') : '후보가 없습니다 - 다른 이름으로'); }
+    catch (e) { $('#f_cands').textContent = e.message; }
+  }
+  async function openFeatureDetail(id) {
+    const f = (featureCache[fProject] || []).find((x) => x.id === Number(id)); if (!f) return;
+    $('#fDetail').hidden = false; $('#fDetailHead').textContent = `${f.name} - 작업`;
+    let tasks = []; try { tasks = (await api('GET', `/admin/features/${fProject}/${id}/tasks`)).tasks || []; } catch (e) { $('#fDetailBody').textContent = e.message; return; }
+    const files = [...(f.scope?.files || []), ...(f.extraFiles || [])];
+    $('#fDetailBody').innerHTML = `${f.description ? `<div style="margin-bottom:8px">${esc(f.description)}</div>` : ''}
+      ${files.length ? `<details><summary class="dim">범위 파일 ${files.length}개${f.scope?.nodes?.length ? ` · 노드 ${f.scope.nodes.length}개` : ''}</summary><div class="dim" style="font-family:ui-monospace,Menlo,monospace;font-size:11px;white-space:pre-wrap">${esc(files.join('\n'))}</div></details>` : ''}
+      ${(f.acceptance || []).length ? `<div class="dim">쌓인 인수 조건: ${f.acceptance.map((a) => `#${a.taskId}(${(a.api || []).length}요청·${(a.steps || []).length}절차)`).join(', ')}</div>` : ''}
+      <table style="margin-top:8px"><thead><tr><th>#</th><th>종류</th><th>제목</th><th>상태</th><th>갱신</th></tr></thead><tbody>${tasks.map((t) => `<tr class="r" data-open="${t.bugReportId}" data-ip="${esc(fProject)}" style="cursor:pointer"><td>${t.bugReportId}</td><td><span class="pill p-${esc(t.kind || 'bug')}">${kindLabel[t.kind || 'bug']}</span></td><td>${esc(t.title || String(t.problem || '').split('\n')[0].slice(0, 100))}</td><td><span class="pill p-${esc(t.fixStatus || 'NONE')}">${fixLabel[t.fixStatus || 'NONE'] || t.fixStatus}</span></td><td class="dim">${ago(t.fixUpdatedAt || t.insertDate)}</td></tr>`).join('') || '<tr><td colspan="5" class="dim">이 기능에 묶인 작업이 없습니다</td></tr>'}</tbody></table>`;
+  }
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('#fNew')) { openFeatureForm(null); return; }
+    if (e.target.closest('#f_cancel')) { $('#fForm').hidden = true; return; }
+    if (e.target.closest('#f_save')) { saveFeature(); return; }
+    if (e.target.closest('#f_suggest')) { suggestScope(); return; }
+    const cand = e.target.closest('[data-fcand]'); if (cand) { e.preventDefault(); $('#f_scope').value = cand.dataset.flabel; $('#f_scope').dataset.nodeId = cand.dataset.fcand; return; }
+    if (e.target.closest('#fDetailClose')) { $('#fDetail').hidden = true; return; }
+    const fo = e.target.closest('[data-fopen]'); if (fo) { openFeatureDetail(fo.dataset.fopen); return; }
+    const fe = e.target.closest('[data-fedit]'); if (fe) { openFeatureForm((featureCache[fProject] || []).find((x) => x.id === Number(fe.dataset.fedit))); return; }
+    const fd = e.target.closest('[data-fdel]'); if (fd) { if (!confirm('이 기능을 지울까요? 묶인 작업은 남고 연결만 풀립니다.')) return; try { await api('DELETE', `/admin/features/${fProject}/${fd.dataset.fdel}`); await loadFeatures(); } catch (x) { $('#fMsg').textContent = x.message; } return; }
+    const ft = e.target.closest('[data-ftask]'); if (ft) { $('#t_feature').dataset.pre = ft.dataset.ftask; document.querySelector('#tabs button[data-t="reports"]').click(); $('#taskForm').hidden = true; openTaskForm(); $('#t_feature').dataset.pre = ''; return; }
   });
 
   async function loadVersions() {
@@ -1161,7 +1242,7 @@
   // ── 이벤트 ──
   document.addEventListener('click', async (e) => {
     const go = e.target.closest('[data-go]'); if (go) { e.preventDefault(); document.querySelector(`#tabs button[data-t="${go.dataset.go}"]`)?.click(); return; }
-    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); if (tab === 'loops') loadLoops(); return; }
+    const t = e.target.closest('#tabs button'); if (t) { tab = t.dataset.t; document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b === t)); document.querySelectorAll('[data-tab]').forEach((d) => { d.hidden = d.dataset.tab !== tab; }); if (['projects', 'secrets', 'server', 'checks'].includes(tab)) loadSettings().catch((x) => alert(x.message)); if (tab === 'logs') loadLogs(); if (tab === 'insights') loadInsights(); if (tab === 'knowledge') loadKnowledge(); if (tab === 'versions') loadVersions(); if (tab === 'loops') loadLoops(); if (tab === 'features') loadFeatures(); return; }
     const sh = e.target.closest('.shots figure'); if (sh) { const img = sh.querySelector('img'); if (img) { const big = document.createElement('div'); big.className = 'shotbig'; big.innerHTML = `<img src="${img.src}"><div class="dim">${esc(sh.dataset.shot)} (눌러서 닫기)</div>`; big.onclick = () => big.remove(); document.body.appendChild(big); } return; }
     const sb = e.target.closest('.shotbig'); if (sb) { sb.remove(); return; }
     const ir = e.target.closest('[data-ireport],[data-ifix]'); if (ir) { const fix = ir.hasAttribute('data-ifix'); const id = Number(ir.dataset.ireport || ir.dataset.ifix); if (fix && !confirm('이 제안으로 리포트를 만들고 바로 AI 수정을 시작할까요? (Claude 비용 발생)')) return; const bs = ir.parentElement.querySelectorAll('[data-ireport],[data-ifix]'); bs.forEach((b) => { b.disabled = true; }); const iProject = ir.closest('tr')?.dataset.ip; try { await api('POST', `/admin/insights/${iProject}/report`, { id, fix, reporter: 'admin' }); await loadInsights(); if (fix) { data = null; await load(); } } catch (x) { alert(x.message); } finally { bs.forEach((b) => { b.disabled = false; }); } return; }

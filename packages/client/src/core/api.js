@@ -44,6 +44,8 @@ export function createApi({ endpoint, project, apiKey, user, adminKey }) {
     planApprove: (id, body) => call('POST', `/reports/${id}/plan/approve`, body || {}),
     planNext: (id) => call('POST', `/reports/${id}/plan/next`),
     planReplan: (id, note) => call('POST', `/reports/${id}/plan/replan`, { note }),
+    impact: (id) => call('GET', `/reports/${id}/impact`),
+    setFeature: (id, featureId) => call('PUT', `/reports/${id}/feature`, { featureId }),
     fixChat: (id, message, mode) => call('POST', `/reports/${id}/fix-chat`, { message, mode }),
     fixSync: (id) => call('POST', `/reports/${id}/fix-sync`),
     previewStart: (id) => call('POST', `/reports/${id}/preview`),

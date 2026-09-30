@@ -93,6 +93,12 @@ export class Runner {
     this.log.info(`[devloop ${project.name}#${id}] ${line}`);
   }
   /** fixStatus 등 부분 갱신 (null 값은 건너뜀) */
+  /** 기능에 묶인 리포트면 기능 설명·범위를 r 에 붙인다(summary.md·knowledge.md 용) */
+  async withFeature(project, r) {
+    if (!r?.featureId || !this.features) return r;
+    const f = await this.features.get(project.name, r.featureId).catch(() => null);
+    return f ? { ...r, featureInfo: f, featureMd: this.features.describe(f) } : r;
+  }
   async updateFix(project, id, patch) {
     let before = null;
     const after = await this.store.update(project.name, id, (c) => {
@@ -184,10 +190,10 @@ export class Runner {
 
   // ── 본 작업 ─────────────────────────────────────────────────────────────
   async run(project, id) {
-    const r = await this.store.get(project.name, id);
+    const r = await this.withFeature(project, await this.store.get(project.name, id));
     if (!r) throw new Error(`리포트 없음: ${id}`);
     await this.updateFix(project, id, { fixStatus: 'RUNNING' });
-    await this.logLine(project, id, '▶ 시작');
+    await this.logLine(project, id, `▶ 시작${r.featureInfo ? ` (기능: ${r.featureInfo.name})` : ''}`);
     const ex = this.ex(project);
     const gh = this.gh(project);
     const base = project.baseBranch;
@@ -490,7 +496,13 @@ export class Runner {
       }
       out.rounds = round;
       await L(`재현 검증 ${round}회 결과:\n${evid.join('\n')}`);
-      if (!failed) { out.passed = true; out.note = evid.join('\n'); await L('✓ 재현 검증 통과 - 신고된 실패가 재현되지 않습니다'); await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: true, rounds: round, evidence: evid }) }); return out; }
+      if (!failed) {
+        out.passed = true; out.note = evid.join('\n');
+        await L(r.kind && r.kind !== 'bug' ? '✓ 인수 조건 검증 통과' : '✓ 재현 검증 통과 - 신고된 실패가 재현되지 않습니다');
+        await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: true, rounds: round, evidence: evid }) });
+        if (r.featureId && this.features) await this.features.recordAcceptance(project.name, r.featureId, id, repro).catch(() => {});
+        return out;
+      }
       if (round > maxRounds) { out.passed = false; out.note = evid.join('\n'); await L(`✗ 재현 검증 실패 - ${maxRounds}회 다시 고쳤지만 여전히 실패합니다. 사람이 봐야 합니다`); await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: false, rounds: round, evidence: evid }) }); return out; }
       // 3) 증거 모아 다시 고치기
       const logs = (await ex.execOut(wt, 1, ['docker', 'logs', '--tail', '300', v.preview.container])).split(/\r?\n/);

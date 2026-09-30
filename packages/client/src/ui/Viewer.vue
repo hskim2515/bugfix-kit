@@ -98,6 +98,8 @@
                 <div class="brv-ai__head">
                   <span class="brv-label brv-ai__title">{{ detail.kind && detail.kind !== 'bug' ? `AI ${kindLabel} 작업` : 'AI 자동 수정' }}</span>
                   <span v-if="detail.kind && detail.kind !== 'bug'" class="brv-kind">{{ kindLabel }} · {{ modeLabel }}</span>
+                  <span v-if="detail.featureId" class="brv-kind brv-kind--feat" title="이 작업이 속한 기능">기능 #{{ detail.featureId }}</span>
+                  <span v-if="impactFeatures.length" class="brv-ai__hint" title="바뀐 파일이 이 기능들의 범위와 겹칩니다">영향: {{ impactFeatures.map((f) => f.name).join(', ') }}</span>
                   <span :class="['brv-fix', `brv-fix--${(detail.fixStatus || 'none').toLowerCase()}`]">{{ fixLabel(detail.fixStatus) }}</span>
                   <span v-if="fixBusy || fixInProgress" class="brv-spin brv-spin--sm"></span>
                   <span v-if="fixInProgress && fixElapsed" class="brv-fix-elapsed">{{ fixElapsed }}</span>
@@ -462,6 +464,7 @@ export default {
       chatInput: '',
       approveMode: 'plan',
       replanNote: '',
+      impactFeatures: [],
       now: Date.now(),
       notice: null,
       canFix: true,            // 프로젝트 설정(fixFrom) - 앱 사용자에게 수정 요청을 열어 두었는가
@@ -671,6 +674,7 @@ export default {
       this.expanded = new Set();
       try {
         this.detail = (await this.kit.api.get(id)) ?? null;
+        this.loadImpact();
         this.loadKnowledge(id);
         // 에러 있는 탭으로 초기 포커스
         if (this.detail) {
@@ -702,6 +706,10 @@ export default {
     // ── AI 자동 수정 ──
     fixLabel(st) { return FIX_LABELS[st || 'none'] || st; },
     fixShort(st) { return FIX_SHORT[st] || st; },
+    async loadImpact() {
+      const id = this.detail?.bugReportId; if (!id || !this.detail?.fixFiles) { this.impactFeatures = []; return; }
+      try { const r = await this.kit.api.impact(id); this.impactFeatures = r?.features || []; } catch { this.impactFeatures = []; }
+    },
     // ── 작업 계획 ──
     async approvePlan() {
       const id = this.detail?.bugReportId; if (!id) return;
@@ -1039,6 +1047,7 @@ export default {
 .brv-fix--planned   { background: #fef3c7; color: #78350f; }
 .brv-fix--step_wait { background: #e0f2fe; color: #0c4a6e; }
 .brv-kind { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #ede9fe; color: #4c1d95; margin-left: 4px; }
+.brv-kind--feat { background: #dbeafe; color: #1e3a8a; }
 .brv-plan { margin: 8px 0; padding: 8px 12px; border: 1px solid rgba(127,127,127,0.25); border-radius: 8px; font-size: 13px; }
 .brv-plan__head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
 .brv-plan__summary { margin-bottom: 6px; }
