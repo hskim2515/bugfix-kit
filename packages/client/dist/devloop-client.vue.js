@@ -7558,6 +7558,7 @@ const Md = `
       replanNote: "",
       resultExpanded: !1,
       chatAll: !1,
+      filesAll: !1,
       openSteps: [],
       openMsgs: [],
       impactFeatures: [],
@@ -7664,6 +7665,9 @@ const Md = `
     },
     visibleChat() {
       return this.chatAll ? this.fixChat : this.fixChat.slice(-2);
+    },
+    visibleFiles() {
+      return this.filesAll ? this.fixFiles : this.fixFiles.slice(0, 6);
     },
     planStep() {
       var e;
@@ -8350,8 +8354,8 @@ function lp(e, A, t, s, r, n) {
     r.isOpen ? (h(), d("div", {
       key: 0,
       class: "brv-overlay",
-      onMousedown: A[30] || (A[30] = (i) => r.backdropPressed = i.target === i.currentTarget),
-      onClick: A[31] || (A[31] = TA((i) => r.backdropPressed && n.close(), ["self"]))
+      onMousedown: A[31] || (A[31] = (i) => r.backdropPressed = i.target === i.currentTarget),
+      onClick: A[32] || (A[32] = TA((i) => r.backdropPressed && n.close(), ["self"]))
     }, [
       c("div", Xd, [
         (h(), Nr(eo("style"), {
@@ -8359,7 +8363,7 @@ function lp(e, A, t, s, r, n) {
         }, null, 8, ["textContent"])),
         c("div", Jd, [
           c("span", Wd, [
-            A[32] || (A[32] = v(" 저장된 버그 리포트 ", -1)),
+            A[33] || (A[33] = v(" 저장된 버그 리포트 ", -1)),
             n.hotkey ? (h(), d("span", Yd, w(n.hotkey), 1)) : C("", !0)
           ]),
           n.viewProjects.length > 1 ? (h(), d("span", Zd, [
@@ -8387,12 +8391,12 @@ function lp(e, A, t, s, r, n) {
               class: "brv-back",
               onClick: A[1] || (A[1] = (i) => r.selected = null)
             }, "← 목록"),
-            r.detailLoading ? (h(), d("div", iw, [...A[34] || (A[34] = [
+            r.detailLoading ? (h(), d("div", iw, [...A[35] || (A[35] = [
               c("span", { class: "brv-spin" }, null, -1),
               v(" 불러오는 중... ", -1)
             ])])) : r.detail ? (h(), d(x, { key: 1 }, [
               r.detail.screenshot ? (h(), d("div", lw, [
-                A[35] || (A[35] = c("div", { class: "brv-label" }, "화면 캡처", -1)),
+                A[36] || (A[36] = c("div", { class: "brv-label" }, "화면 캡처", -1)),
                 c("img", {
                   src: r.detail.screenshot,
                   class: "brv-screenshot",
@@ -8410,7 +8414,7 @@ function lp(e, A, t, s, r, n) {
                 }, null, 8, cw),
                 c("div", Bw, [
                   v(w(r.bigShot.name) + " · " + w(r.bigShot.label) + " ", 1),
-                  A[36] || (A[36] = c("span", { class: "brv-suggest__hint" }, "(눌러서 닫기)", -1))
+                  A[37] || (A[37] = c("span", { class: "brv-suggest__hint" }, "(눌러서 닫기)", -1))
                 ])
               ])) : C("", !0),
               c("div", gw, [
@@ -8445,7 +8449,7 @@ function lp(e, A, t, s, r, n) {
                     class: L(["brv-fix", `brv-fix--${(r.detail.fixStatus || "none").toLowerCase()}`])
                   }, w(n.fixLabel(r.detail.fixStatus)), 3),
                   r.fixBusy || n.fixInProgress ? (h(), d("span", Ew)) : C("", !0),
-                  n.fixInProgress && n.fixElapsed ? (h(), d("span", yw, w(n.fixElapsed), 1)) : n.deployPending ? (h(), d("span", Hw, [...A[37] || (A[37] = [
+                  n.fixInProgress && n.fixElapsed ? (h(), d("span", yw, w(n.fixElapsed), 1)) : n.deployPending ? (h(), d("span", Hw, [...A[38] || (A[38] = [
                     c("span", { class: "brv-spin brv-spin--sm" }, null, -1),
                     v(" 배포 중", -1)
                   ])])) : C("", !0),
@@ -8478,10 +8482,10 @@ function lp(e, A, t, s, r, n) {
                     open: n.planActionable
                   }, [
                     c("summary", _w, [
-                      A[39] || (A[39] = c("b", null, "계획", -1)),
-                      A[40] || (A[40] = v()),
-                      c("span", Rw, w(n.planObj.steps.length) + "단계 · " + w(n.planStep) + "/" + w(n.planObj.steps.length) + " 완료" + w(n.planObj.estimate ? " · " + n.planObj.estimate : ""), 1),
+                      A[40] || (A[40] = c("b", null, "계획", -1)),
                       A[41] || (A[41] = v()),
+                      c("span", Rw, w(n.planObj.steps.length) + "단계 · " + w(n.planStep) + "/" + w(n.planObj.steps.length) + " 완료" + w(n.planObj.estimate ? " · " + n.planObj.estimate : ""), 1),
+                      A[42] || (A[42] = v()),
                       c("span", Ow, w(n.planObj.summary), 1)
                     ]),
                     c("ol", Mw, [
@@ -8503,7 +8507,7 @@ function lp(e, A, t, s, r, n) {
                     n.planObj.approach || n.planObj.risks.length || n.planObj.questions.length || n.planObj.files.length ? (h(), d("details", Vw, [
                       c("summary", null, "접근 · 파일 · 위험" + w(n.planObj.questions.length ? " · 확인 질문 " + n.planObj.questions.length : ""), 1),
                       n.planObj.questions.length ? (h(), d("div", Xw, [
-                        A[42] || (A[42] = c("b", null, "확인 질문", -1)),
+                        A[43] || (A[43] = c("b", null, "확인 질문", -1)),
                         c("ul", null, [
                           (h(!0), d(x, null, S(n.planObj.questions, (i, u) => (h(), d("li", {
                             key: "q" + u
@@ -8516,7 +8520,7 @@ function lp(e, A, t, s, r, n) {
                         innerHTML: n.md(n.planObj.approach)
                       }, null, 8, Jw)) : C("", !0),
                       n.planObj.risks.length ? (h(), d("div", Ww, [
-                        A[43] || (A[43] = c("b", null, "위험", -1)),
+                        A[44] || (A[44] = c("b", null, "위험", -1)),
                         c("ul", null, [
                           (h(!0), d(x, null, S(n.planObj.risks, (i, u) => (h(), d("li", {
                             key: "r" + u
@@ -8524,7 +8528,7 @@ function lp(e, A, t, s, r, n) {
                         ])
                       ])) : C("", !0),
                       n.planObj.files.length ? (h(), d("div", Yw, [
-                        A[44] || (A[44] = c("b", null, "파일", -1)),
+                        A[45] || (A[45] = c("b", null, "파일", -1)),
                         c("ul", Zw, [
                           (h(!0), d(x, null, S(n.planObj.files, (i, u) => (h(), d("li", {
                             key: "f" + u
@@ -8534,7 +8538,7 @@ function lp(e, A, t, s, r, n) {
                         ])
                       ])) : C("", !0),
                       n.planObj.acceptance && n.planObj.acceptance.manual && n.planObj.acceptance.manual.length ? (h(), d("div", jw, [
-                        A[45] || (A[45] = c("b", null, "사람이 확인할 것", -1)),
+                        A[46] || (A[46] = c("b", null, "사람이 확인할 것", -1)),
                         c("ul", null, [
                           (h(!0), d(x, null, S(n.planObj.acceptance.manual, (i, u) => (h(), d("li", {
                             key: "m" + u
@@ -8549,11 +8553,11 @@ function lp(e, A, t, s, r, n) {
                         onClick: A[8] || (A[8] = (...i) => n.approvePlan && n.approvePlan(...i))
                       }, "계획 승인 → 구현 시작", 8, qw),
                       c("label", $w, [
-                        A[47] || (A[47] = v("개입 ", -1)),
+                        A[48] || (A[48] = v("개입 ", -1)),
                         X(c("select", {
                           "onUpdate:modelValue": A[9] || (A[9] = (i) => r.approveMode = i),
                           class: "brv-plan__mode"
-                        }, [...A[46] || (A[46] = [
+                        }, [...A[47] || (A[47] = [
                           c("option", { value: "plan" }, "계획 승인 뒤 끝까지 자동", -1),
                           c("option", { value: "step" }, "단계마다 확인", -1),
                           c("option", { value: "auto" }, "자동", -1)
@@ -8614,7 +8618,7 @@ function lp(e, A, t, s, r, n) {
                           rel: "noopener",
                           title: "이 수정본으로 띄운 앱(프론트+백엔드+DB 사본)"
                         }, "미리보기 열기 ↗", 8, Bf)) : n.previewPending ? (h(), d("span", gf, [
-                          A[48] || (A[48] = c("span", { class: "brv-spin brv-spin--sm" }, null, -1)),
+                          A[49] || (A[49] = c("span", { class: "brv-spin brv-spin--sm" }, null, -1)),
                           v(" 미리보기 준비 중(" + w(n.previewLabel) + ")", 1)
                         ])) : r.detail.preview.canPreview && n.fixable ? (h(), d("button", {
                           key: 2,
@@ -8637,7 +8641,7 @@ function lp(e, A, t, s, r, n) {
                     innerHTML: n.md(r.detail.fixSummary)
                   }, null, 8, df)) : C("", !0),
                   r.detail.fixReport || n.fixFiles.length ? (h(), d("details", wf, [
-                    A[52] || (A[52] = c("summary", null, [
+                    A[53] || (A[53] = c("summary", null, [
                       v("수정 결과 "),
                       c("span", { class: "brv-suggest__hint" }, "원인 · 고친 내용 · 검증 · 확인이 필요한 점")
                     ], -1)),
@@ -8645,7 +8649,7 @@ function lp(e, A, t, s, r, n) {
                       key: 0,
                       class: L(["brv-result__repro", n.fixRepro.passed ? "ok" : "bad"])
                     }, [
-                      A[49] || (A[49] = c("b", null, "재현 검증", -1)),
+                      A[50] || (A[50] = c("b", null, "재현 검증", -1)),
                       v(" " + w(n.fixRepro.passed ? "✓ 통과" : "✗ 실패") + " · " + w(n.fixRepro.rounds) + "회", 1),
                       n.fixRepro.note ? (h(), d("span", ff, " · " + w(n.fixRepro.note), 1)) : C("", !0),
                       (l = n.fixRepro.evidence) != null && l.length ? (h(), d("ul", Qf, [
@@ -8658,8 +8662,8 @@ function lp(e, A, t, s, r, n) {
                       key: 1,
                       class: L(["brv-result__repro", n.fixRegression.results.every((i) => i.passed) ? "ok" : "bad"])
                     }, [
-                      A[50] || (A[50] = c("b", null, "기능 회귀 검증", -1)),
-                      A[51] || (A[51] = v()),
+                      A[51] || (A[51] = c("b", null, "기능 회귀 검증", -1)),
+                      A[52] || (A[52] = v()),
                       (h(!0), d(x, null, S(n.fixRegression.results, (i, u) => (h(), d("span", { key: u }, w(i.passed ? "✓" : "✗") + " " + w(i.name) + "(#" + w(i.taskId) + ") ", 1))), 128))
                     ], 2)) : C("", !0),
                     r.detail.fixReport ? (h(), d("div", {
@@ -8675,14 +8679,19 @@ function lp(e, A, t, s, r, n) {
                     n.fixFiles.length ? (h(), d("div", Cf, [
                       c("span", Uf, "바뀐 파일 (" + w(n.fixFiles.length) + ")", 1),
                       c("ul", null, [
-                        (h(!0), d(x, null, S(n.fixFiles, (i) => (h(), d("li", { key: i }, [
+                        (h(!0), d(x, null, S(n.visibleFiles, (i) => (h(), d("li", { key: i }, [
                           c("code", null, w(i), 1)
                         ]))), 128))
-                      ])
+                      ]),
+                      n.fixFiles.length > 6 ? (h(), d("button", {
+                        key: 0,
+                        class: "brv-more",
+                        onClick: A[15] || (A[15] = (i) => r.filesAll = !r.filesAll)
+                      }, w(r.filesAll ? "접기" : `나머지 ${n.fixFiles.length - 6}개 보기`), 1)) : C("", !0)
                     ])) : C("", !0)
                   ])) : C("", !0),
                   n.kgLayout ? (h(), d("details", Ff, [
-                    A[53] || (A[53] = c("summary", null, [
+                    A[54] || (A[54] = c("summary", null, [
                       v("관련 기능·파일 "),
                       c("span", { class: "brv-suggest__hint" }, "지식 그래프에서 이 신고와 이어진 부분 · 노란 테두리 = 신고 내용과 직접 맞는 것")
                     ], -1)),
@@ -8708,7 +8717,7 @@ function lp(e, A, t, s, r, n) {
                           transform: `translate(${i.x},${i.y})`,
                           class: L(["brv-kg__node", { "brv-kg__node--hit": i.hit, "brv-kg__node--dim": r.kgHover && r.kgHover !== i.id && !n.kgNbr(i.id) }]),
                           onMouseenter: (u) => r.kgHover = i.id,
-                          onMouseleave: A[15] || (A[15] = (u) => r.kgHover = null)
+                          onMouseleave: A[16] || (A[16] = (u) => r.kgHover = null)
                         }, [
                           c("title", null, w(i.label) + w(i.path ? `
 ` + i.path : "") + w(i.route ? `
@@ -8727,7 +8736,7 @@ function lp(e, A, t, s, r, n) {
                   ])) : C("", !0),
                   n.fixShots.length ? (h(), d("div", vf, [
                     c("div", Lf, [
-                      A[54] || (A[54] = v("화면 확인 ", -1)),
+                      A[55] || (A[55] = v("화면 확인 ", -1)),
                       c("span", Sf, w(n.fixShots[n.fixShots.length - 1].label), 1)
                     ]),
                     c("div", kf, [
@@ -8751,7 +8760,7 @@ function lp(e, A, t, s, r, n) {
                     open: n.fixInProgress || n.deployPending
                   }, [
                     c("summary", null, [
-                      A[55] || (A[55] = v("진행 로그 ", -1)),
+                      A[56] || (A[56] = v("진행 로그 ", -1)),
                       c("span", Rf, w(n.logLineCount) + "줄", 1)
                     ]),
                     c("div", {
@@ -8761,7 +8770,7 @@ function lp(e, A, t, s, r, n) {
                     }, null, 8, Of)
                   ], 8, _f)) : C("", !0),
                   n.fixSuggestions.length ? (h(), d("div", Mf, [
-                    A[56] || (A[56] = c("div", { class: "brv-suggest__title" }, [
+                    A[57] || (A[57] = c("div", { class: "brv-suggest__title" }, [
                       v("추천 개선 "),
                       c("span", { class: "brv-suggest__hint" }, "실행을 누르면 그 내용으로 이어서 고칩니다")
                     ], -1)),
@@ -8785,7 +8794,7 @@ function lp(e, A, t, s, r, n) {
                     n.fixChat.length > 2 && !r.chatAll ? (h(), d("button", {
                       key: 0,
                       class: "brv-more",
-                      onClick: A[16] || (A[16] = (i) => r.chatAll = !0)
+                      onClick: A[17] || (A[17] = (i) => r.chatAll = !0)
                     }, "이전 대화 " + w(n.fixChat.length - 2) + "개 보기", 1)) : C("", !0),
                     (h(!0), d(x, null, S(n.visibleChat, (i, u) => (h(), d("div", {
                       key: i.at || u,
@@ -8803,7 +8812,7 @@ function lp(e, A, t, s, r, n) {
                         onClick: TA((Q) => n.toggleMsg(i), ["prevent"])
                       }, w(n.isMsgOpen(i) ? "접기" : "펼치기"), 9, Jf)) : C("", !0)
                     ], 2))), 128)),
-                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (h(), d("div", Wf, [...A[57] || (A[57] = [
+                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (h(), d("div", Wf, [...A[58] || (A[58] = [
                       c("span", { class: "brv-chat__who" }, "AI", -1),
                       c("div", { class: "brv-chat__text" }, [
                         c("span", { class: "brv-spin brv-spin--sm" }),
@@ -8812,14 +8821,14 @@ function lp(e, A, t, s, r, n) {
                     ])])) : C("", !0),
                     n.fixable ? (h(), d("div", Yf, [
                       X(c("textarea", {
-                        "onUpdate:modelValue": A[17] || (A[17] = (i) => r.chatInput = i),
+                        "onUpdate:modelValue": A[18] || (A[18] = (i) => r.chatInput = i),
                         class: "brv-chat__input",
                         rows: "2",
                         disabled: r.fixBusy || n.fixInProgress,
                         placeholder: "질문: 왜 이렇게 고쳤어?   수정 요청: 라이트 테마에서도 맞게 고쳐줘",
                         onKeydown: [
-                          A[18] || (A[18] = Ls(TA((i) => n.sendChat("ask"), ["ctrl", "prevent"]), ["enter"])),
-                          A[19] || (A[19] = Ls(TA((i) => n.sendChat("ask"), ["meta", "prevent"]), ["enter"]))
+                          A[19] || (A[19] = Ls(TA((i) => n.sendChat("ask"), ["ctrl", "prevent"]), ["enter"])),
+                          A[20] || (A[20] = Ls(TA((i) => n.sendChat("ask"), ["meta", "prevent"]), ["enter"]))
                         ]
                       }, null, 40, Zf), [
                         [Qe, r.chatInput]
@@ -8828,13 +8837,13 @@ function lp(e, A, t, s, r, n) {
                         c("button", {
                           class: "brv-fix-btn brv-fix-btn--ghost",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
-                          onClick: A[20] || (A[20] = (i) => n.sendChat("ask")),
+                          onClick: A[21] || (A[21] = (i) => n.sendChat("ask")),
                           title: "코드는 바꾸지 않고 답만 합니다 (Ctrl+Enter)"
                         }, "질문", 8, zf),
                         c("button", {
                           class: "brv-fix-btn",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
-                          onClick: A[21] || (A[21] = (i) => n.sendChat("change")),
+                          onClick: A[22] || (A[22] = (i) => n.sendChat("change")),
                           title: "앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지"
                         }, "수정 요청", 8, qf)
                       ])
@@ -8847,7 +8856,7 @@ function lp(e, A, t, s, r, n) {
                     disabled: r.fixBusy,
                     onClick: A[7] || (A[7] = (...i) => n.requestFix && n.requestFix(...i))
                   }, "AI 에게 수정 요청", 8, Tw),
-                  A[38] || (A[38] = c("span", { class: "brv-ai__hint" }, "서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.", -1))
+                  A[39] || (A[39] = c("span", { class: "brv-ai__hint" }, "서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.", -1))
                 ]))
               ]),
               r.detail.problem || r.detail.reproSteps || r.detail.expectedResult ? (h(), d("details", {
@@ -8856,25 +8865,25 @@ function lp(e, A, t, s, r, n) {
                 open: !r.detail.kind || r.detail.kind === "bug"
               }, [
                 c("summary", eQ, [
-                  A[58] || (A[58] = v("내용 ", -1)),
+                  A[59] || (A[59] = v("내용 ", -1)),
                   c("span", tQ, w(r.detail.kind && r.detail.kind !== "bug" ? "요청 원문" : "문제 · 재현 · 기대 결과"), 1)
                 ]),
                 r.detail.problem ? (h(), d("div", sQ, [
-                  A[59] || (A[59] = c("div", { class: "brv-field-label" }, "문제 상황", -1)),
+                  A[60] || (A[60] = c("div", { class: "brv-field-label" }, "문제 상황", -1)),
                   c("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.problem)
                   }, null, 8, rQ)
                 ])) : C("", !0),
                 r.detail.reproSteps ? (h(), d("div", nQ, [
-                  A[60] || (A[60] = c("div", { class: "brv-field-label" }, "재현 단계", -1)),
+                  A[61] || (A[61] = c("div", { class: "brv-field-label" }, "재현 단계", -1)),
                   c("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.reproSteps)
                   }, null, 8, oQ)
                 ])) : C("", !0),
                 r.detail.expectedResult ? (h(), d("div", iQ, [
-                  A[61] || (A[61] = c("div", { class: "brv-field-label" }, "기대 결과", -1)),
+                  A[62] || (A[62] = c("div", { class: "brv-field-label" }, "기대 결과", -1)),
                   c("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.expectedResult)
@@ -8882,34 +8891,34 @@ function lp(e, A, t, s, r, n) {
                 ])) : C("", !0)
               ], 8, AQ)) : C("", !0),
               n.parsedContext ? (h(), d("details", aQ, [
-                A[67] || (A[67] = c("summary", { class: "brv-label" }, [
+                A[68] || (A[68] = c("summary", { class: "brv-label" }, [
                   v("컨텍스트 "),
                   c("span", { class: "brv-suggest__hint" }, "신고 당시 화면 상태")
                 ], -1)),
                 n.parsedContext.camera ? (h(), d("div", cQ, [
-                  A[62] || (A[62] = c("span", null, "카메라", -1)),
+                  A[63] || (A[63] = c("span", null, "카메라", -1)),
                   c("span", BQ, w(n.parsedContext.camera.longitude) + "°, " + w(n.parsedContext.camera.latitude) + "° · 고도 " + w(n.parsedContext.camera.height) + "m · H" + w(n.parsedContext.camera.heading) + "° P" + w(n.parsedContext.camera.pitch) + "° ", 1)
                 ])) : C("", !0),
                 (a = n.parsedContext.menus) != null && a.header ? (h(), d("div", gQ, [
-                  A[63] || (A[63] = c("span", null, "상단 탭", -1)),
+                  A[64] || (A[64] = c("span", null, "상단 탭", -1)),
                   c("span", uQ, w(n.parsedContext.menus.header), 1)
                 ])) : C("", !0),
                 n.parsedContext.activeData ? (h(), d("div", hQ, [
-                  A[64] || (A[64] = c("span", null, "데이터셋", -1)),
+                  A[65] || (A[65] = c("span", null, "데이터셋", -1)),
                   c("span", dQ, w(((B = n.parsedContext.activeData.datasets) == null ? void 0 : B.map((i) => i._displayName).join(", ")) || "없음"), 1)
                 ])) : C("", !0),
                 (g = n.parsedContext.activeData) != null && g.terrain ? (h(), d("div", wQ, [
-                  A[65] || (A[65] = c("span", null, "지형", -1)),
+                  A[66] || (A[66] = c("span", null, "지형", -1)),
                   c("span", fQ, w(n.parsedContext.activeData.terrain), 1)
                 ])) : C("", !0),
                 n.parsedContext.datetime ? (h(), d("div", QQ, [
-                  A[66] || (A[66] = c("span", null, "발생 시각", -1)),
+                  A[67] || (A[67] = c("span", null, "발생 시각", -1)),
                   c("span", pQ, w(n.parsedContext.datetime), 1)
                 ])) : C("", !0)
               ])) : C("", !0),
               c("div", CQ, [
                 c("div", UQ, [
-                  A[68] || (A[68] = c("div", {
+                  A[69] || (A[69] = c("div", {
                     class: "brv-label",
                     style: { "margin-bottom": "0" }
                   }, "로그", -1)),
@@ -8932,7 +8941,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", EQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[22] || (A[22] = (i) => r.showFE.error = i)
+                        "onUpdate:modelValue": A[23] || (A[23] = (i) => r.showFE.error = i)
                       }, null, 512), [
                         [AA, r.showFE.error]
                       ]),
@@ -8941,7 +8950,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", yQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[23] || (A[23] = (i) => r.showFE.warn = i)
+                        "onUpdate:modelValue": A[24] || (A[24] = (i) => r.showFE.warn = i)
                       }, null, 512), [
                         [AA, r.showFE.warn]
                       ]),
@@ -8950,7 +8959,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", HQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[24] || (A[24] = (i) => r.showFE.log = i)
+                        "onUpdate:modelValue": A[25] || (A[25] = (i) => r.showFE.log = i)
                       }, null, 512), [
                         [AA, r.showFE.log]
                       ]),
@@ -8980,7 +8989,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", KQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[25] || (A[25] = (i) => r.showBE.error = i)
+                        "onUpdate:modelValue": A[26] || (A[26] = (i) => r.showBE.error = i)
                       }, null, 512), [
                         [AA, r.showBE.error]
                       ]),
@@ -8989,7 +8998,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", TQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[26] || (A[26] = (i) => r.showBE.warn = i)
+                        "onUpdate:modelValue": A[27] || (A[27] = (i) => r.showBE.warn = i)
                       }, null, 512), [
                         [AA, r.showBE.warn]
                       ]),
@@ -8998,7 +9007,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", DQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[27] || (A[27] = (i) => r.showBE.info = i)
+                        "onUpdate:modelValue": A[28] || (A[28] = (i) => r.showBE.info = i)
                       }, null, 512), [
                         [AA, r.showBE.info]
                       ]),
@@ -9029,7 +9038,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", VQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[28] || (A[28] = (i) => r.showNet.error = i)
+                        "onUpdate:modelValue": A[29] || (A[29] = (i) => r.showNet.error = i)
                       }, null, 512), [
                         [AA, r.showNet.error]
                       ]),
@@ -9038,7 +9047,7 @@ function lp(e, A, t, s, r, n) {
                     c("label", XQ, [
                       X(c("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[29] || (A[29] = (i) => r.showNet.ok = i)
+                        "onUpdate:modelValue": A[30] || (A[30] = (i) => r.showNet.ok = i)
                       }, null, 512), [
                         [AA, r.showNet.ok]
                       ]),
@@ -9069,19 +9078,19 @@ function lp(e, A, t, s, r, n) {
                     }, [
                       r.expanded.has("n" + u) ? (h(), d("div", zQ, [
                         i.params ? (h(), d("div", qQ, [
-                          A[69] || (A[69] = c("b", null, "Params:", -1)),
+                          A[70] || (A[70] = c("b", null, "Params:", -1)),
                           v(" " + w(i.params), 1)
                         ])) : C("", !0),
                         i.requestBody ? (h(), d("div", $Q, [
-                          A[70] || (A[70] = c("b", null, "Request:", -1)),
+                          A[71] || (A[71] = c("b", null, "Request:", -1)),
                           v(" " + w(i.requestBody), 1)
                         ])) : C("", !0),
                         i.responseBody ? (h(), d("div", Ap, [
-                          A[71] || (A[71] = c("b", null, "Response:", -1)),
+                          A[72] || (A[72] = c("b", null, "Response:", -1)),
                           v(" " + w(i.responseBody), 1)
                         ])) : C("", !0),
                         i.error ? (h(), d("div", ep, [
-                          A[72] || (A[72] = c("b", null, "Error:", -1)),
+                          A[73] || (A[73] = c("b", null, "Error:", -1)),
                           v(" " + w(i.error), 1)
                         ])) : C("", !0)
                       ])) : C("", !0)
@@ -9106,7 +9115,7 @@ function lp(e, A, t, s, r, n) {
               ])
             ], 64)) : C("", !0)
           ], 64)) : (h(), d(x, { key: 0 }, [
-            r.loading ? (h(), d("div", qd, [...A[33] || (A[33] = [
+            r.loading ? (h(), d("div", qd, [...A[34] || (A[34] = [
               c("span", { class: "brv-spin" }, null, -1),
               v(" 불러오는 중... ", -1)
             ])])) : r.list.length === 0 ? (h(), d("div", $d, "저장된 리포트가 없습니다.")) : (h(), d("div", Aw, [
@@ -9145,7 +9154,7 @@ function lp(e, A, t, s, r, n) {
     ], 32)) : C("", !0)
   ]);
 }
-const hp = /* @__PURE__ */ xs(Gd, [["render", lp], ["__scopeId", "data-v-deec30b7"]]);
+const hp = /* @__PURE__ */ xs(Gd, [["render", lp], ["__scopeId", "data-v-e9d1b246"]]);
 export {
   up as ReportModal,
   hp as Viewer,

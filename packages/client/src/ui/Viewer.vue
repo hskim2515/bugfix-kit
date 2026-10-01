@@ -167,7 +167,7 @@
                     <div v-if="fixRegression" :class="['brv-result__repro', fixRegression.results.every((x) => x.passed) ? 'ok' : 'bad']"><b>기능 회귀 검증</b> <span v-for="(x, i) in fixRegression.results" :key="i">{{ x.passed ? '✓' : '✗' }} {{ x.name }}(#{{ x.taskId }}) </span></div>
                     <div v-if="detail.fixReport" :class="['brv-result__body', 'brv-selectable', { 'brv-clamp': !resultExpanded && longReport }]" v-html="md(detail.fixReport)"></div>
                     <button v-if="longReport" class="brv-more" @click="resultExpanded = !resultExpanded">{{ resultExpanded ? '접기' : '더 보기' }}</button>
-                    <div v-if="fixFiles.length" class="brv-result__files"><span class="brv-field-label">바뀐 파일 ({{ fixFiles.length }})</span><ul><li v-for="f in fixFiles" :key="f"><code>{{ f }}</code></li></ul></div>
+                    <div v-if="fixFiles.length" class="brv-result__files"><span class="brv-field-label">바뀐 파일 ({{ fixFiles.length }})</span><ul><li v-for="f in visibleFiles" :key="f"><code>{{ f }}</code></li></ul><button v-if="fixFiles.length > 6" class="brv-more" @click="filesAll = !filesAll">{{ filesAll ? '접기' : `나머지 ${fixFiles.length - 6}개 보기` }}</button></div>
                   </details>
 
                   <!-- 이 신고와 관련된 지식 그래프 부분 - AI 가 참고한 것과 같은 선택. 화면 → 기능 → 파일 → API → 백엔드 층으로 -->
@@ -464,6 +464,7 @@ export default {
       replanNote: '',
       resultExpanded: false,
       chatAll: false,
+      filesAll: false,
       openSteps: [],
       openMsgs: [],
       impactFeatures: [],
@@ -529,6 +530,7 @@ export default {
     planActionable() { return ['PLANNED', 'STEP_WAIT', 'PLANNING'].includes(this.detail?.fixStatus); },
     longReport() { return String(this.detail?.fixReport || '').length > 900; },
     visibleChat() { return this.chatAll ? this.fixChat : this.fixChat.slice(-2); },
+    visibleFiles() { return this.filesAll ? this.fixFiles : this.fixFiles.slice(0, 6); },
     planStep() { return Number(this.detail?.planStep) || 0; },
     kindLabel() { return ({ feature: '기능', improve: '개선', bug: '버그' })[this.detail?.kind || 'bug']; },
     modeLabel() { return ({ auto: '자동', plan: '계획 승인', step: '단계마다 확인' })[this.detail?.mode || 'plan']; },

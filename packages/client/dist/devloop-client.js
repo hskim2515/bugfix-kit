@@ -6514,7 +6514,7 @@ const mc = `
   esc: we,
   logHtml: Uc,
   mdLite: Cc
-}, Symbol.toStringTag, { value: "Module" })), fp = '.brv-projects[data-v-deec30b7]{margin-left:auto;margin-right:12px;display:inline-flex;border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden}.brv-projects button[data-v-deec30b7]{border:0;padding:4px 11px;font-size:11px;background:transparent;color:#aab;cursor:pointer}.brv-projects button+button[data-v-deec30b7]{border-left:1px solid rgba(255,255,255,.18)}.brv-projects__on[data-v-deec30b7]{background:#88aaff47;color:#fff}.brv-ai__head[data-v-deec30b7]{display:flex;align-items:center;gap:8px;margin-bottom:8px}.brv-ai__title[data-v-deec30b7]{margin:0!important}.brv-ai__tools[data-v-deec30b7]{margin-left:auto;display:inline-flex;gap:6px}.brv-ai__tool[data-v-deec30b7]{font-size:11px;padding:3px 9px;border-radius:4px;border:1px solid rgba(255,255,255,.18);background:transparent;color:#aab;cursor:pointer}.brv-ai__tool[data-v-deec30b7]:hover:not(:disabled){background:#ffffff14;color:#fff}.brv-ai__tool[data-v-deec30b7]:disabled{opacity:.4;cursor:default}.brv-ai__start[data-v-deec30b7]{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0 2px}.brv-fix-btn--lg[data-v-deec30b7]{padding:9px 18px;font-size:13px}.brv-ai__hint[data-v-deec30b7]{font-size:11px;color:#8898aa;line-height:1.5;margin-top:6px}.brv-ai__meta[data-v-deec30b7]{display:flex;gap:10px;align-items:center;font-size:12px;margin-bottom:6px}.brv-kg[data-v-deec30b7]{margin:8px 0 4px;font-size:11px}.brv-kg summary[data-v-deec30b7]{cursor:pointer;color:#aab}.brv-kg__wrap[data-v-deec30b7]{overflow-x:auto;margin-top:6px;padding-bottom:4px}.brv-kg__svg[data-v-deec30b7]{display:block;font-family:inherit}.brv-kg__col[data-v-deec30b7]{font-size:10px;fill:#889}.brv-kg__label[data-v-deec30b7]{font-size:11px;fill:#e6ebf5;pointer-events:none}.brv-kg__node rect[data-v-deec30b7]{stroke:#ffffff1f;stroke-width:1;transition:opacity .15s}.brv-kg__node--hit rect[data-v-deec30b7]{stroke:#f2d35b;stroke-width:1.5}.brv-kg__node--dim[data-v-deec30b7]{opacity:.25}.brv-kg__edge[data-v-deec30b7]{fill:none;stroke:#aab4c859;stroke-width:1;transition:opacity .15s}.brv-kg__edge--contains[data-v-deec30b7]{stroke:#e6ebf580}.brv-kg__edge--calls[data-v-deec30b7]{stroke:#ef476f99}.brv-kg__edge--reads[data-v-deec30b7],.brv-kg__edge--writes[data-v-deec30b7]{stroke:#ffb7038c}.brv-kg__edge--navigates[data-v-deec30b7]{stroke:#06d6a099}.brv-kg__edge--dim[data-v-deec30b7]{opacity:.12}.brv-shots[data-v-deec30b7]{margin:8px 0 6px}.brv-shots__title[data-v-deec30b7]{font-size:11px;color:#aab;margin-bottom:4px}.brv-shots__strip[data-v-deec30b7]{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.brv-shots__item[data-v-deec30b7]{margin:0;flex:0 0 auto;width:150px;cursor:zoom-in}.brv-shots__item img[data-v-deec30b7],.brv-shots__ph[data-v-deec30b7]{width:150px;height:88px;object-fit:cover;object-position:top;border:1px solid rgba(255,255,255,.18);border-radius:4px;background:#111;display:block}.brv-shots__ph[data-v-deec30b7]{color:#666;text-align:center;line-height:88px}.brv-shots__item figcaption[data-v-deec30b7]{font-size:10px;color:#99a;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brv-shots__big[data-v-deec30b7]{position:fixed;top:0;right:0;bottom:0;left:0;z-index:100000;background:#000000d9;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:zoom-out;gap:8px}.brv-shots__big img[data-v-deec30b7]{max-width:94vw;max-height:86vh;border:1px solid rgba(255,255,255,.25);border-radius:4px}.brv-shots__bigcap[data-v-deec30b7]{color:#ddd;font-size:12px}.brv-ai__pr[data-v-deec30b7]{font-weight:600}.brv-ai__branch[data-v-deec30b7]{color:#8898aa;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}.brv-ai__summary[data-v-deec30b7]{font-size:12px;line-height:1.55;padding:8px 10px;background:#ffffff0d;border-radius:6px;margin-bottom:8px}.brv-ai__count[data-v-deec30b7]{font-weight:400;color:#778;margin-left:4px;font-size:11px}.brv-chat__compose[data-v-deec30b7]{display:flex;gap:8px;align-items:stretch;margin-top:8px}.brv-chat__compose .brv-chat__input[data-v-deec30b7]{flex:1;margin:0}.brv-chat__btns[data-v-deec30b7]{display:flex;flex-direction:column;gap:6px;justify-content:center}.brv-chat__btns .brv-fix-btn[data-v-deec30b7]{white-space:nowrap}.brv-chat__input[data-v-deec30b7]{font-family:inherit}.brv-chat__text[data-v-deec30b7]{color:#d0d6de;white-space:normal}.brv-chat__msg--user .brv-chat__text[data-v-deec30b7]{color:#e6ebf2}.brv-notice[data-v-deec30b7]{margin:0 16px;padding:8px 12px;border-radius:6px;font-size:12px;background:#eef4ff;color:#1e3a8a}.brv-notice--error[data-v-deec30b7]{background:#fdecec;color:#8a1c1c}.brv-notice--success[data-v-deec30b7]{background:#e9f8ee;color:#14532d}.brv-modal[data-v-deec30b7]{-webkit-user-select:none;user-select:none}.brv-selectable[data-v-deec30b7],.brv-log-list[data-v-deec30b7],.brv-net-detail[data-v-deec30b7],.brv-text[data-v-deec30b7]{-webkit-user-select:text;user-select:text;cursor:text}.brv-overlay[data-v-deec30b7]{position:fixed;top:0;right:0;bottom:0;left:0;z-index:99998;background:#00000080;display:flex;align-items:center;justify-content:center}.brv-modal[data-v-deec30b7]{background:#141c28;border:1px solid rgba(255,255,255,.1);border-radius:10px;width:700px;max-width:96vw;max-height:84vh;display:flex;flex-direction:column;overflow:hidden}.brv-header[data-v-deec30b7]{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}.brv-title[data-v-deec30b7]{font-size:13px;font-weight:600;color:#c8d8e8}.brv-shortcut[data-v-deec30b7]{font-size:10px;font-weight:400;color:#456;margin-left:6px}.brv-close[data-v-deec30b7]{background:none;border:none;color:#789;cursor:pointer;font-size:14px}.brv-close[data-v-deec30b7]:hover{color:#fff}.brv-body[data-v-deec30b7]{flex:1;overflow-y:auto;padding:12px 16px}.brv-loading[data-v-deec30b7]{display:flex;align-items:center;gap:8px;color:#8ac;font-size:12px;padding:16px 0}.brv-empty[data-v-deec30b7]{color:#567;font-size:12px;padding:16px 0;text-align:center}.brv-list[data-v-deec30b7]{display:flex;flex-direction:column;gap:6px}.brv-item[data-v-deec30b7]{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#ffffff08;border:1px solid rgba(255,255,255,.07);border-radius:6px;cursor:pointer;transition:background .15s}.brv-item[data-v-deec30b7]:hover{background:#ffffff12}.brv-problem[data-v-deec30b7]{flex:1;font-size:12px;color:#c8d8e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brv-meta[data-v-deec30b7]{font-size:10px;color:#567;white-space:nowrap}.brv-del[data-v-deec30b7]{background:none;border:none;color:#456;cursor:pointer;font-size:11px;padding:2px 4px}.brv-del[data-v-deec30b7]:hover{color:#e74c3c}.brv-badge[data-v-deec30b7]{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;background:#ffffff14;color:#abc}.brv-badge--tool[data-v-deec30b7]{background:#aaaabe40;color:#ccd}.brv-sev--critical[data-v-deec30b7]{background:#e74c3c40;color:#e74c3c}.brv-sev--high[data-v-deec30b7]{background:#e67e2240;color:#e6802e}.brv-sev--medium[data-v-deec30b7]{background:#f1c40f33;color:#f1c40f}.brv-sev--low[data-v-deec30b7]{background:#2ecc7133;color:#2ecc71}.brv-status[data-v-deec30b7]{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0}.brv-st--open[data-v-deec30b7]{background:#88aaff2e;color:#8af}.brv-st--in_progress[data-v-deec30b7]{background:#f1c40f2e;color:#f1c40f}.brv-st--resolved[data-v-deec30b7]{background:#2ecc7133;color:#2ecc71}.brv-st--closed[data-v-deec30b7]{background:#7888992e;color:#89a}.brv-status-control[data-v-deec30b7]{display:flex;align-items:center;gap:6px}.brv-status-select[data-v-deec30b7]{font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;cursor:pointer;background:#ffffff0f;border:1px solid rgba(255,255,255,.12);color:#c8d8e8}.brv-status-select[data-v-deec30b7]:disabled{opacity:.5;cursor:default}.brv-status-select option[data-v-deec30b7]{background:#141c28;color:#c8d8e8}.brv-spin--sm[data-v-deec30b7]{width:11px;height:11px;border-width:2px}.brv-back[data-v-deec30b7]{background:none;border:none;color:#8ac;cursor:pointer;font-size:11px;padding:0 0 10px;display:block}.brv-back[data-v-deec30b7]:hover{color:#fff}.brv-screenshot[data-v-deec30b7]{width:100%;border-radius:6px;border:1px solid rgba(255,255,255,.08);margin-top:4px}.brv-section[data-v-deec30b7]{margin-bottom:16px}.brv-fix[data-v-deec30b7]{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:#e9eef3;color:#445}.brv-fix--queued[data-v-deec30b7]{background:#fff3cd;color:#7a5a00}.brv-fix--planning[data-v-deec30b7]{background:#ede9fe;color:#4c1d95}.brv-fix--planned[data-v-deec30b7]{background:#fef3c7;color:#78350f}.brv-fix--step_wait[data-v-deec30b7]{background:#e0f2fe;color:#0c4a6e}.brv-kind[data-v-deec30b7]{font-size:11px;padding:1px 7px;border-radius:999px;background:#ede9fe;color:#4c1d95;margin-left:4px}.brv-kind--feat[data-v-deec30b7]{background:#dbeafe;color:#1e3a8a}.brv-plan[data-v-deec30b7]{margin:8px 0;padding:6px 12px;border:1px solid rgba(127,127,127,.25);border-radius:8px;font-size:13px}.brv-plan>summary[data-v-deec30b7]{cursor:pointer;list-style:none}.brv-plan>summary[data-v-deec30b7]::-webkit-details-marker{display:none}.brv-plan__sum1[data-v-deec30b7]{flex-basis:100%;font-size:12px;opacity:.85;margin-top:2px}.brv-plan__more-link[data-v-deec30b7]{font-size:11px;margin-left:6px;opacity:.7}.brv-clamp[data-v-deec30b7]{max-height:230px;overflow:hidden;position:relative}.brv-clamp[data-v-deec30b7]:after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#141c28)}.brv-clamp--sm[data-v-deec30b7]{max-height:120px}.brv-more[data-v-deec30b7]{display:inline-block;margin:4px 0 2px;padding:2px 10px;font-size:11px;border:1px solid rgba(127,127,127,.35);border-radius:999px;background:transparent;color:inherit;cursor:pointer}.brv-meta__row[data-v-deec30b7]{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px}.brv-meta__dim[data-v-deec30b7]{opacity:.7}.brv-fold>summary[data-v-deec30b7]{cursor:pointer;list-style:none}.brv-fold>summary[data-v-deec30b7]::-webkit-details-marker{display:none}.brv-fold>summary.brv-label[data-v-deec30b7]:before{content:"▸ ";opacity:.6}.brv-fold[open]>summary.brv-label[data-v-deec30b7]:before{content:"▾ "}.brv-plan__head[data-v-deec30b7]{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-bottom:4px}.brv-plan__summary[data-v-deec30b7]{margin-bottom:6px}.brv-plan__steps[data-v-deec30b7]{margin:0;padding-left:20px}.brv-plan__steps li[data-v-deec30b7]{margin:3px 0}.brv-plan__step--done b[data-v-deec30b7]{opacity:.6;text-decoration:line-through}.brv-plan__step--next b[data-v-deec30b7]{color:#0c4a6e}.brv-plan__done[data-v-deec30b7]{margin-left:6px;color:#15803d}.brv-plan__detail[data-v-deec30b7]{font-size:12px;opacity:.8;white-space:pre-wrap}.brv-plan__more[data-v-deec30b7]{margin-top:6px;font-size:12px}.brv-plan__more summary[data-v-deec30b7]{cursor:pointer;opacity:.8}.brv-plan__files code[data-v-deec30b7]{font-size:11px}.brv-plan__actions[data-v-deec30b7]{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}.brv-plan__note[data-v-deec30b7]{flex:1;min-width:200px;font-size:12px;padding:4px 8px;border:1px solid rgba(127,127,127,.35);border-radius:6px;background:transparent;color:inherit}.brv-plan__mode[data-v-deec30b7]{font-size:12px}.brv-fix--running[data-v-deec30b7]{background:#dbeafe;color:#1e3a8a}.brv-fix--pr_opened[data-v-deec30b7]{background:#e0f2fe;color:#075985}.brv-fix--ready[data-v-deec30b7]{background:#ccfbf1;color:#115e59}.brv-fix--reverted[data-v-deec30b7]{background:#fce7f3;color:#9d174d}.brv-ai__tool--danger[data-v-deec30b7]{color:#b91c1c;border-color:#fca5a5}.brv-fix--merged[data-v-deec30b7]{background:#dcfce7;color:#166534}.brv-fix--failed[data-v-deec30b7]{background:#fee2e2;color:#991b1b}.brv-link[data-v-deec30b7]{color:#2563eb;text-decoration:underline;word-break:break-all}.brv-fix-summary[data-v-deec30b7]{margin-top:6px}.brv-fix-actions[data-v-deec30b7]{display:flex;gap:6px;margin-top:8px}.brv-fix-btn[data-v-deec30b7]{padding:6px 12px;border:1px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;cursor:pointer}.brv-fix-btn[data-v-deec30b7]:disabled{opacity:.55;cursor:default}.brv-fix-btn--ghost[data-v-deec30b7]{background:transparent;color:#2563eb}.brv-hint[data-v-deec30b7]{margin-top:6px;font-size:11px;color:#667;line-height:1.5}.brv-fix-elapsed[data-v-deec30b7]{margin-left:6px;font-size:11px;color:#667}.brv-fix-log[data-v-deec30b7]{margin-top:8px;font-size:11px}.brv-result[data-v-deec30b7]{margin:6px 0 8px;font-size:12px}.brv-result>summary[data-v-deec30b7]{cursor:pointer;color:#556;font-weight:600}.brv-result__body[data-v-deec30b7]{margin-top:6px;padding:8px 10px;background:#ffffff0a;border-radius:6px;line-height:1.55}.brv-result__body h3[data-v-deec30b7],.brv-result__body h4[data-v-deec30b7]{margin:8px 0 3px;font-size:12px;color:#9ab}.brv-result__body h3[data-v-deec30b7]:first-child,.brv-result__body h4[data-v-deec30b7]:first-child{margin-top:0}.brv-result__repro[data-v-deec30b7]{margin:6px 0;padding:6px 10px;border-radius:6px;font-size:12px;background:#7fe0a41f}.brv-result__repro.bad[data-v-deec30b7]{background:#ff9aa824}.brv-result__repro ul[data-v-deec30b7]{margin:4px 0 0;padding-left:16px}.brv-result__repro code[data-v-deec30b7]{font-size:11px;white-space:pre-wrap;word-break:break-all}.brv-result__files[data-v-deec30b7]{margin-top:6px}.brv-result__files ul[data-v-deec30b7]{margin:2px 0 0;padding-left:16px}.brv-result__files li[data-v-deec30b7]{margin:1px 0}.brv-result__files code[data-v-deec30b7]{font-size:11px}.brv-fix-log summary[data-v-deec30b7]{cursor:pointer;color:#445}.brv-fix-log pre[data-v-deec30b7],.brv-logbox[data-v-deec30b7]{margin:6px 0 0;max-height:260px;overflow:auto;padding:8px;background:#1f2530;color:#d8dee6;border-radius:6px;white-space:pre-wrap;word-break:break-all;font-size:11px;line-height:1.45;font-family:ui-monospace,Menlo,Consolas,monospace}.brv-fix-summary[data-v-deec30b7]{color:inherit}.brv-suggest[data-v-deec30b7]{margin-top:10px;border-top:1px dashed #c9d0d8;padding-top:8px}.brv-suggest__title[data-v-deec30b7]{font-size:12px;font-weight:600;color:#334;margin-bottom:4px}.brv-suggest__hint[data-v-deec30b7]{margin-left:6px;font-size:11px;font-weight:400;color:#778}.brv-suggest__item[data-v-deec30b7]{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:12px;line-height:1.5}.brv-suggest__item+.brv-suggest__item[data-v-deec30b7]{border-top:1px solid #eef1f4}.brv-suggest__text[data-v-deec30b7]{flex:1;color:#d0d6de}.brv-suggest__run[data-v-deec30b7]{flex-shrink:0;padding:3px 10px;font-size:11px}.brv-chat[data-v-deec30b7]{margin-top:10px;border-top:1px dashed #c9d0d8;padding-top:8px}.brv-chat__msg[data-v-deec30b7]{margin:6px 0;font-size:12px}.brv-chat__who[data-v-deec30b7]{display:inline-block;min-width:44px;font-size:11px;color:#667}.brv-chat__msg--user .brv-chat__who[data-v-deec30b7]{color:#1e5bb8}.brv-chat__text[data-v-deec30b7]{display:inline-block;max-width:calc(100% - 52px);vertical-align:top;white-space:pre-wrap;word-break:break-word;line-height:1.5}.brv-chat__input[data-v-deec30b7]{width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;font-size:12px;border:1px solid #c9d0d8;border-radius:6px;resize:vertical;color:inherit;background:transparent}.brv-label[data-v-deec30b7]{font-size:10px;color:#567;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.brv-label-row[data-v-deec30b7]{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}.brv-row[data-v-deec30b7]{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:11px;color:#a8b8c8;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}.brv-row>span[data-v-deec30b7]:first-child{color:#567;flex-shrink:0}.brv-row>span[data-v-deec30b7]:last-child{text-align:right;word-break:break-all}.brv-field[data-v-deec30b7]{margin-bottom:8px}.brv-field-label[data-v-deec30b7]{font-size:10px;color:#456;margin-bottom:3px}.brv-text[data-v-deec30b7]{font-size:11px;color:#c8d8e8;line-height:1.6;white-space:normal;background:#0003;padding:8px;border-radius:4px}.brv-log-tabs[data-v-deec30b7]{display:flex;gap:4px}.brv-log-tab[data-v-deec30b7]{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:4px;border:1px solid rgba(255,255,255,.08);background:#ffffff08;color:#678;font-size:11px;cursor:pointer;transition:background .15s}.brv-log-tab[data-v-deec30b7]:hover{background:#ffffff12;color:#abc}.brv-log-tab.active[data-v-deec30b7]{background:#88aaff1f;border-color:#88aaff4d;color:#8af}.brv-log-tab-count[data-v-deec30b7]{font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;background:#e74c3c4d;color:#e87070}.brv-cnt-err[data-v-deec30b7]{background:#e74c3c4d;color:#e87070}.brv-log-filters[data-v-deec30b7]{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}.brv-filter-chip[data-v-deec30b7]{display:flex;align-items:center;gap:4px;font-size:10px;color:#678;cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.06);background:#ffffff05}.brv-filter-chip[data-v-deec30b7]:hover{background:#ffffff0f}.brv-filter-error[data-v-deec30b7]{color:#c06060}.brv-filter-warn[data-v-deec30b7]{color:#b09040}.brv-filter-log[data-v-deec30b7]{color:#589}.brv-log-list[data-v-deec30b7]{max-height:220px;overflow-y:auto;background:#00000040;border-radius:5px;border:1px solid rgba(255,255,255,.05);font-family:Consolas,Menlo,monospace}.brv-log-item[data-v-deec30b7]{display:flex;gap:6px;align-items:flex-start;font-size:10.5px;color:#a8b8c8;padding:3px 8px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer}.brv-log-item[data-v-deec30b7]:hover{background:#ffffff0a}.brv-log-item[data-v-deec30b7]:last-child{border-bottom:none}.brv-log-time[data-v-deec30b7]{color:#456;flex-shrink:0;font-size:10px;padding-top:1px}.brv-log-lv[data-v-deec30b7]{font-weight:700;flex-shrink:0;width:38px;font-size:10px;padding-top:1px}.brv-log-logger[data-v-deec30b7]{color:#578;flex-shrink:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;padding-top:1px}.brv-log-msg[data-v-deec30b7]{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brv-log-msg.expanded[data-v-deec30b7]{white-space:pre-wrap;overflow:visible}.brv-log-payload[data-v-deec30b7]{color:#567;font-size:10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-top:1px}.brv-mutation[data-v-deec30b7]{color:#8ac;font-weight:600}.brv-log--error[data-v-deec30b7]{color:#e87070}.brv-log--warn[data-v-deec30b7]{color:#d4a84b}.brv-log--info[data-v-deec30b7]{color:#a8b8c8}.brv-log-empty[data-v-deec30b7]{padding:12px 8px;color:#456;font-size:11px;text-align:center}.brv-net-item[data-v-deec30b7]{display:flex;gap:6px;align-items:flex-start;font-size:10.5px;color:#a8b8c8;padding:3px 8px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;font-family:Consolas,Menlo,monospace}.brv-net-item[data-v-deec30b7]:hover{background:#ffffff0a}.brv-net-err[data-v-deec30b7]{background:#e74c3c0d}.brv-net-status[data-v-deec30b7]{font-weight:700;flex-shrink:0;width:32px;font-size:10px;padding-top:1px}.brv-net-method[data-v-deec30b7]{flex-shrink:0;width:36px;color:#8ac;font-size:10px;padding-top:1px}.brv-net-dur[data-v-deec30b7]{flex-shrink:0;color:#456;font-size:10px;padding-top:1px}.st-err[data-v-deec30b7],.st-5xx[data-v-deec30b7]{color:#e87070}.st-4xx[data-v-deec30b7]{color:#d4a84b}.st-3xx[data-v-deec30b7]{color:#8ac}.st-2xx[data-v-deec30b7]{color:#6c8}.brv-net-detail[data-v-deec30b7]{padding:6px 12px;font-size:10px;color:#89a;background:#0000004d;border-bottom:1px solid rgba(255,255,255,.03);word-break:break-all;white-space:pre-wrap;line-height:1.6;font-family:Consolas,Menlo,monospace}.brv-spin[data-v-deec30b7]{display:inline-block;width:13px;height:13px;flex-shrink:0;border:2px solid rgba(136,170,255,.3);border-top-color:#8af;border-radius:50%;animation:brv-spin-deec30b7 .7s linear infinite}@keyframes brv-spin-deec30b7{to{transform:rotate(360deg)}}', gp = {
+}, Symbol.toStringTag, { value: "Module" })), fp = '.brv-projects[data-v-e9d1b246]{margin-left:auto;margin-right:12px;display:inline-flex;border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden}.brv-projects button[data-v-e9d1b246]{border:0;padding:4px 11px;font-size:11px;background:transparent;color:#aab;cursor:pointer}.brv-projects button+button[data-v-e9d1b246]{border-left:1px solid rgba(255,255,255,.18)}.brv-projects__on[data-v-e9d1b246]{background:#88aaff47;color:#fff}.brv-ai__head[data-v-e9d1b246]{display:flex;align-items:center;gap:8px;margin-bottom:8px}.brv-ai__title[data-v-e9d1b246]{margin:0!important}.brv-ai__tools[data-v-e9d1b246]{margin-left:auto;display:inline-flex;gap:6px}.brv-ai__tool[data-v-e9d1b246]{font-size:11px;padding:3px 9px;border-radius:4px;border:1px solid rgba(255,255,255,.18);background:transparent;color:#aab;cursor:pointer}.brv-ai__tool[data-v-e9d1b246]:hover:not(:disabled){background:#ffffff14;color:#fff}.brv-ai__tool[data-v-e9d1b246]:disabled{opacity:.4;cursor:default}.brv-ai__start[data-v-e9d1b246]{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0 2px}.brv-fix-btn--lg[data-v-e9d1b246]{padding:9px 18px;font-size:13px}.brv-ai__hint[data-v-e9d1b246]{font-size:11px;color:#8898aa;line-height:1.5;margin-top:6px}.brv-ai__meta[data-v-e9d1b246]{display:flex;gap:10px;align-items:center;font-size:12px;margin-bottom:6px}.brv-kg[data-v-e9d1b246]{margin:8px 0 4px;font-size:11px}.brv-kg summary[data-v-e9d1b246]{cursor:pointer;color:#aab}.brv-kg__wrap[data-v-e9d1b246]{overflow-x:auto;margin-top:6px;padding-bottom:4px}.brv-kg__svg[data-v-e9d1b246]{display:block;font-family:inherit}.brv-kg__col[data-v-e9d1b246]{font-size:10px;fill:#889}.brv-kg__label[data-v-e9d1b246]{font-size:11px;fill:#e6ebf5;pointer-events:none}.brv-kg__node rect[data-v-e9d1b246]{stroke:#ffffff1f;stroke-width:1;transition:opacity .15s}.brv-kg__node--hit rect[data-v-e9d1b246]{stroke:#f2d35b;stroke-width:1.5}.brv-kg__node--dim[data-v-e9d1b246]{opacity:.25}.brv-kg__edge[data-v-e9d1b246]{fill:none;stroke:#aab4c859;stroke-width:1;transition:opacity .15s}.brv-kg__edge--contains[data-v-e9d1b246]{stroke:#e6ebf580}.brv-kg__edge--calls[data-v-e9d1b246]{stroke:#ef476f99}.brv-kg__edge--reads[data-v-e9d1b246],.brv-kg__edge--writes[data-v-e9d1b246]{stroke:#ffb7038c}.brv-kg__edge--navigates[data-v-e9d1b246]{stroke:#06d6a099}.brv-kg__edge--dim[data-v-e9d1b246]{opacity:.12}.brv-shots[data-v-e9d1b246]{margin:8px 0 6px}.brv-shots__title[data-v-e9d1b246]{font-size:11px;color:#aab;margin-bottom:4px}.brv-shots__strip[data-v-e9d1b246]{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.brv-shots__item[data-v-e9d1b246]{margin:0;flex:0 0 auto;width:150px;cursor:zoom-in}.brv-shots__item img[data-v-e9d1b246],.brv-shots__ph[data-v-e9d1b246]{width:150px;height:88px;object-fit:cover;object-position:top;border:1px solid rgba(255,255,255,.18);border-radius:4px;background:#111;display:block}.brv-shots__ph[data-v-e9d1b246]{color:#666;text-align:center;line-height:88px}.brv-shots__item figcaption[data-v-e9d1b246]{font-size:10px;color:#99a;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brv-shots__big[data-v-e9d1b246]{position:fixed;top:0;right:0;bottom:0;left:0;z-index:100000;background:#000000d9;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:zoom-out;gap:8px}.brv-shots__big img[data-v-e9d1b246]{max-width:94vw;max-height:86vh;border:1px solid rgba(255,255,255,.25);border-radius:4px}.brv-shots__bigcap[data-v-e9d1b246]{color:#ddd;font-size:12px}.brv-ai__pr[data-v-e9d1b246]{font-weight:600}.brv-ai__branch[data-v-e9d1b246]{color:#8898aa;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}.brv-ai__summary[data-v-e9d1b246]{font-size:12px;line-height:1.55;padding:8px 10px;background:#ffffff0d;border-radius:6px;margin-bottom:8px}.brv-ai__count[data-v-e9d1b246]{font-weight:400;color:#778;margin-left:4px;font-size:11px}.brv-chat__compose[data-v-e9d1b246]{display:flex;gap:8px;align-items:stretch;margin-top:8px}.brv-chat__compose .brv-chat__input[data-v-e9d1b246]{flex:1;margin:0}.brv-chat__btns[data-v-e9d1b246]{display:flex;flex-direction:column;gap:6px;justify-content:center}.brv-chat__btns .brv-fix-btn[data-v-e9d1b246]{white-space:nowrap}.brv-chat__input[data-v-e9d1b246]{font-family:inherit}.brv-chat__text[data-v-e9d1b246]{color:#d0d6de;white-space:normal}.brv-chat__msg--user .brv-chat__text[data-v-e9d1b246]{color:#e6ebf2}.brv-notice[data-v-e9d1b246]{margin:0 16px;padding:8px 12px;border-radius:6px;font-size:12px;background:#eef4ff;color:#1e3a8a}.brv-notice--error[data-v-e9d1b246]{background:#fdecec;color:#8a1c1c}.brv-notice--success[data-v-e9d1b246]{background:#e9f8ee;color:#14532d}.brv-modal[data-v-e9d1b246]{-webkit-user-select:none;user-select:none}.brv-selectable[data-v-e9d1b246],.brv-log-list[data-v-e9d1b246],.brv-net-detail[data-v-e9d1b246],.brv-text[data-v-e9d1b246]{-webkit-user-select:text;user-select:text;cursor:text}.brv-overlay[data-v-e9d1b246]{position:fixed;top:0;right:0;bottom:0;left:0;z-index:99998;background:#00000080;display:flex;align-items:center;justify-content:center}.brv-modal[data-v-e9d1b246]{background:#141c28;border:1px solid rgba(255,255,255,.1);border-radius:10px;width:700px;max-width:96vw;max-height:84vh;display:flex;flex-direction:column;overflow:hidden}.brv-header[data-v-e9d1b246]{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}.brv-title[data-v-e9d1b246]{font-size:13px;font-weight:600;color:#c8d8e8}.brv-shortcut[data-v-e9d1b246]{font-size:10px;font-weight:400;color:#456;margin-left:6px}.brv-close[data-v-e9d1b246]{background:none;border:none;color:#789;cursor:pointer;font-size:14px}.brv-close[data-v-e9d1b246]:hover{color:#fff}.brv-body[data-v-e9d1b246]{flex:1;overflow-y:auto;padding:12px 16px}.brv-loading[data-v-e9d1b246]{display:flex;align-items:center;gap:8px;color:#8ac;font-size:12px;padding:16px 0}.brv-empty[data-v-e9d1b246]{color:#567;font-size:12px;padding:16px 0;text-align:center}.brv-list[data-v-e9d1b246]{display:flex;flex-direction:column;gap:6px}.brv-item[data-v-e9d1b246]{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#ffffff08;border:1px solid rgba(255,255,255,.07);border-radius:6px;cursor:pointer;transition:background .15s}.brv-item[data-v-e9d1b246]:hover{background:#ffffff12}.brv-problem[data-v-e9d1b246]{flex:1;font-size:12px;color:#c8d8e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brv-meta[data-v-e9d1b246]{font-size:10px;color:#567;white-space:nowrap}.brv-del[data-v-e9d1b246]{background:none;border:none;color:#456;cursor:pointer;font-size:11px;padding:2px 4px}.brv-del[data-v-e9d1b246]:hover{color:#e74c3c}.brv-badge[data-v-e9d1b246]{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;background:#ffffff14;color:#abc}.brv-badge--tool[data-v-e9d1b246]{background:#aaaabe40;color:#ccd}.brv-sev--critical[data-v-e9d1b246]{background:#e74c3c40;color:#e74c3c}.brv-sev--high[data-v-e9d1b246]{background:#e67e2240;color:#e6802e}.brv-sev--medium[data-v-e9d1b246]{background:#f1c40f33;color:#f1c40f}.brv-sev--low[data-v-e9d1b246]{background:#2ecc7133;color:#2ecc71}.brv-status[data-v-e9d1b246]{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0}.brv-st--open[data-v-e9d1b246]{background:#88aaff2e;color:#8af}.brv-st--in_progress[data-v-e9d1b246]{background:#f1c40f2e;color:#f1c40f}.brv-st--resolved[data-v-e9d1b246]{background:#2ecc7133;color:#2ecc71}.brv-st--closed[data-v-e9d1b246]{background:#7888992e;color:#89a}.brv-status-control[data-v-e9d1b246]{display:flex;align-items:center;gap:6px}.brv-status-select[data-v-e9d1b246]{font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;cursor:pointer;background:#ffffff0f;border:1px solid rgba(255,255,255,.12);color:#c8d8e8}.brv-status-select[data-v-e9d1b246]:disabled{opacity:.5;cursor:default}.brv-status-select option[data-v-e9d1b246]{background:#141c28;color:#c8d8e8}.brv-spin--sm[data-v-e9d1b246]{width:11px;height:11px;border-width:2px}.brv-back[data-v-e9d1b246]{background:none;border:none;color:#8ac;cursor:pointer;font-size:11px;padding:0 0 10px;display:block}.brv-back[data-v-e9d1b246]:hover{color:#fff}.brv-screenshot[data-v-e9d1b246]{width:100%;border-radius:6px;border:1px solid rgba(255,255,255,.08);margin-top:4px}.brv-section[data-v-e9d1b246]{margin-bottom:16px}.brv-fix[data-v-e9d1b246]{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:#e9eef3;color:#445}.brv-fix--queued[data-v-e9d1b246]{background:#fff3cd;color:#7a5a00}.brv-fix--planning[data-v-e9d1b246]{background:#ede9fe;color:#4c1d95}.brv-fix--planned[data-v-e9d1b246]{background:#fef3c7;color:#78350f}.brv-fix--step_wait[data-v-e9d1b246]{background:#e0f2fe;color:#0c4a6e}.brv-kind[data-v-e9d1b246]{font-size:11px;padding:1px 7px;border-radius:999px;background:#ede9fe;color:#4c1d95;margin-left:4px}.brv-kind--feat[data-v-e9d1b246]{background:#dbeafe;color:#1e3a8a}.brv-plan[data-v-e9d1b246]{margin:8px 0;padding:6px 12px;border:1px solid rgba(127,127,127,.25);border-radius:8px;font-size:13px}.brv-plan>summary[data-v-e9d1b246]{cursor:pointer;list-style:none}.brv-plan>summary[data-v-e9d1b246]::-webkit-details-marker{display:none}.brv-plan__sum1[data-v-e9d1b246]{flex-basis:100%;font-size:12px;opacity:.85;margin-top:2px}.brv-plan__more-link[data-v-e9d1b246]{font-size:11px;margin-left:6px;opacity:.7}.brv-clamp[data-v-e9d1b246]{max-height:230px;overflow:hidden;position:relative}.brv-clamp[data-v-e9d1b246]:after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(transparent,#141c28)}.brv-clamp--sm[data-v-e9d1b246]{max-height:120px}.brv-more[data-v-e9d1b246]{display:inline-block;margin:4px 0 2px;padding:2px 10px;font-size:11px;border:1px solid rgba(127,127,127,.35);border-radius:999px;background:transparent;color:inherit;cursor:pointer}.brv-meta__row[data-v-e9d1b246]{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px}.brv-meta__dim[data-v-e9d1b246]{opacity:.7}.brv-fold>summary[data-v-e9d1b246]{cursor:pointer;list-style:none}.brv-fold>summary[data-v-e9d1b246]::-webkit-details-marker{display:none}.brv-fold>summary.brv-label[data-v-e9d1b246]:before{content:"▸ ";opacity:.6}.brv-fold[open]>summary.brv-label[data-v-e9d1b246]:before{content:"▾ "}.brv-plan__head[data-v-e9d1b246]{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-bottom:4px}.brv-plan__summary[data-v-e9d1b246]{margin-bottom:6px}.brv-plan__steps[data-v-e9d1b246]{margin:0;padding-left:20px}.brv-plan__steps li[data-v-e9d1b246]{margin:3px 0}.brv-plan__step--done b[data-v-e9d1b246]{opacity:.6;text-decoration:line-through}.brv-plan__step--next b[data-v-e9d1b246]{color:#0c4a6e}.brv-plan__done[data-v-e9d1b246]{margin-left:6px;color:#15803d}.brv-plan__detail[data-v-e9d1b246]{font-size:12px;opacity:.8;white-space:pre-wrap}.brv-plan__more[data-v-e9d1b246]{margin-top:6px;font-size:12px}.brv-plan__more summary[data-v-e9d1b246]{cursor:pointer;opacity:.8}.brv-plan__files code[data-v-e9d1b246]{font-size:11px}.brv-plan__actions[data-v-e9d1b246]{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}.brv-plan__note[data-v-e9d1b246]{flex:1;min-width:200px;font-size:12px;padding:4px 8px;border:1px solid rgba(127,127,127,.35);border-radius:6px;background:transparent;color:inherit}.brv-plan__mode[data-v-e9d1b246]{font-size:12px}.brv-fix--running[data-v-e9d1b246]{background:#dbeafe;color:#1e3a8a}.brv-fix--pr_opened[data-v-e9d1b246]{background:#e0f2fe;color:#075985}.brv-fix--ready[data-v-e9d1b246]{background:#ccfbf1;color:#115e59}.brv-fix--reverted[data-v-e9d1b246]{background:#fce7f3;color:#9d174d}.brv-ai__tool--danger[data-v-e9d1b246]{color:#b91c1c;border-color:#fca5a5}.brv-fix--merged[data-v-e9d1b246]{background:#dcfce7;color:#166534}.brv-fix--failed[data-v-e9d1b246]{background:#fee2e2;color:#991b1b}.brv-link[data-v-e9d1b246]{color:#2563eb;text-decoration:underline;word-break:break-all}.brv-fix-summary[data-v-e9d1b246]{margin-top:6px}.brv-fix-actions[data-v-e9d1b246]{display:flex;gap:6px;margin-top:8px}.brv-fix-btn[data-v-e9d1b246]{padding:6px 12px;border:1px solid #2563eb;border-radius:6px;background:#2563eb;color:#fff;font-size:12px;cursor:pointer}.brv-fix-btn[data-v-e9d1b246]:disabled{opacity:.55;cursor:default}.brv-fix-btn--ghost[data-v-e9d1b246]{background:transparent;color:#2563eb}.brv-hint[data-v-e9d1b246]{margin-top:6px;font-size:11px;color:#667;line-height:1.5}.brv-fix-elapsed[data-v-e9d1b246]{margin-left:6px;font-size:11px;color:#667}.brv-fix-log[data-v-e9d1b246]{margin-top:8px;font-size:11px}.brv-result[data-v-e9d1b246]{margin:6px 0 8px;font-size:12px}.brv-result>summary[data-v-e9d1b246]{cursor:pointer;color:#556;font-weight:600}.brv-result__body[data-v-e9d1b246]{margin-top:6px;padding:8px 10px;background:#ffffff0a;border-radius:6px;line-height:1.55}.brv-result__body h3[data-v-e9d1b246],.brv-result__body h4[data-v-e9d1b246]{margin:8px 0 3px;font-size:12px;color:#9ab}.brv-result__body h3[data-v-e9d1b246]:first-child,.brv-result__body h4[data-v-e9d1b246]:first-child{margin-top:0}.brv-result__repro[data-v-e9d1b246]{margin:6px 0;padding:6px 10px;border-radius:6px;font-size:12px;background:#7fe0a41f}.brv-result__repro.bad[data-v-e9d1b246]{background:#ff9aa824}.brv-result__repro ul[data-v-e9d1b246]{margin:4px 0 0;padding-left:16px}.brv-result__repro code[data-v-e9d1b246]{font-size:11px;white-space:pre-wrap;word-break:break-all}.brv-result__files[data-v-e9d1b246]{margin-top:6px}.brv-result__files ul[data-v-e9d1b246]{margin:2px 0 0;padding-left:16px}.brv-result__files li[data-v-e9d1b246]{margin:1px 0}.brv-result__files code[data-v-e9d1b246]{font-size:11px}.brv-fix-log summary[data-v-e9d1b246]{cursor:pointer;color:#445}.brv-fix-log pre[data-v-e9d1b246],.brv-logbox[data-v-e9d1b246]{margin:6px 0 0;max-height:260px;overflow:auto;padding:8px;background:#1f2530;color:#d8dee6;border-radius:6px;white-space:pre-wrap;word-break:break-all;font-size:11px;line-height:1.45;font-family:ui-monospace,Menlo,Consolas,monospace}.brv-fix-summary[data-v-e9d1b246]{color:inherit}.brv-suggest[data-v-e9d1b246]{margin-top:10px;border-top:1px dashed #c9d0d8;padding-top:8px}.brv-suggest__title[data-v-e9d1b246]{font-size:12px;font-weight:600;color:#334;margin-bottom:4px}.brv-suggest__hint[data-v-e9d1b246]{margin-left:6px;font-size:11px;font-weight:400;color:#778}.brv-suggest__item[data-v-e9d1b246]{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:12px;line-height:1.5}.brv-suggest__item+.brv-suggest__item[data-v-e9d1b246]{border-top:1px solid #eef1f4}.brv-suggest__text[data-v-e9d1b246]{flex:1;color:#d0d6de}.brv-suggest__run[data-v-e9d1b246]{flex-shrink:0;padding:3px 10px;font-size:11px}.brv-chat[data-v-e9d1b246]{margin-top:10px;border-top:1px dashed #c9d0d8;padding-top:8px}.brv-chat__msg[data-v-e9d1b246]{margin:6px 0;font-size:12px}.brv-chat__who[data-v-e9d1b246]{display:inline-block;min-width:44px;font-size:11px;color:#667}.brv-chat__msg--user .brv-chat__who[data-v-e9d1b246]{color:#1e5bb8}.brv-chat__text[data-v-e9d1b246]{display:inline-block;max-width:calc(100% - 52px);vertical-align:top;white-space:pre-wrap;word-break:break-word;line-height:1.5}.brv-chat__input[data-v-e9d1b246]{width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;font-size:12px;border:1px solid #c9d0d8;border-radius:6px;resize:vertical;color:inherit;background:transparent}.brv-label[data-v-e9d1b246]{font-size:10px;color:#567;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.brv-label-row[data-v-e9d1b246]{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}.brv-row[data-v-e9d1b246]{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:11px;color:#a8b8c8;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}.brv-row>span[data-v-e9d1b246]:first-child{color:#567;flex-shrink:0}.brv-row>span[data-v-e9d1b246]:last-child{text-align:right;word-break:break-all}.brv-field[data-v-e9d1b246]{margin-bottom:8px}.brv-field-label[data-v-e9d1b246]{font-size:10px;color:#456;margin-bottom:3px}.brv-text[data-v-e9d1b246]{font-size:11px;color:#c8d8e8;line-height:1.6;white-space:normal;background:#0003;padding:8px;border-radius:4px}.brv-log-tabs[data-v-e9d1b246]{display:flex;gap:4px}.brv-log-tab[data-v-e9d1b246]{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:4px;border:1px solid rgba(255,255,255,.08);background:#ffffff08;color:#678;font-size:11px;cursor:pointer;transition:background .15s}.brv-log-tab[data-v-e9d1b246]:hover{background:#ffffff12;color:#abc}.brv-log-tab.active[data-v-e9d1b246]{background:#88aaff1f;border-color:#88aaff4d;color:#8af}.brv-log-tab-count[data-v-e9d1b246]{font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;background:#e74c3c4d;color:#e87070}.brv-cnt-err[data-v-e9d1b246]{background:#e74c3c4d;color:#e87070}.brv-log-filters[data-v-e9d1b246]{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}.brv-filter-chip[data-v-e9d1b246]{display:flex;align-items:center;gap:4px;font-size:10px;color:#678;cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.06);background:#ffffff05}.brv-filter-chip[data-v-e9d1b246]:hover{background:#ffffff0f}.brv-filter-error[data-v-e9d1b246]{color:#c06060}.brv-filter-warn[data-v-e9d1b246]{color:#b09040}.brv-filter-log[data-v-e9d1b246]{color:#589}.brv-log-list[data-v-e9d1b246]{max-height:220px;overflow-y:auto;background:#00000040;border-radius:5px;border:1px solid rgba(255,255,255,.05);font-family:Consolas,Menlo,monospace}.brv-log-item[data-v-e9d1b246]{display:flex;gap:6px;align-items:flex-start;font-size:10.5px;color:#a8b8c8;padding:3px 8px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer}.brv-log-item[data-v-e9d1b246]:hover{background:#ffffff0a}.brv-log-item[data-v-e9d1b246]:last-child{border-bottom:none}.brv-log-time[data-v-e9d1b246]{color:#456;flex-shrink:0;font-size:10px;padding-top:1px}.brv-log-lv[data-v-e9d1b246]{font-weight:700;flex-shrink:0;width:38px;font-size:10px;padding-top:1px}.brv-log-logger[data-v-e9d1b246]{color:#578;flex-shrink:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;padding-top:1px}.brv-log-msg[data-v-e9d1b246]{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.brv-log-msg.expanded[data-v-e9d1b246]{white-space:pre-wrap;overflow:visible}.brv-log-payload[data-v-e9d1b246]{color:#567;font-size:10px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-top:1px}.brv-mutation[data-v-e9d1b246]{color:#8ac;font-weight:600}.brv-log--error[data-v-e9d1b246]{color:#e87070}.brv-log--warn[data-v-e9d1b246]{color:#d4a84b}.brv-log--info[data-v-e9d1b246]{color:#a8b8c8}.brv-log-empty[data-v-e9d1b246]{padding:12px 8px;color:#456;font-size:11px;text-align:center}.brv-net-item[data-v-e9d1b246]{display:flex;gap:6px;align-items:flex-start;font-size:10.5px;color:#a8b8c8;padding:3px 8px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;font-family:Consolas,Menlo,monospace}.brv-net-item[data-v-e9d1b246]:hover{background:#ffffff0a}.brv-net-err[data-v-e9d1b246]{background:#e74c3c0d}.brv-net-status[data-v-e9d1b246]{font-weight:700;flex-shrink:0;width:32px;font-size:10px;padding-top:1px}.brv-net-method[data-v-e9d1b246]{flex-shrink:0;width:36px;color:#8ac;font-size:10px;padding-top:1px}.brv-net-dur[data-v-e9d1b246]{flex-shrink:0;color:#456;font-size:10px;padding-top:1px}.st-err[data-v-e9d1b246],.st-5xx[data-v-e9d1b246]{color:#e87070}.st-4xx[data-v-e9d1b246]{color:#d4a84b}.st-3xx[data-v-e9d1b246]{color:#8ac}.st-2xx[data-v-e9d1b246]{color:#6c8}.brv-net-detail[data-v-e9d1b246]{padding:6px 12px;font-size:10px;color:#89a;background:#0000004d;border-bottom:1px solid rgba(255,255,255,.03);word-break:break-all;white-space:pre-wrap;line-height:1.6;font-family:Consolas,Menlo,monospace}.brv-spin[data-v-e9d1b246]{display:inline-block;width:13px;height:13px;flex-shrink:0;border:2px solid rgba(136,170,255,.3);border-top-color:#8af;border-radius:50%;animation:brv-spin-e9d1b246 .7s linear infinite}@keyframes brv-spin-e9d1b246{to{transform:rotate(360deg)}}', gp = {
   none: "요청 전",
   QUEUED: "대기 중",
   RUNNING: "AI 가 고치는 중",
@@ -6553,6 +6553,7 @@ const mc = `
       replanNote: "",
       resultExpanded: !1,
       chatAll: !1,
+      filesAll: !1,
       openSteps: [],
       openMsgs: [],
       impactFeatures: [],
@@ -6659,6 +6660,9 @@ const mc = `
     },
     visibleChat() {
       return this.chatAll ? this.fixChat : this.fixChat.slice(-2);
+    },
+    visibleFiles() {
+      return this.filesAll ? this.fixFiles : this.fixFiles.slice(0, 6);
     },
     planStep() {
       var e;
@@ -7345,8 +7349,8 @@ function kb(e, A, t, s, r, n) {
     r.isOpen ? (B(), h("div", {
       key: 0,
       class: "brv-overlay",
-      onMousedown: A[30] || (A[30] = (a) => r.backdropPressed = a.target === a.currentTarget),
-      onClick: A[31] || (A[31] = dt((a) => r.backdropPressed && n.close(), ["self"]))
+      onMousedown: A[31] || (A[31] = (a) => r.backdropPressed = a.target === a.currentTarget),
+      onClick: A[32] || (A[32] = dt((a) => r.backdropPressed && n.close(), ["self"]))
     }, [
       u("div", wp, [
         (B(), ei(Gu("style"), {
@@ -7354,7 +7358,7 @@ function kb(e, A, t, s, r, n) {
         }, null, 8, ["textContent"])),
         u("div", bp, [
           u("span", Qp, [
-            A[32] || (A[32] = N(" 저장된 버그 리포트 ", -1)),
+            A[33] || (A[33] = N(" 저장된 버그 리포트 ", -1)),
             n.hotkey ? (B(), h("span", Cp, C(n.hotkey), 1)) : F("", !0)
           ]),
           n.viewProjects.length > 1 ? (B(), h("span", Up, [
@@ -7382,12 +7386,12 @@ function kb(e, A, t, s, r, n) {
               class: "brv-back",
               onClick: A[1] || (A[1] = (a) => r.selected = null)
             }, "← 목록"),
-            r.detailLoading ? (B(), h("div", kp, [...A[34] || (A[34] = [
+            r.detailLoading ? (B(), h("div", kp, [...A[35] || (A[35] = [
               u("span", { class: "brv-spin" }, null, -1),
               N(" 불러오는 중... ", -1)
             ])])) : r.detail ? (B(), h(M, { key: 1 }, [
               r.detail.screenshot ? (B(), h("div", Tp, [
-                A[35] || (A[35] = u("div", { class: "brv-label" }, "화면 캡처", -1)),
+                A[36] || (A[36] = u("div", { class: "brv-label" }, "화면 캡처", -1)),
                 u("img", {
                   src: r.detail.screenshot,
                   class: "brv-screenshot",
@@ -7405,7 +7409,7 @@ function kb(e, A, t, s, r, n) {
                 }, null, 8, Dp),
                 u("div", Rp, [
                   N(C(r.bigShot.name) + " · " + C(r.bigShot.label) + " ", 1),
-                  A[36] || (A[36] = u("span", { class: "brv-suggest__hint" }, "(눌러서 닫기)", -1))
+                  A[37] || (A[37] = u("span", { class: "brv-suggest__hint" }, "(눌러서 닫기)", -1))
                 ])
               ])) : F("", !0),
               u("div", Op, [
@@ -7440,7 +7444,7 @@ function kb(e, A, t, s, r, n) {
                     class: Y(["brv-fix", `brv-fix--${(r.detail.fixStatus || "none").toLowerCase()}`])
                   }, C(n.fixLabel(r.detail.fixStatus)), 3),
                   r.fixBusy || n.fixInProgress ? (B(), h("span", qp)) : F("", !0),
-                  n.fixInProgress && n.fixElapsed ? (B(), h("span", $p, C(n.fixElapsed), 1)) : n.deployPending ? (B(), h("span", Aw, [...A[37] || (A[37] = [
+                  n.fixInProgress && n.fixElapsed ? (B(), h("span", $p, C(n.fixElapsed), 1)) : n.deployPending ? (B(), h("span", Aw, [...A[38] || (A[38] = [
                     u("span", { class: "brv-spin brv-spin--sm" }, null, -1),
                     N(" 배포 중", -1)
                   ])])) : F("", !0),
@@ -7473,10 +7477,10 @@ function kb(e, A, t, s, r, n) {
                     open: n.planActionable
                   }, [
                     u("summary", cw, [
-                      A[39] || (A[39] = u("b", null, "계획", -1)),
-                      A[40] || (A[40] = N()),
-                      u("span", dw, C(n.planObj.steps.length) + "단계 · " + C(n.planStep) + "/" + C(n.planObj.steps.length) + " 완료" + C(n.planObj.estimate ? " · " + n.planObj.estimate : ""), 1),
+                      A[40] || (A[40] = u("b", null, "계획", -1)),
                       A[41] || (A[41] = N()),
+                      u("span", dw, C(n.planObj.steps.length) + "단계 · " + C(n.planStep) + "/" + C(n.planObj.steps.length) + " 완료" + C(n.planObj.estimate ? " · " + n.planObj.estimate : ""), 1),
+                      A[42] || (A[42] = N()),
                       u("span", uw, C(n.planObj.summary), 1)
                     ]),
                     u("ol", fw, [
@@ -7498,7 +7502,7 @@ function kb(e, A, t, s, r, n) {
                     n.planObj.approach || n.planObj.risks.length || n.planObj.questions.length || n.planObj.files.length ? (B(), h("details", pw, [
                       u("summary", null, "접근 · 파일 · 위험" + C(n.planObj.questions.length ? " · 확인 질문 " + n.planObj.questions.length : ""), 1),
                       n.planObj.questions.length ? (B(), h("div", ww, [
-                        A[42] || (A[42] = u("b", null, "확인 질문", -1)),
+                        A[43] || (A[43] = u("b", null, "확인 질문", -1)),
                         u("ul", null, [
                           (B(!0), h(M, null, j(n.planObj.questions, (a, f) => (B(), h("li", {
                             key: "q" + f
@@ -7511,7 +7515,7 @@ function kb(e, A, t, s, r, n) {
                         innerHTML: n.md(n.planObj.approach)
                       }, null, 8, bw)) : F("", !0),
                       n.planObj.risks.length ? (B(), h("div", Qw, [
-                        A[43] || (A[43] = u("b", null, "위험", -1)),
+                        A[44] || (A[44] = u("b", null, "위험", -1)),
                         u("ul", null, [
                           (B(!0), h(M, null, j(n.planObj.risks, (a, f) => (B(), h("li", {
                             key: "r" + f
@@ -7519,7 +7523,7 @@ function kb(e, A, t, s, r, n) {
                         ])
                       ])) : F("", !0),
                       n.planObj.files.length ? (B(), h("div", Cw, [
-                        A[44] || (A[44] = u("b", null, "파일", -1)),
+                        A[45] || (A[45] = u("b", null, "파일", -1)),
                         u("ul", Uw, [
                           (B(!0), h(M, null, j(n.planObj.files, (a, f) => (B(), h("li", {
                             key: "f" + f
@@ -7529,7 +7533,7 @@ function kb(e, A, t, s, r, n) {
                         ])
                       ])) : F("", !0),
                       n.planObj.acceptance && n.planObj.acceptance.manual && n.planObj.acceptance.manual.length ? (B(), h("div", mw, [
-                        A[45] || (A[45] = u("b", null, "사람이 확인할 것", -1)),
+                        A[46] || (A[46] = u("b", null, "사람이 확인할 것", -1)),
                         u("ul", null, [
                           (B(!0), h(M, null, j(n.planObj.acceptance.manual, (a, f) => (B(), h("li", {
                             key: "m" + f
@@ -7544,11 +7548,11 @@ function kb(e, A, t, s, r, n) {
                         onClick: A[8] || (A[8] = (...a) => n.approvePlan && n.approvePlan(...a))
                       }, "계획 승인 → 구현 시작", 8, xw),
                       u("label", vw, [
-                        A[47] || (A[47] = N("개입 ", -1)),
+                        A[48] || (A[48] = N("개입 ", -1)),
                         QA(u("select", {
                           "onUpdate:modelValue": A[9] || (A[9] = (a) => r.approveMode = a),
                           class: "brv-plan__mode"
-                        }, [...A[46] || (A[46] = [
+                        }, [...A[47] || (A[47] = [
                           u("option", { value: "plan" }, "계획 승인 뒤 끝까지 자동", -1),
                           u("option", { value: "step" }, "단계마다 확인", -1),
                           u("option", { value: "auto" }, "자동", -1)
@@ -7609,7 +7613,7 @@ function kb(e, A, t, s, r, n) {
                           rel: "noopener",
                           title: "이 수정본으로 띄운 앱(프론트+백엔드+DB 사본)"
                         }, "미리보기 열기 ↗", 8, Dw)) : n.previewPending ? (B(), h("span", Rw, [
-                          A[48] || (A[48] = u("span", { class: "brv-spin brv-spin--sm" }, null, -1)),
+                          A[49] || (A[49] = u("span", { class: "brv-spin brv-spin--sm" }, null, -1)),
                           N(" 미리보기 준비 중(" + C(n.previewLabel) + ")", 1)
                         ])) : r.detail.preview.canPreview && n.fixable ? (B(), h("button", {
                           key: 2,
@@ -7632,7 +7636,7 @@ function kb(e, A, t, s, r, n) {
                     innerHTML: n.md(r.detail.fixSummary)
                   }, null, 8, Nw)) : F("", !0),
                   r.detail.fixReport || n.fixFiles.length ? (B(), h("details", Pw, [
-                    A[52] || (A[52] = u("summary", null, [
+                    A[53] || (A[53] = u("summary", null, [
                       N("수정 결과 "),
                       u("span", { class: "brv-suggest__hint" }, "원인 · 고친 내용 · 검증 · 확인이 필요한 점")
                     ], -1)),
@@ -7640,7 +7644,7 @@ function kb(e, A, t, s, r, n) {
                       key: 0,
                       class: Y(["brv-result__repro", n.fixRepro.passed ? "ok" : "bad"])
                     }, [
-                      A[49] || (A[49] = u("b", null, "재현 검증", -1)),
+                      A[50] || (A[50] = u("b", null, "재현 검증", -1)),
                       N(" " + C(n.fixRepro.passed ? "✓ 통과" : "✗ 실패") + " · " + C(n.fixRepro.rounds) + "회", 1),
                       n.fixRepro.note ? (B(), h("span", Vw, " · " + C(n.fixRepro.note), 1)) : F("", !0),
                       (i = n.fixRepro.evidence) != null && i.length ? (B(), h("ul", Gw, [
@@ -7653,8 +7657,8 @@ function kb(e, A, t, s, r, n) {
                       key: 1,
                       class: Y(["brv-result__repro", n.fixRegression.results.every((a) => a.passed) ? "ok" : "bad"])
                     }, [
-                      A[50] || (A[50] = u("b", null, "기능 회귀 검증", -1)),
-                      A[51] || (A[51] = N()),
+                      A[51] || (A[51] = u("b", null, "기능 회귀 검증", -1)),
+                      A[52] || (A[52] = N()),
                       (B(!0), h(M, null, j(n.fixRegression.results, (a, f) => (B(), h("span", { key: f }, C(a.passed ? "✓" : "✗") + " " + C(a.name) + "(#" + C(a.taskId) + ") ", 1))), 128))
                     ], 2)) : F("", !0),
                     r.detail.fixReport ? (B(), h("div", {
@@ -7670,14 +7674,19 @@ function kb(e, A, t, s, r, n) {
                     n.fixFiles.length ? (B(), h("div", Jw, [
                       u("span", Ww, "바뀐 파일 (" + C(n.fixFiles.length) + ")", 1),
                       u("ul", null, [
-                        (B(!0), h(M, null, j(n.fixFiles, (a) => (B(), h("li", { key: a }, [
+                        (B(!0), h(M, null, j(n.visibleFiles, (a) => (B(), h("li", { key: a }, [
                           u("code", null, C(a), 1)
                         ]))), 128))
-                      ])
+                      ]),
+                      n.fixFiles.length > 6 ? (B(), h("button", {
+                        key: 0,
+                        class: "brv-more",
+                        onClick: A[15] || (A[15] = (a) => r.filesAll = !r.filesAll)
+                      }, C(r.filesAll ? "접기" : `나머지 ${n.fixFiles.length - 6}개 보기`), 1)) : F("", !0)
                     ])) : F("", !0)
                   ])) : F("", !0),
                   n.kgLayout ? (B(), h("details", Yw, [
-                    A[53] || (A[53] = u("summary", null, [
+                    A[54] || (A[54] = u("summary", null, [
                       N("관련 기능·파일 "),
                       u("span", { class: "brv-suggest__hint" }, "지식 그래프에서 이 신고와 이어진 부분 · 노란 테두리 = 신고 내용과 직접 맞는 것")
                     ], -1)),
@@ -7703,7 +7712,7 @@ function kb(e, A, t, s, r, n) {
                           transform: `translate(${a.x},${a.y})`,
                           class: Y(["brv-kg__node", { "brv-kg__node--hit": a.hit, "brv-kg__node--dim": r.kgHover && r.kgHover !== a.id && !n.kgNbr(a.id) }]),
                           onMouseenter: (f) => r.kgHover = a.id,
-                          onMouseleave: A[15] || (A[15] = (f) => r.kgHover = null)
+                          onMouseleave: A[16] || (A[16] = (f) => r.kgHover = null)
                         }, [
                           u("title", null, C(a.label) + C(a.path ? `
 ` + a.path : "") + C(a.route ? `
@@ -7722,7 +7731,7 @@ function kb(e, A, t, s, r, n) {
                   ])) : F("", !0),
                   n.fixShots.length ? (B(), h("div", t0, [
                     u("div", s0, [
-                      A[54] || (A[54] = N("화면 확인 ", -1)),
+                      A[55] || (A[55] = N("화면 확인 ", -1)),
                       u("span", r0, C(n.fixShots[n.fixShots.length - 1].label), 1)
                     ]),
                     u("div", n0, [
@@ -7746,7 +7755,7 @@ function kb(e, A, t, s, r, n) {
                     open: n.fixInProgress || n.deployPending
                   }, [
                     u("summary", null, [
-                      A[55] || (A[55] = N("진행 로그 ", -1)),
+                      A[56] || (A[56] = N("진행 로그 ", -1)),
                       u("span", c0, C(n.logLineCount) + "줄", 1)
                     ]),
                     u("div", {
@@ -7756,7 +7765,7 @@ function kb(e, A, t, s, r, n) {
                     }, null, 8, d0)
                   ], 8, a0)) : F("", !0),
                   n.fixSuggestions.length ? (B(), h("div", u0, [
-                    A[56] || (A[56] = u("div", { class: "brv-suggest__title" }, [
+                    A[57] || (A[57] = u("div", { class: "brv-suggest__title" }, [
                       N("추천 개선 "),
                       u("span", { class: "brv-suggest__hint" }, "실행을 누르면 그 내용으로 이어서 고칩니다")
                     ], -1)),
@@ -7780,7 +7789,7 @@ function kb(e, A, t, s, r, n) {
                     n.fixChat.length > 2 && !r.chatAll ? (B(), h("button", {
                       key: 0,
                       class: "brv-more",
-                      onClick: A[16] || (A[16] = (a) => r.chatAll = !0)
+                      onClick: A[17] || (A[17] = (a) => r.chatAll = !0)
                     }, "이전 대화 " + C(n.fixChat.length - 2) + "개 보기", 1)) : F("", !0),
                     (B(!0), h(M, null, j(n.visibleChat, (a, f) => (B(), h("div", {
                       key: a.at || f,
@@ -7798,7 +7807,7 @@ function kb(e, A, t, s, r, n) {
                         onClick: dt((p) => n.toggleMsg(a), ["prevent"])
                       }, C(n.isMsgOpen(a) ? "접기" : "펼치기"), 9, w0)) : F("", !0)
                     ], 2))), 128)),
-                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (B(), h("div", b0, [...A[57] || (A[57] = [
+                    n.fixInProgress && n.fixChat.length && n.fixChat[n.fixChat.length - 1].role === "user" ? (B(), h("div", b0, [...A[58] || (A[58] = [
                       u("span", { class: "brv-chat__who" }, "AI", -1),
                       u("div", { class: "brv-chat__text" }, [
                         u("span", { class: "brv-spin brv-spin--sm" }),
@@ -7807,14 +7816,14 @@ function kb(e, A, t, s, r, n) {
                     ])])) : F("", !0),
                     n.fixable ? (B(), h("div", Q0, [
                       QA(u("textarea", {
-                        "onUpdate:modelValue": A[17] || (A[17] = (a) => r.chatInput = a),
+                        "onUpdate:modelValue": A[18] || (A[18] = (a) => r.chatInput = a),
                         class: "brv-chat__input",
                         rows: "2",
                         disabled: r.fixBusy || n.fixInProgress,
                         placeholder: "질문: 왜 이렇게 고쳤어?   수정 요청: 라이트 테마에서도 맞게 고쳐줘",
                         onKeydown: [
-                          A[18] || (A[18] = el(dt((a) => n.sendChat("ask"), ["ctrl", "prevent"]), ["enter"])),
-                          A[19] || (A[19] = el(dt((a) => n.sendChat("ask"), ["meta", "prevent"]), ["enter"]))
+                          A[19] || (A[19] = el(dt((a) => n.sendChat("ask"), ["ctrl", "prevent"]), ["enter"])),
+                          A[20] || (A[20] = el(dt((a) => n.sendChat("ask"), ["meta", "prevent"]), ["enter"]))
                         ]
                       }, null, 40, C0), [
                         [ps, r.chatInput]
@@ -7823,13 +7832,13 @@ function kb(e, A, t, s, r, n) {
                         u("button", {
                           class: "brv-fix-btn brv-fix-btn--ghost",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
-                          onClick: A[20] || (A[20] = (a) => n.sendChat("ask")),
+                          onClick: A[21] || (A[21] = (a) => n.sendChat("ask")),
                           title: "코드는 바꾸지 않고 답만 합니다 (Ctrl+Enter)"
                         }, "질문", 8, m0),
                         u("button", {
                           class: "brv-fix-btn",
                           disabled: r.fixBusy || n.fixInProgress || !r.chatInput.trim(),
-                          onClick: A[21] || (A[21] = (a) => n.sendChat("change")),
+                          onClick: A[22] || (A[22] = (a) => n.sendChat("change")),
                           title: "앞서 고친 내용에 이어서 고치고 검증 → PR → 병합까지"
                         }, "수정 요청", 8, F0)
                       ])
@@ -7842,7 +7851,7 @@ function kb(e, A, t, s, r, n) {
                     disabled: r.fixBusy,
                     onClick: A[7] || (A[7] = (...a) => n.requestFix && n.requestFix(...a))
                   }, "AI 에게 수정 요청", 8, lw),
-                  A[38] || (A[38] = u("span", { class: "brv-ai__hint" }, "서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.", -1))
+                  A[39] || (A[39] = u("span", { class: "brv-ai__hint" }, "서버의 AI 가 원인을 찾아 고치고 검증 → PR → 병합 → 배포까지 자동으로 진행합니다. 진행 상황은 여기에 실시간으로 표시됩니다.", -1))
                 ]))
               ]),
               r.detail.problem || r.detail.reproSteps || r.detail.expectedResult ? (B(), h("details", {
@@ -7851,25 +7860,25 @@ function kb(e, A, t, s, r, n) {
                 open: !r.detail.kind || r.detail.kind === "bug"
               }, [
                 u("summary", y0, [
-                  A[58] || (A[58] = N("내용 ", -1)),
+                  A[59] || (A[59] = N("내용 ", -1)),
                   u("span", E0, C(r.detail.kind && r.detail.kind !== "bug" ? "요청 원문" : "문제 · 재현 · 기대 결과"), 1)
                 ]),
                 r.detail.problem ? (B(), h("div", H0, [
-                  A[59] || (A[59] = u("div", { class: "brv-field-label" }, "문제 상황", -1)),
+                  A[60] || (A[60] = u("div", { class: "brv-field-label" }, "문제 상황", -1)),
                   u("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.problem)
                   }, null, 8, I0)
                 ])) : F("", !0),
                 r.detail.reproSteps ? (B(), h("div", _0, [
-                  A[60] || (A[60] = u("div", { class: "brv-field-label" }, "재현 단계", -1)),
+                  A[61] || (A[61] = u("div", { class: "brv-field-label" }, "재현 단계", -1)),
                   u("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.reproSteps)
                   }, null, 8, S0)
                 ])) : F("", !0),
                 r.detail.expectedResult ? (B(), h("div", L0, [
-                  A[61] || (A[61] = u("div", { class: "brv-field-label" }, "기대 결과", -1)),
+                  A[62] || (A[62] = u("div", { class: "brv-field-label" }, "기대 결과", -1)),
                   u("div", {
                     class: "brv-text brv-selectable",
                     innerHTML: n.md(r.detail.expectedResult)
@@ -7877,34 +7886,34 @@ function kb(e, A, t, s, r, n) {
                 ])) : F("", !0)
               ], 8, v0)) : F("", !0),
               n.parsedContext ? (B(), h("details", T0, [
-                A[67] || (A[67] = u("summary", { class: "brv-label" }, [
+                A[68] || (A[68] = u("summary", { class: "brv-label" }, [
                   N("컨텍스트 "),
                   u("span", { class: "brv-suggest__hint" }, "신고 당시 화면 상태")
                 ], -1)),
                 n.parsedContext.camera ? (B(), h("div", K0, [
-                  A[62] || (A[62] = u("span", null, "카메라", -1)),
+                  A[63] || (A[63] = u("span", null, "카메라", -1)),
                   u("span", D0, C(n.parsedContext.camera.longitude) + "°, " + C(n.parsedContext.camera.latitude) + "° · 고도 " + C(n.parsedContext.camera.height) + "m · H" + C(n.parsedContext.camera.heading) + "° P" + C(n.parsedContext.camera.pitch) + "° ", 1)
                 ])) : F("", !0),
                 (l = n.parsedContext.menus) != null && l.header ? (B(), h("div", R0, [
-                  A[63] || (A[63] = u("span", null, "상단 탭", -1)),
+                  A[64] || (A[64] = u("span", null, "상단 탭", -1)),
                   u("span", O0, C(n.parsedContext.menus.header), 1)
                 ])) : F("", !0),
                 n.parsedContext.activeData ? (B(), h("div", M0, [
-                  A[64] || (A[64] = u("span", null, "데이터셋", -1)),
+                  A[65] || (A[65] = u("span", null, "데이터셋", -1)),
                   u("span", N0, C(((c = n.parsedContext.activeData.datasets) == null ? void 0 : c.map((a) => a._displayName).join(", ")) || "없음"), 1)
                 ])) : F("", !0),
                 (d = n.parsedContext.activeData) != null && d.terrain ? (B(), h("div", P0, [
-                  A[65] || (A[65] = u("span", null, "지형", -1)),
+                  A[66] || (A[66] = u("span", null, "지형", -1)),
                   u("span", V0, C(n.parsedContext.activeData.terrain), 1)
                 ])) : F("", !0),
                 n.parsedContext.datetime ? (B(), h("div", G0, [
-                  A[66] || (A[66] = u("span", null, "발생 시각", -1)),
+                  A[67] || (A[67] = u("span", null, "발생 시각", -1)),
                   u("span", X0, C(n.parsedContext.datetime), 1)
                 ])) : F("", !0)
               ])) : F("", !0),
               u("div", J0, [
                 u("div", W0, [
-                  A[68] || (A[68] = u("div", {
+                  A[69] || (A[69] = u("div", {
                     class: "brv-label",
                     style: { "margin-bottom": "0" }
                   }, "로그", -1)),
@@ -7927,7 +7936,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", Z0, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[22] || (A[22] = (a) => r.showFE.error = a)
+                        "onUpdate:modelValue": A[23] || (A[23] = (a) => r.showFE.error = a)
                       }, null, 512), [
                         [DA, r.showFE.error]
                       ]),
@@ -7936,7 +7945,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", q0, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[23] || (A[23] = (a) => r.showFE.warn = a)
+                        "onUpdate:modelValue": A[24] || (A[24] = (a) => r.showFE.warn = a)
                       }, null, 512), [
                         [DA, r.showFE.warn]
                       ]),
@@ -7945,7 +7954,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", $0, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[24] || (A[24] = (a) => r.showFE.log = a)
+                        "onUpdate:modelValue": A[25] || (A[25] = (a) => r.showFE.log = a)
                       }, null, 512), [
                         [DA, r.showFE.log]
                       ]),
@@ -7975,7 +7984,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", ob, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[25] || (A[25] = (a) => r.showBE.error = a)
+                        "onUpdate:modelValue": A[26] || (A[26] = (a) => r.showBE.error = a)
                       }, null, 512), [
                         [DA, r.showBE.error]
                       ]),
@@ -7984,7 +7993,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", ib, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[26] || (A[26] = (a) => r.showBE.warn = a)
+                        "onUpdate:modelValue": A[27] || (A[27] = (a) => r.showBE.warn = a)
                       }, null, 512), [
                         [DA, r.showBE.warn]
                       ]),
@@ -7993,7 +8002,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", lb, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[27] || (A[27] = (a) => r.showBE.info = a)
+                        "onUpdate:modelValue": A[28] || (A[28] = (a) => r.showBE.info = a)
                       }, null, 512), [
                         [DA, r.showBE.info]
                       ]),
@@ -8024,7 +8033,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", hb, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[28] || (A[28] = (a) => r.showNet.error = a)
+                        "onUpdate:modelValue": A[29] || (A[29] = (a) => r.showNet.error = a)
                       }, null, 512), [
                         [DA, r.showNet.error]
                       ]),
@@ -8033,7 +8042,7 @@ function kb(e, A, t, s, r, n) {
                     u("label", pb, [
                       QA(u("input", {
                         type: "checkbox",
-                        "onUpdate:modelValue": A[29] || (A[29] = (a) => r.showNet.ok = a)
+                        "onUpdate:modelValue": A[30] || (A[30] = (a) => r.showNet.ok = a)
                       }, null, 512), [
                         [DA, r.showNet.ok]
                       ]),
@@ -8064,19 +8073,19 @@ function kb(e, A, t, s, r, n) {
                     }, [
                       r.expanded.has("n" + f) ? (B(), h("div", mb, [
                         a.params ? (B(), h("div", Fb, [
-                          A[69] || (A[69] = u("b", null, "Params:", -1)),
+                          A[70] || (A[70] = u("b", null, "Params:", -1)),
                           N(" " + C(a.params), 1)
                         ])) : F("", !0),
                         a.requestBody ? (B(), h("div", xb, [
-                          A[70] || (A[70] = u("b", null, "Request:", -1)),
+                          A[71] || (A[71] = u("b", null, "Request:", -1)),
                           N(" " + C(a.requestBody), 1)
                         ])) : F("", !0),
                         a.responseBody ? (B(), h("div", vb, [
-                          A[71] || (A[71] = u("b", null, "Response:", -1)),
+                          A[72] || (A[72] = u("b", null, "Response:", -1)),
                           N(" " + C(a.responseBody), 1)
                         ])) : F("", !0),
                         a.error ? (B(), h("div", yb, [
-                          A[72] || (A[72] = u("b", null, "Error:", -1)),
+                          A[73] || (A[73] = u("b", null, "Error:", -1)),
                           N(" " + C(a.error), 1)
                         ])) : F("", !0)
                       ])) : F("", !0)
@@ -8101,7 +8110,7 @@ function kb(e, A, t, s, r, n) {
               ])
             ], 64)) : F("", !0)
           ], 64)) : (B(), h(M, { key: 0 }, [
-            r.loading ? (B(), h("div", xp, [...A[33] || (A[33] = [
+            r.loading ? (B(), h("div", xp, [...A[34] || (A[34] = [
               u("span", { class: "brv-spin" }, null, -1),
               N(" 불러오는 중... ", -1)
             ])])) : r.list.length === 0 ? (B(), h("div", vp, "저장된 리포트가 없습니다.")) : (B(), h("div", yp, [
@@ -8140,7 +8149,7 @@ function kb(e, A, t, s, r, n) {
     ], 32)) : F("", !0)
   ]);
 }
-const Tb = /* @__PURE__ */ si(hp, [["render", kb], ["styles", [fp]], ["__scopeId", "data-v-deec30b7"]]);
+const Tb = /* @__PURE__ */ si(hp, [["render", kb], ["styles", [fp]], ["__scopeId", "data-v-e9d1b246"]]);
 function Sn({ endpoint: e, project: A, apiKey: t, user: s, adminKey: r }) {
   const n = e ? `${String(e).replace(/\/+$/, "")}/p/${A}` : "", o = !!n;
   async function i(l, c, d, { query: a, blob: f } = {}) {
