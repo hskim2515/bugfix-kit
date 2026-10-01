@@ -68,14 +68,9 @@
       </div>
 
       <!-- 기본 정보 -->
-              <div class="brv-section">
-                <div class="brv-label">기본 정보</div>
-                <div class="brv-row">
-                  <span>심각도</span>
+              <div class="brv-section brv-meta">
+                <div class="brv-meta__row">
                   <span :class="['brv-badge', `brv-sev--${detail.severity?.toLowerCase()}`]">{{ detail.severity }}</span>
-                </div>
-                <div class="brv-row">
-                  <span>상태</span>
                   <span class="brv-status-control">
                     <span v-if="statusSaving" class="brv-spin brv-spin--sm"></span>
                     <select
@@ -88,9 +83,8 @@
                       <option v-for="s in STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
                     </select>
                   </span>
+                  <span class="brv-meta__dim brv-selectable">{{ detail.reporter }} · {{ formatDate(detail.insertDate) }}</span>
                 </div>
-                <div class="brv-row"><span>보고자</span><span class="brv-selectable">{{ detail.reporter }}</span></div>
-                <div class="brv-row"><span>일시</span><span class="brv-selectable">{{ formatDate(detail.insertDate) }}</span></div>
               </div>
 
               <!-- AI 자동 수정: 머리줄(제목·상태·경과·도구) → 요청 전이면 큰 버튼 하나, 아니면 PR·요약 → 진행 로그 → 추천 개선 → 대화 -->
@@ -121,13 +115,13 @@
 
                 <template v-else>
                   <!-- 기능·개선 작업의 계획: 단계 목록 · 승인/다시 계획 · 단계 모드의 다음 단계 -->
-                  <div v-if="planObj" class="brv-plan">
-                    <div class="brv-plan__head"><b>계획</b> <span class="brv-ai__hint">{{ planObj.steps.length }}단계 · 파일 {{ planObj.files.length }}개{{ planObj.estimate ? ' · ' + planObj.estimate : '' }}</span></div>
-                    <div class="brv-plan__summary brv-selectable">{{ planObj.summary }}</div>
+                  <details v-if="planObj" class="brv-plan" :open="planActionable">
+                    <summary class="brv-plan__head"><b>계획</b> <span class="brv-ai__hint">{{ planObj.steps.length }}단계 · {{ planStep }}/{{ planObj.steps.length }} 완료{{ planObj.estimate ? ' · ' + planObj.estimate : '' }}</span> <span class="brv-plan__sum1">{{ planObj.summary }}</span></summary>
                     <ol class="brv-plan__steps">
                       <li v-for="(st, i) in planObj.steps" :key="i" :class="{ 'brv-plan__step--done': i < planStep, 'brv-plan__step--next': i === planStep && detail.fixStatus === 'STEP_WAIT' }">
                         <b>{{ st.title }}</b><span v-if="i < planStep" class="brv-plan__done">✓</span>
-                        <div class="brv-plan__detail brv-selectable">{{ st.detail }}</div>
+                        <a v-if="st.detail" href="#" class="brv-plan__more-link" @click.prevent="toggleStep(i)">{{ isStepOpen(i) ? '접기' : '자세히' }}</a>
+                        <div v-if="isStepOpen(i)" class="brv-plan__detail brv-selectable">{{ st.detail }}</div>
                       </li>
                     </ol>
                     <details v-if="planObj.approach || planObj.risks.length || planObj.questions.length || planObj.files.length" class="brv-plan__more">
@@ -150,7 +144,7 @@
                       <span class="brv-ai__hint">{{ planStep }}/{{ planObj.steps.length }} 단계 완료 · 미리보기로 확인한 뒤</span>
                       <button class="brv-fix-btn" :disabled="fixBusy" @click="nextStep">다음 단계 → {{ planObj.steps[planStep] ? planObj.steps[planStep].title : '' }}</button>
                     </div>
-                  </div>
+                  </details>
                   <div v-if="detail.fixPrUrl || detail.fixBranch" class="brv-ai__meta">
                     <a v-if="detail.fixPrUrl" class="brv-link brv-ai__pr" :href="detail.fixPrUrl" target="_blank" rel="noopener">PR #{{ prNumber }}</a>
                     <a v-if="detail.fixRevertPrUrl" class="brv-link" :href="detail.fixRevertPrUrl" target="_blank" rel="noopener">되돌리기 PR</a>
@@ -171,12 +165,13 @@
                     <summary>수정 결과 <span class="brv-suggest__hint">원인 · 고친 내용 · 검증 · 확인이 필요한 점</span></summary>
                     <div v-if="fixRepro" :class="['brv-result__repro', fixRepro.passed ? 'ok' : 'bad']"><b>재현 검증</b> {{ fixRepro.passed ? '✓ 통과' : '✗ 실패' }} · {{ fixRepro.rounds }}회<span v-if="fixRepro.note"> · {{ fixRepro.note }}</span><ul v-if="fixRepro.evidence?.length"><li v-for="(e, i) in fixRepro.evidence.slice(0, 6)" :key="i"><code>{{ e }}</code></li></ul></div>
                     <div v-if="fixRegression" :class="['brv-result__repro', fixRegression.results.every((x) => x.passed) ? 'ok' : 'bad']"><b>기능 회귀 검증</b> <span v-for="(x, i) in fixRegression.results" :key="i">{{ x.passed ? '✓' : '✗' }} {{ x.name }}(#{{ x.taskId }}) </span></div>
-                    <div v-if="detail.fixReport" class="brv-result__body brv-selectable" v-html="md(detail.fixReport)"></div>
+                    <div v-if="detail.fixReport" :class="['brv-result__body', 'brv-selectable', { 'brv-clamp': !resultExpanded && longReport }]" v-html="md(detail.fixReport)"></div>
+                    <button v-if="longReport" class="brv-more" @click="resultExpanded = !resultExpanded">{{ resultExpanded ? '접기' : '더 보기' }}</button>
                     <div v-if="fixFiles.length" class="brv-result__files"><span class="brv-field-label">바뀐 파일 ({{ fixFiles.length }})</span><ul><li v-for="f in fixFiles" :key="f"><code>{{ f }}</code></li></ul></div>
                   </details>
 
                   <!-- 이 신고와 관련된 지식 그래프 부분 - AI 가 참고한 것과 같은 선택. 화면 → 기능 → 파일 → API → 백엔드 층으로 -->
-                  <details v-if="kgLayout" class="brv-kg" open>
+                  <details v-if="kgLayout" class="brv-kg">
                     <summary>관련 기능·파일 <span class="brv-suggest__hint">지식 그래프에서 이 신고와 이어진 부분 · 노란 테두리 = 신고 내용과 직접 맞는 것</span></summary>
                     <div class="brv-kg__wrap">
                       <svg :viewBox="`0 0 ${kgLayout.w} ${kgLayout.h}`" :style="{ width: kgLayout.w + 'px', height: kgLayout.h + 'px' }" class="brv-kg__svg">
@@ -219,9 +214,11 @@
 
                   <!-- 이어서 대화: 질문(코드 변경 없음) · 수정 요청(수정 → 검증 → PR/병합) -->
                   <div class="brv-chat">
-                    <div v-for="(m, i) in fixChat" :key="i" :class="['brv-chat__msg', `brv-chat__msg--${m.role}`]">
+                    <button v-if="fixChat.length > 2 && !chatAll" class="brv-more" @click="chatAll = true">이전 대화 {{ fixChat.length - 2 }}개 보기</button>
+                    <div v-for="(m, i) in visibleChat" :key="m.at || i" :class="['brv-chat__msg', `brv-chat__msg--${m.role}`]">
                       <span class="brv-chat__who">{{ m.role === 'user' ? '나' : 'AI' }}</span>
-                      <div class="brv-chat__text brv-selectable" v-html="md(m.text)"></div>
+                      <div :class="['brv-chat__text', 'brv-selectable', { 'brv-clamp brv-clamp--sm': !isMsgOpen(m) && isLongMsg(m) }]" v-html="md(m.text)"></div>
+                      <a v-if="isLongMsg(m)" href="#" class="brv-plan__more-link" @click.prevent="toggleMsg(m)">{{ isMsgOpen(m) ? '접기' : '펼치기' }}</a>
                     </div>
                     <div v-if="fixInProgress && fixChat.length && fixChat[fixChat.length - 1].role === 'user'" class="brv-chat__msg brv-chat__msg--assistant">
                       <span class="brv-chat__who">AI</span>
@@ -242,8 +239,8 @@
               </div>
 
               <!-- 문제 상황 -->
-              <div class="brv-section" v-if="detail.problem || detail.reproSteps || detail.expectedResult">
-                <div class="brv-label">내용</div>
+              <details class="brv-section brv-fold" v-if="detail.problem || detail.reproSteps || detail.expectedResult" :open="!detail.kind || detail.kind === 'bug'">
+                <summary class="brv-label">내용 <span class="brv-suggest__hint">{{ detail.kind && detail.kind !== 'bug' ? '요청 원문' : '문제 · 재현 · 기대 결과' }}</span></summary>
                 <div v-if="detail.problem" class="brv-field">
                   <div class="brv-field-label">문제 상황</div>
                   <div class="brv-text brv-selectable" v-html="md(detail.problem)"></div>
@@ -256,11 +253,11 @@
                   <div class="brv-field-label">기대 결과</div>
                   <div class="brv-text brv-selectable" v-html="md(detail.expectedResult)"></div>
                 </div>
-              </div>
+              </details>
 
               <!-- 컨텍스트 요약 -->
-              <div class="brv-section" v-if="parsedContext">
-                <div class="brv-label">컨텍스트</div>
+              <details class="brv-section brv-fold" v-if="parsedContext">
+                <summary class="brv-label">컨텍스트 <span class="brv-suggest__hint">신고 당시 화면 상태</span></summary>
                 <div class="brv-row" v-if="parsedContext.camera">
                   <span>카메라</span>
                   <span class="brv-selectable">
@@ -284,10 +281,10 @@
                 <div class="brv-row" v-if="parsedContext.datetime">
                   <span>발생 시각</span><span class="brv-selectable">{{ parsedContext.datetime }}</span>
                 </div>
-              </div>
+              </details>
 
               <!-- 로그 탭 -->
-              <div class="brv-section">
+              <div class="brv-section brv-fold-logs">
                 <div class="brv-label-row">
                   <div class="brv-label" style="margin-bottom:0">로그</div>
                   <div class="brv-log-tabs">
@@ -465,6 +462,10 @@ export default {
       chatInput: '',
       approveMode: 'plan',
       replanNote: '',
+      resultExpanded: false,
+      chatAll: false,
+      openSteps: [],
+      openMsgs: [],
       impactFeatures: [],
       now: Date.now(),
       notice: null,
@@ -525,6 +526,9 @@ export default {
     logLineCount() { return (this.detail?.fixLog || '').split('\n').filter(Boolean).length; },
     fixInProgress() { return ['QUEUED', 'RUNNING', 'PLANNING'].includes(this.detail?.fixStatus); },
     planObj() { try { return this.detail?.plan ? JSON.parse(this.detail.plan) : null; } catch { return null; } },
+    planActionable() { return ['PLANNED', 'STEP_WAIT', 'PLANNING'].includes(this.detail?.fixStatus); },
+    longReport() { return String(this.detail?.fixReport || '').length > 900; },
+    visibleChat() { return this.chatAll ? this.fixChat : this.fixChat.slice(-2); },
     planStep() { return Number(this.detail?.planStep) || 0; },
     kindLabel() { return ({ feature: '기능', improve: '개선', bug: '버그' })[this.detail?.kind || 'bug']; },
     modeLabel() { return ({ auto: '자동', plan: '계획 승인', step: '단계마다 확인' })[this.detail?.mode || 'plan']; },
@@ -708,6 +712,11 @@ export default {
     // ── AI 자동 수정 ──
     fixLabel(st) { return FIX_LABELS[st || 'none'] || st; },
     fixShort(st) { return FIX_SHORT[st] || st; },
+    toggleStep(i) { this.openSteps = this.openSteps.includes(i) ? this.openSteps.filter((x) => x !== i) : [...this.openSteps, i]; },
+    isStepOpen(i) { return this.openSteps.includes(i) || (this.detail?.fixStatus === 'PLANNED') || (this.detail?.fixStatus === 'STEP_WAIT' && i === this.planStep); },
+    isLongMsg(m) { return String(m.text || '').length > 600; },
+    isMsgOpen(m) { return this.openMsgs.includes(m.at || m.text); },
+    toggleMsg(m) { const k = m.at || m.text; this.openMsgs = this.openMsgs.includes(k) ? this.openMsgs.filter((x) => x !== k) : [...this.openMsgs, k]; },
     async loadImpact() {
       const id = this.detail?.bugReportId; if (!id || !this.detail?.fixFiles) { this.impactFeatures = []; return; }
       try { const r = await this.kit.api.impact(id); this.impactFeatures = r?.features || []; } catch { this.impactFeatures = []; }
@@ -1050,8 +1059,19 @@ export default {
 .brv-fix--step_wait { background: #e0f2fe; color: #0c4a6e; }
 .brv-kind { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #ede9fe; color: #4c1d95; margin-left: 4px; }
 .brv-kind--feat { background: #dbeafe; color: #1e3a8a; }
-.brv-plan { margin: 8px 0; padding: 8px 12px; border: 1px solid rgba(127,127,127,0.25); border-radius: 8px; font-size: 13px; }
-.brv-plan__head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+.brv-plan { margin: 8px 0; padding: 6px 12px; border: 1px solid rgba(127,127,127,0.25); border-radius: 8px; font-size: 13px; }
+.brv-plan > summary { cursor: pointer; list-style: none; } .brv-plan > summary::-webkit-details-marker { display: none; }
+.brv-plan__sum1 { flex-basis: 100%; font-size: 12px; opacity: 0.85; margin-top: 2px; }
+.brv-plan__more-link { font-size: 11px; margin-left: 6px; opacity: 0.7; }
+.brv-clamp { max-height: 230px; overflow: hidden; position: relative; }
+.brv-clamp::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(transparent, #141c28); }
+.brv-clamp--sm { max-height: 120px; }
+.brv-more { display: inline-block; margin: 4px 0 2px; padding: 2px 10px; font-size: 11px; border: 1px solid rgba(127,127,127,0.35); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
+.brv-meta__row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12px; }
+.brv-meta__dim { opacity: 0.7; }
+.brv-fold > summary { cursor: pointer; list-style: none; } .brv-fold > summary::-webkit-details-marker { display: none; }
+.brv-fold > summary.brv-label::before { content: '▸ '; opacity: 0.6; } .brv-fold[open] > summary.brv-label::before { content: '▾ '; }
+.brv-plan__head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin-bottom: 4px; }
 .brv-plan__summary { margin-bottom: 6px; }
 .brv-plan__steps { margin: 0; padding-left: 20px; }
 .brv-plan__steps li { margin: 3px 0; }
