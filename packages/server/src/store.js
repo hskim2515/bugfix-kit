@@ -130,7 +130,8 @@ export class FileStore {
         await this.update(p, id, (c) => ({
           ...c,
           fixStatus: hasPr ? 'PR_OPENED' : 'QUEUED',
-          fixLog: (c.fixLog || '') + `${new Date().toTimeString().slice(0, 8)}  ↻ 서버 재시작으로 끊김${hasPr ? ' - PR 은 열려 있습니다. 새로고침으로 상태를 맞추거나 직접 병합하세요' : ' - 다시 큐에 넣습니다'}\n`,
+          fixResume: !hasPr,   // 다시 돌 때 작업 사본·세션을 지우지 않고 이어서
+          fixLog: (c.fixLog || '') + `${new Date().toTimeString().slice(0, 8)}  ↻ 서버 재시작으로 끊김${hasPr ? ' - PR 은 열려 있습니다. 새로고침으로 상태를 맞추거나 직접 병합하세요' : ' - 작업 사본을 지우지 않고 이어서 진행합니다'}\n`,
           fixUpdatedAt: nowIso(),
         }));
         if (!hasPr) redo.push(followup ? { project: p, id, kind: 'followup', message: followup.text, mode: /^추천 개선 실행:|수정|고쳐/.test(followup.text) ? 'change' : 'ask', prevStatus: null } : (r.kind && r.kind !== 'bug' ? { project: p, id, kind: (r.fixStatus === 'PLANNING' || !r.plan) ? 'plan' : 'implement' } : { project: p, id, kind: 'fix' }));

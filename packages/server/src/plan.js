@@ -174,11 +174,17 @@ ${mods}
     let branch = r.fixBranch;
     let cont = false;
     if (from > 0 && notBlank(branch) && (await ex.execRc(repo, 1, ['git', 'rev-parse', '--verify', '-q', `refs/heads/${branch}`])) === 0) cont = true;
-    if (!cont) branch = `claude/devloop-${id}-${stamp()}`;
-    await this.freshWorktree(ex, repo, jobs, wt, cont ? branch : `origin/${base}`);
-    if (cont) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', branch, branch]);
-    else await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
-    await L(`작업 사본: ${cont ? `브랜치 ${branch} 이어서` : `${base} 에서 새 브랜치 ${branch}`} @ ${(await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim()}`);
+    // 재시작으로 끊긴 구현이면 작업 사본을 그대로(브랜치도 그대로) 이어간다
+    const rs = await this.resumeWorktree(project, r, ex, repo, jobs, wt, cont ? branch : `origin/${base}`, L);
+    if (rs.resume) {
+      const cur = (await ex.exec(wt, 1, ['git', 'rev-parse', '--abbrev-ref', 'HEAD'])).trim();
+      if (cur === 'HEAD') { if (!notBlank(branch) || !cont) branch = `claude/devloop-${id}-${stamp()}`; await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]); } else branch = cur;
+    } else {
+      if (!cont) branch = `claude/devloop-${id}-${stamp()}`;
+      if (cont) await ex.exec(wt, 1, ['git', 'checkout', '-q', '-B', branch, branch]);
+      else await ex.exec(wt, 1, ['git', 'checkout', '-q', '-b', branch]);
+      await L(`작업 사본: ${cont ? `브랜치 ${branch} 이어서` : `${base} 에서 새 브랜치 ${branch}`} @ ${(await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim()}`);
+    }
     try {
       await writeReportFiles(path.join(wt, '.devloop'), r);
       await fs.writeFile(path.join(wt, '.devloop/plan.json'), JSON.stringify(plan, null, 2), 'utf8');
@@ -186,7 +192,7 @@ ${mods}
       await this.knowledge?.writeFor(project, path.join(wt, '.devloop'), r).catch(() => false);
       await this.prepareNodeModules(project, ex, wt, L);
       await L(`Claude Code 실행 중… (최대 ${this.cfg.server.timeoutMinutes}분)`);
-      const prompt = this.implementPrompt(project, r, plan, from, to);
+      const prompt = (rs.resume ? this.resumePreface(rs.changed) : '') + this.implementPrompt(project, r, plan, from, to);
       const out = await this.claudeResume(project, ex, id, wt, r.fixSessionId, prompt, this.allowedTools(project), Math.max(20, this.cfg.server.maxTurns));
       const sid = sessionIdOf(out) || r.fixSessionId;
       await this.updateFix(project, id, { fixSessionId: sid });
@@ -272,7 +278,7 @@ ${steps.map((s) => `### ${s.n}. ${s.title}\n${s.detail}${s.files.length ? `\n파
 - 이 단계(들)의 범위만 구현합니다. 계획과 다르게 해야 한다면 그 이유를 result.md 에 적으세요.
 - 모듈·검증:
 ${mods}
-  바꾼 모듈의 검증 명령을 직접 돌려 통과시키세요.
+  빠른 확인(lint·compileJava·단위 테스트)만 직접 돌리세요. 전체 빌드(npm run build, bootWar)는 몇 분이 걸리고 서버가 검증 단계에서 다시 돌리니 직접 돌리지 마세요.
 - ${project.conventions || '저장소의 기존 컨벤션을 따릅니다.'}
 - 마지막에 \`.devloop/result.md\` 를 씁니다. 첫 줄이 커밋/PR 제목(한 줄, 60자 이내, 한국어), 아래에 ## 바꾼 내용 · ## 검증 · ## 확인이 필요한 점.
 ${to >= plan.steps.length ? `- 마지막 단계이니 \`.devloop/repro.json\` 에 인수 조건 검증 절차(api 배열·steps)를 계획의 acceptance 를 바탕으로 실제 구현에 맞게 씁니다. 저장 대상 식별자는 미리보기 전용 값으로.\n` : ''}- git 커밋·푸시는 하지 마세요(서버가 합니다). .devloop/ 아래는 커밋되지 않습니다.`;

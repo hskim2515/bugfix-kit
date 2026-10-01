@@ -99,6 +99,29 @@ export class Runner {
     const f = await this.features.get(project.name, r.featureId).catch(() => null);
     return f ? { ...r, featureInfo: f, featureMd: this.features.describe(f) } : r;
   }
+  /**
+   * 재시작으로 끊긴 작업을 이어갈 수 있나: 리포트에 fixResume 표시가 있고 작업 사본(worktree)이 아직 있으면 그대로 쓴다.
+   * 돌려주는 값은 { resume, changed(변경 파일 목록 문자열) }. 이어가지 못하면 사본을 새로 만든다.
+   */
+  async resumeWorktree(project, r, ex, repo, jobs, wt, ref, L) {
+    const { fixResume } = r;
+    if (fixResume && fss.existsSync(path.join(wt, '.git'))) {
+      const rc = await ex.execRc(wt, 1, ['git', 'status', '--porcelain']);
+      if (rc === 0) {
+        const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();
+        const head = (await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim();
+        await this.updateFix(project, r.bugReportId, { fixResume: null });
+        await L(`↻ 끊긴 작업 사본 이어서 (@ ${head}, 미커밋 변경 ${changed ? changed.split('\n').length : 0}개) - 처음부터 다시 하지 않습니다`);
+        return { resume: true, changed };
+      }
+    }
+    if (fixResume) await this.updateFix(project, r.bugReportId, { fixResume: null });
+    await this.freshWorktree(ex, repo, jobs, wt, ref);
+    return { resume: false, changed: '' };
+  }
+  resumePreface(changed) {
+    return `서버가 재시작돼 앞선 작업이 중간에 끊겼습니다. 작업 사본에 그때까지의 변경이 그대로 남아 있습니다${changed ? `(git status:\n${changed.slice(0, 1500)})` : ''}. \`git diff\` 로 어디까지 했는지 확인하고 **처음부터 다시 하지 말고 이어서** 완료하세요.\n\n원래 요청:\n`;
+  }
   async updateFix(project, id, patch) {
     let before = null;
     const after = await this.store.update(project.name, id, (c) => {
@@ -226,8 +249,8 @@ export class Runner {
 
     await this.prepareRepo(project, ex, auth, L);
     if (!await this.fetch(project, ex, auth, [base])) throw new Error(`origin/${base} 를 받지 못했습니다`);
-    await this.freshWorktree(ex, repo, jobs, wt, `origin/${base}`);
-    await L(`작업 사본 준비: ${base} @ ${(await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim()}`);
+    const rs = await this.resumeWorktree(project, r, ex, repo, jobs, wt, `origin/${base}`, L);
+    if (!rs.resume) await L(`작업 사본 준비: ${base} @ ${(await ex.exec(wt, 1, ['git', 'rev-parse', '--short', 'HEAD'])).trim()}`);
 
     try {
       await writeReportFiles(path.join(wt, '.devloop'), r);
@@ -236,8 +259,10 @@ export class Runner {
       await this.prepareNodeModules(project, ex, wt, L);
 
       await L(`Claude Code 실행 중… (최대 ${this.cfg.server.timeoutMinutes}분)`);
-      const out = await this.claude(project, ex, id, wt, this.cfg.server.timeoutMinutes,
-        ['-p', this.prompt(project, r), '--max-turns', String(Math.max(10, this.cfg.server.maxTurns)), '--permission-mode', 'acceptEdits', '--allowedTools', this.allowedTools(project).join(',')]);
+      const out = rs.resume
+        ? await this.claudeResume(project, ex, id, wt, r.fixSessionId, this.resumePreface(rs.changed) + this.prompt(project, r), this.allowedTools(project), Math.max(10, this.cfg.server.maxTurns))
+        : await this.claude(project, ex, id, wt, this.cfg.server.timeoutMinutes,
+          ['-p', this.prompt(project, r), '--max-turns', String(Math.max(10, this.cfg.server.maxTurns)), '--permission-mode', 'acceptEdits', '--allowedTools', this.allowedTools(project).join(',')]);
       await this.updateFix(project, id, { fixSessionId: sessionIdOf(out) });
       await L(`Claude 종료 (${claudeSummary(out)})`);
 
@@ -467,9 +492,10 @@ export class Runner {
         }
         if (res && res.status !== 'ERR' && ![502, 503, 504].includes(res.status)) break;
       }
-      const ok = res && typeof res.status === 'number' && (a.expect?.status ? res.status === Number(a.expect.status) : res.status < (Number(a.expect?.statusLt) || 500));
+      const needAuth = res && [401, 403].includes(res.status) && !(a.expect?.status && [401, 403].includes(Number(a.expect.status)));
+      const ok = needAuth || (res && typeof res.status === 'number' && (a.expect?.status ? res.status === Number(a.expect.status) : res.status < (Number(a.expect?.statusLt) || 500)));
       if (!ok) failed = true;
-      evid.push(`${ok ? '✓' : '✗'} ${pre}${a.method || 'GET'} ${res?.path || p} (${res?.via || '-'}) → ${res?.status}${res?.text ? ` ${firstLine(res.text, 200)}` : ''}`);
+      evid.push(`${needAuth ? '○' : ok ? '✓' : '✗'} ${pre}${a.method || 'GET'} ${res?.path || p} (${res?.via || '-'}) → ${res?.status}${needAuth ? ' 인증 필요 - 로그인 없이 호출해 건너뜀(실패 아님)' : ''}${res?.text && !needAuth ? ` ${firstLine(res.text, 200)}` : ''}`);
     }
     if (spec.steps?.length) {
       const appUrl = this.notifier?.appUrl(project) || (project.cors || [])[0] || '';
@@ -486,7 +512,7 @@ export class Runner {
           if (bad) failed = true;
           evid.push(`${bad ? '✗' : '✓'} ${pre}화면 절차: 절차 실패 ${(j?.failures || []).length} · 페이지 예외 ${c.pageErrors || 0} · 실패 요청 ${c.failedRequests || 0}`, ...(j?.failures || []).slice(0, 3).map((f) => `  - ${firstLine(f, 160)}`));
           if (id != null) await this.keepShots(project, id, j, cwd, label || '재현 검증').catch(() => []);
-        } catch (e) { evid.push(`- ${pre}화면 절차 실행 실패: ${firstLine(e.message, 160)}`); }
+        } catch (e) { const tail = String(e.message || '').trim().split('\n').filter(Boolean).slice(-3).join(' | '); evid.push(`- ${pre}화면 절차 실행 실패: ${tail.slice(0, 400)}`); }
       }
     }
     return { failed, evid };
@@ -1020,6 +1046,7 @@ ${project.conventions ? `\n프로젝트 규약:\n${project.conventions.trim()}\n
      \`## 추천 개선\` 은 앱의 버그 리포트 화면에 목록으로 뜨고, 사용자가 누르면 그 줄이 그대로 추가 요청으로 실행됩니다.
      한 항목을 \`- \` 로 시작하는 한 줄로 쓰고(들여쓴 하위 목록 금지), 많아야 5개까지 적습니다. 없으면 절을 빼세요.
 git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
+전체 빌드(npm run build, gradle bootWar/build 등 몇 분 걸리는 것)는 돌리지 마세요 - 서버가 검증 단계에서 같은 명령을 다시 돌립니다. lint·컴파일(compileJava)·단위 테스트처럼 빠른 확인만 직접 하세요.
 `;
   }
 
@@ -1073,6 +1100,7 @@ git 커밋·푸시·PR 은 하지 마세요 - 바깥에서 처리합니다.
     if (!fc?.command) return null;
     if (fc.when?.length && !mods.some((m) => fc.when.includes(m.name))) return null;
     const L = (s) => this.logLine(project, id, s);
+    if (/context\.json/.test(fc.command)) { const rr = await this.store.get(project.name, id); if (!rr?.contextJson) { await L('화면 확인 건너뜀 - 신고 화면 컨텍스트가 없는 작업(기능·개선 요청)은 인수 조건 검증으로 대신합니다'); return null; } }
     await L('화면 확인(front-check)…');
     const summarize = (r) => { const c = r.collected || {}; return `${r.ok ? '✓' : '✗'} 콘솔 오류 ${c.consoleErrors ?? 0} · 페이지 예외 ${c.pageErrors ?? 0} · 실패 요청 ${c.failedRequests ?? 0} · 절차 실패 ${(r.failures || []).length}${r.fatal ? ` · 치명: ${firstLine(r.fatal, 120)}` : ''}`; };
     try {
