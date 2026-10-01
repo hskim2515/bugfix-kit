@@ -75,7 +75,7 @@ export function loadConfig(file) {
       taskMode: ['auto', 'plan', 'step'].includes(p.taskMode) ? p.taskMode : 'plan',
       // 외부 이슈(GitHub/GitLab issues) 연동: 가져온 이슈에 진행 상황 댓글 · 병합되면 닫기
       issues: { comment: p.issues?.comment !== false, closeOnMerge: p.issues?.closeOnMerge === true },
-      previewAuto: p.previewAuto !== false,
+      previewAuto: p.previewAuto === true,   // 기본 끔 - 미리보기는 재현·인수 검증 때와 사람이 '미리보기 띄우기' 를 누를 때만
       reproCheck: p.reproCheck !== false,
       reproRounds: Number(p.reproRounds) > 0 ? Number(p.reproRounds) : 2,
       restBase: typeof p.restBase === 'string' ? p.restBase.replace(/\/+$/, '') : '',

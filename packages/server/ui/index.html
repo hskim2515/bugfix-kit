@@ -424,7 +424,7 @@
           <label>작업 개입 방식 <small>기능·개선 요청 기본값</small></label><div class="inline"><select id="p_taskMode"><option value="plan">계획 승인 뒤 끝까지 자동</option><option value="step">단계마다 확인</option><option value="auto">끝까지 자동</option></select><span class="dim">작업을 만들 때 바꿀 수 있습니다</span></div>
           <label>수정 뒤 검증 <small>미리보기·재현</small></label><div class="inline" style="flex-direction:column;align-items:flex-start;gap:4px">
             <label class="dim"><input type="checkbox" id="p_reproCheck"> <b>재현 검증</b> - 고친 수정본을 미리보기로 띄워 신고된 요청·화면 절차를 다시 돌려 고쳐졌는지 확인. 실패하면 응답·서버 로그를 증거로 AI 가 다시 고침(최대 <input id="p_reproRounds" type="number" min="1" max="5" value="2" style="width:50px"> 회). 레시피가 있어야 함</label>
-            <label class="dim"><input type="checkbox" id="p_previewAuto"> <b>미리보기 자동 생성</b> - 재현 검증을 끈 경우에도 수정이 끝나면 미리보기를 띄움</label>
+            <label class="dim"><input type="checkbox" id="p_previewAuto"> <b>미리보기 자동 생성</b> - 수정·단계가 끝날 때마다 미리보기를 띄움(기본 끔: 미리보기는 재현·인수 검증 때와 '미리보기 띄우기' 를 누를 때만 만들어짐, 한 번에 3~8분)</label>
             <span class="dim">REST 접두 경로 <input id="p_restBase" placeholder="/rest 또는 /lhdt-rest (요청 경로 변환용)" style="width:220px"></span>
           </div>
           <label>수정 요청 <small>누가 할 수 있나</small></label><div class="inline"><select id="p_fixFrom"><option value="app">앱 사용자 + 관리 콘솔</option><option value="admin">관리 콘솔에서만 (앱은 신고만)</option></select></div>
@@ -1279,7 +1279,7 @@
     $('#p_delivery').value = p ? (p.delivery || (p.autoMerge === false ? 'pr' : 'merge')) : 'merge';
     $('#p_notify_webhook').value = p?.notify?.webhook || ''; $('#p_notify_mention').value = p?.notify?.mention || '';
     $('#p_taskMode').value = p?.taskMode || 'plan'; $('#p_issues_comment').checked = p ? p.issues?.comment !== false : true; $('#p_issues_close').checked = !!p?.issues?.closeOnMerge;
-    $('#p_reproCheck').checked = p ? p.reproCheck !== false : true; $('#p_previewAuto').checked = p ? p.previewAuto !== false : true; $('#p_reproRounds').value = p?.reproRounds || 2; $('#p_restBase').value = p?.restBase || '';
+    $('#p_reproCheck').checked = p ? p.reproCheck !== false : true; $('#p_previewAuto').checked = p ? p.previewAuto === true : false; $('#p_reproRounds').value = p?.reproRounds || 2; $('#p_restBase').value = p?.restBase || '';
     renderNotifyEvents(p?.notify?.events);
     $('#p_fixFrom').value = p?.fixFrom === 'admin' ? 'admin' : 'app';
     v('#p_cors', (p?.cors || []).join(', ')); v('#p_apiKey', ''); $('#p_apiKey').placeholder = p?.apiKeySet ? `${p.apiKeySet} - 바꾸려면 입력` : '(선택)';

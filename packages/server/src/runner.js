@@ -429,7 +429,7 @@ export class Runner {
       try { return await this.reproLoop(project, id, ex, wt, branch, base, summary, n, mods, sessionId); }
       catch (e) { await this.logLine(project, id, `재현 검증 오류(계속): ${firstLine(e.message, 200)}`); await this.updateFix(project, id, { fixRepro: JSON.stringify({ passed: null, rounds: 0, evidence: [], note: `재현 검증 오류: ${firstLine(e.message, 200)}` }) }); return none; }
     }
-    if (project.previewAuto !== false) { await this.logLine(project, id, `미리보기 v${n} 자동 생성 예약`); this.versions.start(project, n, { low: true }).catch(() => {}); }
+    if (project.previewAuto === true) { await this.logLine(project, id, `미리보기 v${n} 자동 생성 예약`); this.versions.start(project, n, { low: true }).catch(() => {}); }
     return none;
   }
 

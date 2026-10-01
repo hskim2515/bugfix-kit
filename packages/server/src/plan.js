@@ -244,8 +244,8 @@ ${mods}
       if (!last) {
         // 단계 모드: 여기서 멈추고 사람이 '다음 단계' 를 누를 때까지 기다린다 - 확인할 수 있게 미리보기는 띄워 둔다
         await this.updateFix(project, id, { fixStatus: 'STEP_WAIT' });
-        await L(`■ ${to}/${plan.steps.length} 단계 완료 - 다음 단계 대기 (미리보기로 확인한 뒤 '다음 단계')`);
-        if (n != null && this.versions?.recipe(project) && project.previewAuto !== false) this.versions.start(project, n, { low: true }).catch(() => {});
+        await L(`■ ${to}/${plan.steps.length} 단계 완료 - 다음 단계 대기 (확인하려면 콘솔 버전 탭에서 v${n} 미리보기를 띄운 뒤 '다음 단계')`);
+        if (n != null && this.versions?.recipe(project) && project.previewAuto === true) this.versions.start(project, n, { low: true }).catch(() => {});
         this.notifier?.send(project, 'step.wait', { title: `${to}/${plan.steps.length} 단계 완료 - #${id} ${this.taskTitle(r)}`, lines: [summary], url: `/reports/${id}`, level: 'info' }).catch(() => {});
         return;
       }
