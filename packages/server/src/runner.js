@@ -106,6 +106,12 @@ export class Runner {
   async resumeWorktree(project, r, ex, repo, jobs, wt, ref, L) {
     const { fixResume } = r;
     if (fixResume && fss.existsSync(path.join(wt, '.git'))) {
+      // 옛 워커가 남긴 고아 프로세스(그 작업 사본을 cwd 로 가진 claude 등)가 있으면 먼저 끝낸다 - 같은 사본을 둘이 고치면 안 된다
+      try {
+        const out = await ex.execOut('/', 1, ['sh', '-c', `for p in /proc/[0-9]*; do [ "$(readlink $p/cwd 2>/dev/null)" = ${JSON.stringify(wt)} ] && basename $p; done`]);
+        const pids = out.split(/\s+/).filter((x) => /^\d+$/.test(x) && Number(x) !== process.pid);
+        if (pids.length) { await ex.execOut('/', 1, ['kill', '-TERM', ...pids]); await L(`옛 워커가 남긴 프로세스 ${pids.length}개 종료 (${pids.join(', ')})`); await sleep(2000); }
+      } catch { /* /proc 없음(비 리눅스) */ }
       const rc = await ex.execRc(wt, 1, ['git', 'status', '--porcelain']);
       if (rc === 0) {
         const changed = (await ex.exec(wt, 1, ['git', 'status', '--porcelain'])).trim();

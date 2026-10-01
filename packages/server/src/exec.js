@@ -56,12 +56,14 @@ export function makeExec(server, project, log = console) {
       c = ['sudo', '-n', '-H', '-u', server.runAsUser, 'env', ...Object.entries(vars).map(([k, v]) => `${k}=${v}`), ...c];
     }
     const child = spawn(c[0], c.slice(1), { cwd, env: { ...process.env, ...vars }, stdio: ['pipe', 'pipe', 'pipe'] });
+    trackChild(child);
     return { child, describe: describe(c) };
   }
 
   function rawRun(c, { cwd, timeoutMs, stdin }) {
     return new Promise((resolve, reject) => {
       const child = spawn(c[0], c.slice(1), { cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'] });
+      trackChild(child);
       let out = '';
       child.stdout.on('data', (d) => { out += d; });
       child.stderr.on('data', (d) => { out += d; });
@@ -127,3 +129,16 @@ export function describe(c) {
   }
   return c.slice(i, i + 4).join(' ').replace(/Authorization: Basic \S+/g, 'Authorization: ***');
 }
+
+/**
+ * 워커가 띄운 자식 프로세스(claude·빌드 명령) 추적 - 워커가 SIGTERM 으로 내려갈 때(앱 재배포) 같이 끝내서
+ * 고아 claude 프로세스가 옛 작업 사본에서 계속 돌며 비용을 쓰고 이어가기 작업과 충돌하는 일을 막는다.
+ */
+const CHILDREN = new Set();
+export function trackChild(child) { CHILDREN.add(child); child.once('close', () => CHILDREN.delete(child)); }
+export function killChildren(signal = 'SIGTERM') {
+  let n = 0;
+  for (const c of CHILDREN) { try { c.kill(signal); n++; } catch { /* 이미 끝남 */ } }
+  return n;
+}
+export function childCount() { return CHILDREN.size; }
